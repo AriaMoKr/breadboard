@@ -1,0 +1,55 @@
+# Breadboard 8-bit
+
+An interactive browser simulator that follows Ben Eater's YouTube playlist
+[**Building an 8-bit breadboard computer!**](https://www.youtube.com/playlist?list=PLowKtXNTBypGqImE405J2565dvjafglHU)
+video by video.
+
+* **The finished computer** (`#/`): the SAP-1-style machine as it stands at the end of
+  the series. It has 16 bytes of RAM, A/B registers, an adder/subtractor ALU with carry
+  and zero flags, a microcoded control unit and a decimal display. You can pulse the
+  clock by hand or let it run, and watch every control signal and bus transfer. It
+  also has an assembler with Ben's programs, a live microcode table you can edit, and a
+  microcode-version picker that matches the stage of the series.
+* **Chapter labs** (`#/lab/<id>`): each of the 44 videos maps to an interactive lab
+  that rebuilds what that video builds. Examples: the 555 timer modes, SR/D latches,
+  flip-flops, JK racing, tri-state buses, registers, two's complement, the ALU, RAM,
+  counters, 7-segment and EEPROM decoders, the Arduino EEPROM programmer, the
+  multiplexed decimal display, the control logic, microcode, flags and conditional jumps.
+
+## Running
+
+```bash
+npm install
+```
+
+```bash
+npm run dev
+```
+
+Then open http://localhost:5173. Other scripts: `npm test` (vitest), `npm run typecheck`,
+`npm run build` (static site in `dist/`, works from any sub-path).
+
+Keyboard on the computer page: **Space** = clock pulse, **I** = step one
+instruction, **R** = run/stop, **Backspace** = reset.
+
+## How it's built
+
+| Layer | Path | Notes |
+| --- | --- | --- |
+| Computer model | `src/sim/` | Control-signal-level, cycle-exact model. Registers latch on the rising edge from pre-edge bus values. The step counter advances on the falling edge (74LS161 on ~CLK) and resets at T5. HLT gates the clock. Undriven bus lines read 0 (10 kΩ pull-downs). IO drives only the operand nibble. Flags latch only on FI. Reset clears A, B, IR, MAR, flags, PC, OUT and the step counter. |
+| Microcode | `src/sim/microcode.ts` | Verbatim from Ben's `microcode-eeprom-with-flags.ino`, with the same EEPROM address layout (`ZF CF │ byte-sel │ opcode │ step`) and four historical versions (control logic part 3 → Arduino → more instructions → flags). |
+| Display | `src/sim/display.ts` | The `multiplexed-display.ino` EEPROM image: unsigned and two's complement, no leading-zero blanking. |
+| Gate-level engine | `src/logic/circuit.ts` | Event-driven with unit gate delays, 0/1/Z/X levels, tri-state buffers and RC edge detectors, so latches, races and contention behave as in the videos. |
+| UI | `src/ui/` | Framework-free widgets (LEDs, DIP switches, 7-segment, scope), live SVG schematics, the breadboard view of the computer. |
+| Labs | `src/labs/**.lab.ts` | One file per lab, discovered automatically. See [docs/LABS.md](docs/LABS.md). |
+
+Research notes with sources, used for fidelity:
+[docs/research/computer-spec.md](docs/research/computer-spec.md) (exact behaviour of the
+final machine) and [docs/research/videos.md](docs/research/videos.md) (per-video content).
+
+## Credits
+
+Ben Eater designed the computer, its microcode and the display code. See
+[eater.net/8bit](https://eater.net/8bit) and
+[beneater/eeprom-programmer](https://github.com/beneater/eeprom-programmer) (MIT).
+This project is an independent, unofficial learning companion; watch the videos!

@@ -1,0 +1,20 @@
+{
+  "name": "breadboard-8bit",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Browser simulator that follows Ben Eater's 'Building an 8-bit breadboard computer!' playlist",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vite": "^6.4.4",
+    "vitest": "^3.2.7"
+  }
+}
