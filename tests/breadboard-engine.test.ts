@@ -977,7 +977,7 @@ describe('A register board on the engine', () => {
     return levels.every((l) => l === 0 || l === 1) ? levels.reduce<number>((v, l, i) => v | ((l as number) << i), 0) : levels;
   };
   /** D8 = bit 0 ... D1 = bit 7. */
-  const ledByte = (sim: BreadboardSim) => Array.from({ length: 8 }, (_, bit) => (sim.ledLit(`D${8 - bit}`) ? 1 << bit : 0)).reduce((a, b) => a | b, 0);
+  const ledByte = (sim: BreadboardSim) => Array.from({ length: 8 }, (_, bit) => (sim.ledLit(`D${17 - bit}`) ? 1 << bit : 0)).reduce((a, b) => a | b, 0);
   const load = (sim: BreadboardSim, v: number) => {
     setBus(sim, v);
     sim.setPort('~AI', 0);
@@ -1004,7 +1004,7 @@ describe('A register board on the engine', () => {
     sim.setPort('CLK', 1);
     settled(sim);
     expect(ledByte(sim)).toBe(0x2a);
-    expect(litLeds(sim, L)).toEqual(['D3', 'D5', 'D7']);
+    expect(litLeds(sim, L)).toEqual(['D12', 'D14', 'D16']);
     expect(read(sim, 'A')).toBe(0x2a); // to the ALU
     sim.setPort('CLK', 0);
     sim.setPort('~AI', 1);
@@ -1056,7 +1056,7 @@ describe('A register board on the engine', () => {
     settled(sim);
     load(sim, 0xc3);
     expect(ledByte(sim)).toBe(0xc3);
-    expect(litLeds(sim, L)).toEqual(['D1', 'D2', 'D7', 'D8']);
+    expect(litLeds(sim, L)).toEqual(['D10', 'D11', 'D16', 'D17']);
   });
 
   it('loads every value bit by bit', () => {

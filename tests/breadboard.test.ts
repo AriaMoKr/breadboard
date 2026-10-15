@@ -99,13 +99,13 @@ describe('A register board (reference)', () => {
     expect(net('U7', 9)).toBe('port:A0'); // A_0 = U7 pin 9
     expect(net('U7', 11)).toBe('port:BUS0'); // BUS_0 = U7 pin 11
   });
-  it('has 8 red LEDs D1 (A7) ... D8 (A0) on the register outputs, bound to c.a, bit 7 on the left', () => {
+  it('has 8 red LEDs D10 (A7) ... D17 (A0) on the register outputs, bound to c.a, bit 7 on the left', () => {
     const leds = L.parts.filter((p) => p.kind === 'led');
-    expect(leds.map((p) => p.id).sort()).toEqual(['D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7', 'D8']);
+    expect(leds.map((p) => p.id).sort()).toEqual(['D10', 'D11', 'D12', 'D13', 'D14', 'D15', 'D16', 'D17']);
     expect(Object.keys(aRegister.live.leds).sort()).toEqual(leds.map((p) => p.id).sort());
     const xs: number[] = [];
     for (let bit = 7; bit >= 0; bit--) {
-      const id = `D${8 - bit}`;
+      const id = `D${17 - bit}`; // D10 (A7) ... D17 (A0), as in the netlist
       const led = leds.find((p) => p.id === id)!;
       expect(led.kind === 'led' && led.color).toBe('red');
       expect(pinNet(L, nets, id, 'anode')).toBe(`port:A${bit}`);
@@ -146,7 +146,7 @@ describe('A register board (reference)', () => {
       }
       return v;
     };
-    const leds = () => [0, 1, 2, 3, 4, 5, 6, 7].reduce((v, bit) => v | ((sim.ledLit(`D${8 - bit}`) ? 1 : 0) << bit), 0);
+    const leds = () => [0, 1, 2, 3, 4, 5, 6, 7].reduce((v, bit) => v | ((sim.ledLit(`D${17 - bit}`) ? 1 : 0) << bit), 0);
     const clock = () => {
       sim.pulse('CLK', 20, 1);
       settle();

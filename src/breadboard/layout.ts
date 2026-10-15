@@ -42,7 +42,7 @@ export type PartSpec =
   /** 10-pin 7-segment display (0.6" pin rows d/h) with pin 1 at column `col`. */
   | { kind: 'seg7'; col: number; common: 'cathode' | 'anode' }
   /** Named off-board connection (net label), e.g. "BUS3", "CLK", "~AI". Same name = same net. */
-  | { kind: 'port'; name: string; hole: string; side: PortSide }
+  | { kind: 'port'; name: string; hole: string; side: PortSide; hidden?: boolean }
   /** Silkscreen-style text on the board (board-local pitch units). */
   | { kind: 'text'; text: string; x: number; y: number; size?: number };
 
@@ -385,10 +385,14 @@ export class BoardBuilder {
     return { id, pin: (n: number | (typeof SEG7_PINS)[number]) => dipPinHole(col, 10, typeof n === 'number' ? n : SEG7_PINS.indexOf(n) + 1, 6) };
   }
 
-  /** Off-board connection label at `hole` (e.g. "BUS3", "CLK", "~AI"). */
-  port(name: string, hole: string, side: PortSide = 'right') {
+  /**
+   * Off-board connection label at `hole` (e.g. "BUS3", "CLK", "~AI").
+   * `hidden` draws only the connection dot, for ports that between-board
+   * wires end on directly (the bus rails), where a tag would cross the board.
+   */
+  port(name: string, hole: string, side: PortSide = 'right', opts: { hidden?: boolean } = {}) {
     const id = this.b.nextId(`${this.id}.port.${name}.`);
-    this.part(id, { kind: 'port', name, hole, side });
+    this.part(id, { kind: 'port', name, hole, side, hidden: opts.hidden || undefined });
     return id;
   }
 

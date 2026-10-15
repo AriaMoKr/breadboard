@@ -626,3 +626,88 @@ describe('MAR, RAM and IR on the bus (composed scene)', () => {
     expect(t.s.problems()).toEqual([]);
   });
 });
+
+// ===========================================================================
+// The breadboard view's LEDs must show what the real circuit would
+
+describe('live bindings agree with the chip-level engine', () => {
+  /** Every LED of `def` lit in the engine exactly when its live binding says so. */
+  const agree = (def: ModuleBoardDef, sim: BreadboardSim, m: Machine) => {
+    for (const [id, fn] of Object.entries(def.live.leds)) expect(sim.ledLit(id), `${def.id}/${id}`).toBe(fn(m.computer, m));
+  };
+
+  it('IR: every LED over a sweep of values', () => {
+    const t = bench(ir.layout);
+    const m = new Machine();
+    t.set({ CLK: 0, CLR: 0, '~II': 1, '~IO': 1 });
+    for (const v of [0x00, 0xff, 0xa5, 0x5a, 0x0f, 0xf0, 0x81, 0x3c, 0x1e, 0xe0]) {
+      t.word('BUS', 8, v).set({ '~II': 0 }).clock().set({ '~II': 1 }).word('BUS', 8, null);
+      m.computer.ir = v;
+      agree(ir, t.s, m);
+    }
+  });
+
+  it('MAR: address and run/program LEDs, with the board’s own SW5/SW6 moved on both sides', () => {
+    const t = bench(mar.layout);
+    const m = new Machine();
+    const c = m.computer;
+    const sw5 = mar.live.controls.SW5, sw6 = mar.live.controls.SW6;
+    if (sw5.kind !== 'dip' || sw6.kind !== 'slide') throw new Error('wrong control kinds');
+    t.set({ CLK: 0, CLR: 0, '~MI': 1 });
+    agree(mar, t.s, m);
+    for (let v = 0; v < 16; v++) {
+      t.word('BUS', 4, v).set({ '~MI': 0 }).clock().set({ '~MI': 1 }).word('BUS', 4, null);
+      c.mar = v;
+      agree(mar, t.s, m);
+    }
+    sw6.set(m, 0);
+    t.s.setSlide('SW6', 0);
+    t.settle();
+    for (const dip of [0, 0b0101, 0b1111, 0b1000, 0b0011]) {
+      sw5.set(m, dip);
+      t.s.setDip('SW5', dip);
+      t.settle();
+      agree(mar, t.s, m);
+    }
+    sw6.set(m, 1);
+    t.s.setSlide('SW6', 1);
+    t.settle();
+    agree(mar, t.s, m);
+  });
+
+  it('RAM: data LEDs follow the addressed byte in run mode and after a program-mode write', () => {
+    const t = bench(ram.layout);
+    const m = new Machine();
+    const c = m.computer;
+    const sw3 = ram.live.controls.SW3, sw4 = ram.live.controls.SW4;
+    if (sw3.kind !== 'dip' || sw4.kind !== 'button') throw new Error('wrong control kinds');
+    t.set({ CLK: 0, RI: 0, '~RO': 1, PROG: 1 });
+    // Ben's 28 + 14 program plus one pattern, written over the bus with RI + CLK
+    const writes: [number, number][] = [[0, 0x1e], [1, 0x2f], [2, 0xe0], [3, 0xf0], [14, 28], [15, 14], [9, 0xaa]];
+    for (const [a, v] of writes) {
+      t.word('RA', 4, a).word('BUS', 8, v).set({ RI: 1 }).clock().set({ RI: 0 }).word('BUS', 8, null);
+      c.ram[a] = v;
+    }
+    for (const [a] of writes) {
+      t.word('RA', 4, a);
+      c.mar = a;
+      agree(ram, t.s, m);
+    }
+    // program mode: SW3 (ON = 0) and the SW4 button write on both sides.
+    // On the full computer the MAR board puts the DIP address on RA; here RA is driven directly.
+    c.programMode = true;
+    c.dipAddress = 6;
+    t.set({ PROG: 0 }).word('RA', 4, 6);
+    sw3.set(m, 0x0f);
+    t.s.setDip('SW3', 0x0f);
+    t.settle();
+    sw4.press(m);
+    t.s.press('SW4');
+    t.settle();
+    sw4.release?.(m);
+    t.s.release('SW4');
+    t.settle();
+    expect(c.ram[6]).toBe(0xf0);
+    agree(ram, t.s, m);
+  });
+});

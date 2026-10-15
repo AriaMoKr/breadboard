@@ -17,9 +17,7 @@ import { LayoutBuilder, type BoardBuilder, type ChipHandle } from '../layout';
  * ... D3/Q3 = bit 0, U7 A1/B1 (pins 2/18) = bit 7 ... A8/B8 (pins 9/11) =
  * bit 0. (Logically the same register; it is how Ben's wires run.)
  *
- * 8 red LEDs on the 245's A side, ids D1 (A7) ... D8 (A0). (The netlist
- * numbers them D10 (A7) ... D17 (A0); the ids stay D1-D8 because
- * tests/breadboard-engine.test.ts reads them. The labels say A7 ... A0.)
+ * 8 red LEDs on the 245's A side, D10 (A7) ... D17 (A0) as in the netlist.
  * The schematic gives them 220 Ω (R24-R31); Ben left those out on the
  * breadboard, and so do we, as on the B register and the ALU.
  *
@@ -97,7 +95,7 @@ const BITS = [7, 6, 5, 4, 3, 2, 1, 0];
 const ledCols = BITS.map((bit) => colOf(U7.pin(`A${k245(bit)}`)));
 const cathodes = railCathodes(bb, 'bn', ledCols);
 BITS.forEach((bit, i) => {
-  bb.led(`D${8 - bit}`, 'red', `j${ledCols[i]}`, cathodes[i], `A${bit}`).live((c) => ((c.a >> bit) & 1) === 1);
+  bb.led(`D${17 - bit}`, 'red', `j${ledCols[i]}`, cathodes[i], `A${bit}`).live((c) => ((c.a >> bit) & 1) === 1);
 });
 
 // ---- power ------------------------------------------------------------------------

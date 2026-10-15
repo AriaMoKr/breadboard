@@ -547,8 +547,14 @@ export class LayoutView {
   }
 
   private drawPort(part: Extract<Part, { kind: 'port' }>) {
-    const g = this.boardGroup(part, this.layerTop, 'bb-port');
+    const g = this.boardGroup(part, this.layerTop, `bb-port${part.hidden ? ' hidden' : ''}`);
     const { x, y } = holeXY(part.hole);
+    if (part.hidden) {
+      g.appendChild(s('circle', { cx: x, cy: y, r: 0.17, class: 'bb-port-dot' }));
+      g.appendChild(s('title', null, `Connection "${part.name}"`));
+      this.handles.set(part.id, { part, el: g });
+      return;
+    }
     const label = part.name.startsWith('~') ? prettyPin(part.name) : part.name;
     const chars = label.replace(/̅/g, '').length;
     const w = chars * 0.42 + 0.55;

@@ -67,13 +67,15 @@ give them, and follow the netlist's bit order (Ben wires bit 7 to the lowest-num
 
 ### Tidiness rules
 
-These are enforced by the "layout tidiness" checks in `tests/boards-datapath.test.ts`; copy them
-for new boards.
+`tests/boards-tidy.test.ts` checks them on every module board (the checker is `untidy()` in
+`tests/helpers/tidy.ts`), so a new board is covered once it is registered.
 
 * No wire passes under a chip, display or LED body, or over another part's leg.
 * No two wires lie on top of each other. Give each long run its own lane **between** hole rows
   (e.g. 11.0, 12.0), and enter a strip from the hole right next to the lane.
-* Port tags sit on the outer rows (a or j) and point off the board, not across it.
+* Port tags sit on the outer rows (a or j) and point off the board, not across it. Where
+  between-board wires end on the hole itself (the bus rails), use `port(…, { hidden: true })`,
+  which draws only the connection dot.
 * Power wires go to a rail column that exists. Columns 8, 14, 20 … have no rail holes, so pick
   the neighbouring column on the clear side.
 
@@ -93,6 +95,13 @@ Ports with the same name are one net. Use exactly these names:
 
 Port tags may point `top`, `bottom`, `left` or `right`. Prefer the board edge facing where the
 signal goes.
+
+**Module-local ports.** A wire can't leave its board, so a module spread over several boards joins
+them with ports whose name starts with an upper-case module prefix and a dot, e.g. `RAM.D0`–`RAM.D7`
+and `RAM.~WE` between the two RAM boards, or `CTL.*` on the control boards. They are ordinary
+same-name nets, so the engine joins them. They aren't part of the contract above: no other module
+may use them, and `producerOf()` returns null for them, so the breadboard view draws no
+between-module wire.
 
 ### Visual conventions
 

@@ -63,7 +63,9 @@ for (let row = 0; row < 5; row++) {
   SLOTS.forEach(([left, right], i) => {
     for (const [bit, side] of [[left, LEFT], [right, RIGHT]] as const) {
       const board = bit >= 4 ? seg.hi : seg.lo;
-      board.port(`BUS${bit}`, `${RAIL_OF[bit]}${cols[i]}`, side);
+      // No tag: the wire from each module ends on the rail itself, and a tag
+      // facing the far column would have to cross the whole board.
+      board.port(`BUS${bit}`, `${RAIL_OF[bit]}${cols[i]}`, side, { hidden: true });
     }
   });
 }
