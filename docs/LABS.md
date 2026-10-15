@@ -4,7 +4,7 @@ Each video in the playlist maps to a **lab** (`src/app/chapters.ts` → `lab` id
 A lab is one file `src/labs/<group>/<lab-id>.lab.ts` that default-exports
 `defineLab({ id, title, summary, mount })`. Labs are discovered
 automatically: never edit a shared file to register a lab. The app loads each
-`*.lab.ts` lazily as its own chunk, keyed by file name (`src/app/lab-loader.ts`),
+`*.lab.ts` on demand through `import.meta.glob`, keyed by file name (`src/app/lab-loader.ts`),
 so the file name must be exactly `<lab-id>.lab.ts`; `src/labs/registry.ts` is
 the eager map that tests use (a test checks that names and ids agree).
 

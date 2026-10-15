@@ -37,10 +37,38 @@ npm run dev
 ```
 
 Then open http://localhost:5173. Other scripts: `npm test` (vitest), `npm run typecheck`,
-`npm run build` (static site in `dist/`, works from any sub-path).
+`npm run build` (static site in `dist/`, see [Deploying](#deploying)).
 
 Keyboard on the computer page: **Space** = clock pulse, **I** = step one
 instruction, **R** = run/stop, **Backspace** = reset.
+
+## Deploying
+
+`npm run build` writes a static site to `dist/`: `index.html`, one JS and one CSS file, and
+`breadboard-8bit.zip`, the same site as a download (made by `scripts/zip-dist.mjs`). Copy `dist/`
+to any static host, at the root or in a sub-folder. Pages use `#/…` URLs, so the host needs no
+rewrite rules.
+
+The app is built as a single JS file on purpose, so a plain mirror gets all of it:
+
+```bash
+wget --mirror --no-parent --page-requisites https://example.com/breadboard/
+```
+
+Or download the zip:
+
+```bash
+curl -LO https://example.com/breadboard/breadboard-8bit.zip
+```
+
+Either copy has to be served over HTTP, because browsers don't run module scripts from
+`file://`. In the folder with `index.html`:
+
+```bash
+python -m http.server 8000
+```
+
+Then open http://localhost:8000/.
 
 ## How it's built
 
