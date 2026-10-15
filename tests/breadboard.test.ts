@@ -4,6 +4,10 @@ import { CHIPS } from '../src/breadboard/catalog';
 import { dipPinHole, holeXY, parseHole, stripOf, RAIL_COLUMNS } from '../src/breadboard/geometry';
 import { LayoutBuilder, validateLayout } from '../src/breadboard/layout';
 import { GND_NET, VCC_NET, buildNets, pinNet, unpoweredChips } from '../src/breadboard/nets';
+import { BreadboardSim } from '../src/breadboard/sim/engine';
+import type { Level } from '../src/logic/circuit';
+import type { Computer } from '../src/sim/computer';
+import type { Machine } from '../src/sim/machine';
 
 describe('breadboard geometry', () => {
   it('parses holes and knows which exist', () => {
@@ -61,6 +65,7 @@ describe('layout builder', () => {
 describe('A register board (reference)', () => {
   const L = aRegister.layout;
   const nets = buildNets(L);
+  const net = (u: string, p: string | number) => pinNet(L, nets, u, p);
   it('is a valid layout with every chip powered', () => {
     expect(validateLayout(L)).toEqual([]);
     expect(unpoweredChips(L, nets)).toEqual([]);
@@ -68,25 +73,154 @@ describe('A register board (reference)', () => {
   });
   it('is wired like Ben’s schematic', () => {
     for (const u of ['U8', 'U9']) {
-      expect(pinNet(L, nets, u, '~M')).toBe(GND_NET);
-      expect(pinNet(L, nets, u, '~N')).toBe(GND_NET);
-      expect(pinNet(L, nets, u, '~G1')).toBe('port:~AI');
-      expect(pinNet(L, nets, u, '~G2')).toBe('port:~AI');
-      expect(pinNet(L, nets, u, 'CP')).toBe('port:CLK');
-      expect(pinNet(L, nets, u, 'MR')).toBe('port:CLR');
+      expect(net(u, '~M')).toBe(GND_NET);
+      expect(net(u, '~N')).toBe(GND_NET);
+      expect(net(u, '~G1')).toBe('port:~AI');
+      expect(net(u, '~G2')).toBe('port:~AI');
+      expect(net(u, 'CP')).toBe('port:CLK');
+      expect(net(u, 'MR')).toBe('port:CLR');
     }
-    expect(pinNet(L, nets, 'U7', 'DIR')).toBe(VCC_NET);
-    expect(pinNet(L, nets, 'U7', '~OE')).toBe('port:~AO');
+    expect(net('U7', 'DIR')).toBe(VCC_NET);
+    expect(net('U7', '~OE')).toBe('port:~AO');
+  });
+  it('runs the bits like the KiCad netlist: the high bit of each chip on its lowest pin', () => {
+    // U8 = bits 7-4 (D0/Q0 = bit 7), U9 = bits 3-0 (D0/Q0 = bit 3), U7 A1/B1 = bit 7 ... A8/B8 = bit 0
     for (let bit = 0; bit < 8; bit++) {
       const u = bit < 4 ? 'U9' : 'U8';
-      expect(pinNet(L, nets, u, `D${bit % 4}`)).toBe(`port:BUS${bit}`);
-      expect(pinNet(L, nets, 'U7', `B${bit + 1}`)).toBe(`port:BUS${bit}`);
-      expect(pinNet(L, nets, u, `Q${bit % 4}`)).toBe(`port:A${bit}`);
-      expect(pinNet(L, nets, 'U7', `A${bit + 1}`)).toBe(`port:A${bit}`);
+      const k = 3 - (bit % 4);
+      expect(net(u, `D${k}`)).toBe(`port:BUS${bit}`);
+      expect(net(u, `Q${k}`)).toBe(`port:A${bit}`);
+      expect(net('U7', `B${8 - bit}`)).toBe(`port:BUS${bit}`);
+      expect(net('U7', `A${8 - bit}`)).toBe(`port:A${bit}`);
     }
-    // 8 LEDs, each bound to a bit of A
+    expect(net('U9', 6)).toBe('port:A0'); // netlist: A_0 = U9 pin 6 (Q3)
+    expect(net('U8', 3)).toBe('port:A7'); // A_7 = U8 pin 3 (Q0)
+    expect(net('U9', 11)).toBe('port:BUS0'); // BUS_0 = U9 pin 11 (D3)
+    expect(net('U7', 9)).toBe('port:A0'); // A_0 = U7 pin 9
+    expect(net('U7', 11)).toBe('port:BUS0'); // BUS_0 = U7 pin 11
+  });
+  it('has 8 red LEDs D1 (A7) ... D8 (A0) on the register outputs, bound to c.a, bit 7 on the left', () => {
     const leds = L.parts.filter((p) => p.kind === 'led');
-    expect(leds).toHaveLength(8);
-    expect(Object.keys(aRegister.live.leds)).toHaveLength(8);
+    expect(leds.map((p) => p.id).sort()).toEqual(['D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7', 'D8']);
+    expect(Object.keys(aRegister.live.leds).sort()).toEqual(leds.map((p) => p.id).sort());
+    const xs: number[] = [];
+    for (let bit = 7; bit >= 0; bit--) {
+      const id = `D${8 - bit}`;
+      const led = leds.find((p) => p.id === id)!;
+      expect(led.kind === 'led' && led.color).toBe('red');
+      expect(pinNet(L, nets, id, 'anode')).toBe(`port:A${bit}`);
+      expect(pinNet(L, nets, id, 'cathode')).toBe(GND_NET);
+      if (led.kind === 'led') xs.push(holeXY(led.anode).x);
+      for (const v of [0, 0xff, 0xa5, 0x5a, 1 << bit]) {
+        expect(aRegister.live.leds[id]({ a: v } as Computer, {} as Machine), `${id} ${v}`).toBe(((v >> bit) & 1) === 1);
+      }
+    }
+    expect([...xs].sort((p, q) => p - q)).toEqual(xs);
+  });
+  it('points the A0-A7 and CLK tags down (the ALU sits below), the rest up', () => {
+    for (const p of L.parts) {
+      if (p.kind !== 'port') continue;
+      expect(p.side, p.name).toBe(/^A\d$/.test(p.name) || p.name === 'CLK' ? 'bottom' : 'top');
+    }
+  });
+
+  // ---- chip level ----------------------------------------------------------
+
+  function bench() {
+    const sim = new BreadboardSim(L);
+    const settle = () => expect(sim.settle(5000).stable).toBe(true);
+    const set = (levels: Record<string, Level | null>) => {
+      for (const [k, v] of Object.entries(levels)) sim.setPort(k, v);
+      settle();
+    };
+    const bus = (v: number | null) => {
+      for (let k = 0; k < 8; k++) sim.setPort(`BUS${k}`, v === null ? null : (((v >> k) & 1) as Level));
+      settle();
+    };
+    const read = (prefix: string): number | string => {
+      let v = 0;
+      for (let k = 0; k < 8; k++) {
+        const l = sim.portLevel(`${prefix}${k}`);
+        if (l !== 0 && l !== 1) return `${prefix}${k}=${l}`;
+        v |= l << k;
+      }
+      return v;
+    };
+    const leds = () => [0, 1, 2, 3, 4, 5, 6, 7].reduce((v, bit) => v | ((sim.ledLit(`D${8 - bit}`) ? 1 : 0) << bit), 0);
+    const clock = () => {
+      sim.pulse('CLK', 20, 1);
+      settle();
+    };
+    // the rest of the computer at rest: no load, no output, no reset, clock low
+    set({ CLK: 0, CLR: 0, '~AI': 1, '~AO': 1 });
+    return { sim, set, bus, read, leds, clock };
+  }
+
+  it('loads the bus on a rising CLK edge while ~AI is low, holds otherwise (chip level)', () => {
+    const t = bench();
+    t.bus(0x2c);
+    expect(t.read('A')).toBe(0);
+    t.clock();
+    expect(t.read('A')).toBe(0); // ~AI high: no load
+    t.set({ '~AI': 0 });
+    expect(t.read('A')).toBe(0); // nothing before the edge
+    t.clock();
+    expect(t.read('A')).toBe(0x2c);
+    expect(t.leds()).toBe(0x2c);
+    t.bus(0xd3);
+    expect(t.read('A')).toBe(0x2c); // edge-triggered
+    t.set({ CLK: 1 });
+    expect(t.read('A')).toBe(0xd3);
+    t.bus(0x11);
+    t.set({ CLK: 0 }); // the falling edge does nothing
+    expect(t.read('A')).toBe(0xd3);
+    t.set({ '~AI': 1 });
+    t.clock();
+    expect(t.read('A')).toBe(0xd3);
+    for (let bit = 0; bit < 8; bit++) {
+      t.bus(1 << bit);
+      t.set({ '~AI': 0 });
+      t.clock();
+      t.set({ '~AI': 1 });
+      expect(t.read('A')).toBe(1 << bit);
+      expect(t.leds(), `LED of bit ${bit}`).toBe(1 << bit);
+    }
+    expect(t.sim.problems({ floatingInputs: true })).toEqual([]);
+  });
+
+  it('drives the bus only while ~AO is low (chip level)', () => {
+    const t = bench();
+    t.bus(0x9b);
+    t.set({ '~AI': 0 });
+    t.clock();
+    t.set({ '~AI': 1 });
+    t.bus(null);
+    for (let k = 0; k < 8; k++) expect(t.sim.portLevel(`BUS${k}`)).toBe('Z'); // ~AO high: the 245 is off
+    t.set({ '~AO': 0 });
+    expect(t.read('BUS')).toBe(0x9b);
+    t.set({ '~AO': 1 });
+    for (let k = 0; k < 8; k++) expect(t.sim.portLevel(`BUS${k}`)).toBe('Z');
+    // AI and AO at once (never in Ben's microcode): the register reloads what it drives
+    t.set({ '~AO': 0, '~AI': 0 });
+    t.clock();
+    t.set({ '~AO': 1, '~AI': 1 });
+    expect(t.read('A')).toBe(0x9b);
+    expect(t.sim.problems()).toEqual([]);
+  });
+
+  it('clears asynchronously while CLR is high (chip level)', () => {
+    const t = bench();
+    t.bus(0xff);
+    t.set({ '~AI': 0 });
+    t.clock();
+    expect(t.read('A')).toBe(0xff);
+    t.set({ CLR: 1 });
+    expect(t.read('A')).toBe(0); // no clock needed
+    expect(t.leds()).toBe(0);
+    t.clock(); // held in reset: the edge loads nothing
+    expect(t.read('A')).toBe(0);
+    t.set({ CLR: 0 });
+    t.clock();
+    expect(t.read('A')).toBe(0xff);
   });
 });

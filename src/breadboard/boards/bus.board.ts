@@ -23,12 +23,13 @@ import { LayoutBuilder, type BoardBuilder, type PortSide } from '../layout';
  * third, ordinary (powered) board turned 90° at the bottom of the bus
  * column (rows 5-6, where no module uses the bus; eater.net also suggests
  * mounting the bus LEDs on a breadboard instead of soldering them). Each
- * line is one row there: GND rail <- 10k <- BUSn strip -> 220R -> LED -> GND
- * rail, so every pull-down and LED cathode is in a GND rail.
+ * line is one column there: GND rail <- 10k <- BUSn strip -> LED (across the
+ * channel) -> 220R -> GND rail, so every pull-down and LED resistor ends in a
+ * GND rail.
  *
- * LED designators D74-D81 are inferred from the KiCad numbering (control
- * word D58-D73, PC D82-D85); the LED resistors RB0-RB7 are not numbered in
- * the research notes.
+ * Designators as in the KiCad netlist, which numbers the bus MSB first:
+ * pull-downs R8 (BUS7) ... R15 (BUS0), LEDs D2 (BUS7) ... D9 (BUS0) with
+ * their 220R on the cathode side, R16 (BUS7) ... R23 (BUS0).
  */
 
 const b = new LayoutBuilder();
@@ -76,9 +77,9 @@ for (let k = 0; k < 8; k++) {
   const bit = 7 - k; // BUS7 at the top
   const n = 40 + 3 * k; // columns 40, 43, ..., 61: all have rail holes
   leds.port(`BUS${bit}`, `c${n}`, 'left'); // points up, at the bus lines
-  leds.resistor(`R${8 + bit}`, 10_000, `a${n}`, `tn${n}`, `R${8 + bit} BUS${bit} pull-down`);
-  leds.resistor(`RB${bit}`, 220, `e${n}`, `f${n}`);
-  leds.led(`D${74 + bit}`, 'red', `j${n}`, `bn${n}`, `BUS${bit}`).live((c) => ((c.bus.value >> bit) & 1) === 1);
+  leds.resistor(`R${15 - bit}`, 10_000, `a${n}`, `tn${n}`, `R${15 - bit} BUS${bit} pull-down`);
+  leds.led(`D${9 - bit}`, 'red', `e${n}`, `f${n}`, `BUS${bit}`).live((c) => ((c.bus.value >> bit) & 1) === 1);
+  leds.resistor(`R${23 - bit}`, 220, `j${n}`, `bn${n}`, `R${23 - bit}`);
 }
 
 export default b.module({

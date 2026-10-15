@@ -11,7 +11,14 @@ import { LayoutBuilder, type BoardBuilder, type PortSide } from '../layout';
  *     D0-D3 <- bus, Q0-Q3 -> 245 A side, LEDs and the ALU's XOR gates (B0-B7)
  *   U10 74LS245: wired like the A register's (DIR -> VCC, A = Q, B = BUS) but
  *     ~OE (19) is tied to VCC (Ben's ~BO is tied high), so it never drives.
- *   8 red LEDs on the register outputs, no resistors (as on the A register).
+ *   8 red LEDs on the register outputs, D18 (B7) ... D25 (B0) as in the KiCad
+ *     netlist; no resistors (as on the A register: the schematic's 220 Ω
+ *     R32-R39 were left out on the breadboard).
+ *
+ * Bit order: bit k on D(k mod 4)/Q(k mod 4) and the 245's A(k+1)/B(k+1), as
+ * the datasheet names them. (Ben's netlist runs them the other way round, bit
+ * 7 on the lowest pin, as on our A register; logically the same, and with the
+ * chips turned 180° this order reads bit 7 on the left.)
  *
  * Layout: the B register sits below the ALU, so the board is the A register
  * turned round: the 173 outputs face up (the B0-B7 tags point at the ALU),
@@ -73,7 +80,7 @@ const ledCols = [7, 6, 5, 4, 3, 2, 1, 0].map((bit) => Number(U10.pin(`A${bit + 1
 const cathodes = railCathodes(bb, 'tn', ledCols);
 [7, 6, 5, 4, 3, 2, 1, 0].forEach((bit, i) => {
   const anode = far(bb, U10.pin(`A${bit + 1}`));
-  bb.led(`D${8 - bit}`, 'red', anode, cathodes[i], `B${bit}`).live((c) => ((c.b >> bit) & 1) === 1);
+  bb.led(`D${25 - bit}`, 'red', anode, cathodes[i], `B${bit}`).live((c) => ((c.b >> bit) & 1) === 1);
 });
 
 // ---- power ----------------------------------------------------------------

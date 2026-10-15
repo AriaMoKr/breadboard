@@ -2,14 +2,18 @@ import { describe, expect, it } from 'vitest';
 import aRegister from '../src/breadboard/boards/a-register.board';
 import alu from '../src/breadboard/boards/alu.board';
 import bRegister from '../src/breadboard/boards/b-register.board';
+import control from '../src/breadboard/boards/control.board';
 import flags from '../src/breadboard/boards/flags.board';
+import output from '../src/breadboard/boards/output.board';
 import { CHIPS } from '../src/breadboard/catalog';
 import { composeComputer } from '../src/breadboard/computer-layout';
-import { partPins, validateLayout, type Layout, type ModuleBoardDef } from '../src/breadboard/layout';
+import { BOARD_H, BOARD_W, ROW_Y, colX, dipRows, holeXY, parseHole } from '../src/breadboard/geometry';
+import { partPins, validateLayout, type Layout, type ModuleBoardDef, type Part } from '../src/breadboard/layout';
 import { GND_NET, VCC_NET, buildNets, pinNet, unpoweredChips, type Netlist } from '../src/breadboard/nets';
 import { BreadboardSim } from '../src/breadboard/sim/engine';
 import type { Computer } from '../src/sim/computer';
-import type { Machine } from '../src/sim/machine';
+import { Machine } from '../src/sim/machine';
+import { SIGNAL_BITS } from '../src/sim/signals';
 
 // ---------------------------------------------------------------------------
 // helpers
@@ -103,10 +107,10 @@ function sim(L: Layout) {
       }
       return v;
     },
-    /** LEDs D1..D8 = bits 7..0 (as on the A register), read as a byte. */
-    ledByte(prefix = '') {
+    /** The LEDs of a register, read as a byte: Ben numbers them from bit 7 up, so bit k is D(top - k). */
+    ledByte(top: number, prefix = '') {
       let v = 0;
-      for (let bit = 0; bit < 8; bit++) if (s.ledLit(`${prefix}D${8 - bit}`)) v |= 1 << bit;
+      for (let bit = 0; bit < 8; bit++) if (s.ledLit(`${prefix}D${top - bit}`)) v |= 1 << bit;
       return v;
     },
     /** Rising then falling edge on CLK. */
@@ -151,7 +155,7 @@ describe('B register board', () => {
 
   it('has 8 red LEDs on the register outputs, bound to c.b', () => {
     for (let bit = 0; bit < 8; bit++) {
-      const id = `D${8 - bit}`;
+      const id = `D${25 - bit}`; // D18 (B7) ... D25 (B0), as in the netlist
       const led = L.parts.find((p) => p.id === id)!;
       expect(led.kind === 'led' && led.color).toBe('red');
       expect(pinNet(L, nets, id, 'anode')).toBe(`port:B${bit}`);
@@ -167,7 +171,7 @@ describe('B register board', () => {
     expect(t.read('B')).toBe(0); // ~BI high: no load
     t.set({ '~BI': 0 }).clock();
     expect(t.read('B')).toBe(0xa5);
-    expect(t.ledByte()).toBe(0xa5);
+    expect(t.ledByte(25)).toBe(0xa5);
     t.byte('BUS', 0x3c);
     expect(t.read('B')).toBe(0xa5); // edge-triggered: no change without a clock edge
     t.clock();
@@ -180,7 +184,7 @@ describe('B register board', () => {
     for (let bit = 0; bit < 8; bit++) expect(t.s.portLevel(`BUS${bit}`)).toBe('Z');
     t.set({ CLR: 1 }).set({ CLR: 0 });
     expect(t.read('B')).toBe(0);
-    expect(t.ledByte()).toBe(0);
+    expect(t.ledByte(25)).toBe(0);
   });
 });
 
@@ -232,7 +236,7 @@ describe('ALU board', () => {
       expect(net(adder(bit), `S${n(bit)}`)).toBe(`port:SUM${bit}`);
       expect(net('U17', `A${bit + 1}`)).toBe(`port:SUM${bit}`);
       expect(net('U17', `B${bit + 1}`)).toBe(`port:BUS${bit}`);
-      const id = `D${8 - bit}`;
+      const id = `D${81 - bit}`; // D74 (bit 7) ... D81 (bit 0), as in the netlist
       const led = L.parts.find((p) => p.id === id)!;
       expect(led.kind === 'led' && led.color).toBe('red');
       expect(pinNet(L, nets, id, 'anode')).toBe(`port:SUM${bit}`);
@@ -250,7 +254,7 @@ describe('ALU board', () => {
         t.byte('A', a).byte('B', b).set({ SU: su });
         const full = a + (su ? b ^ 0xff : b) + su;
         expect(t.read('SUM'), `${a} ${su ? '-' : '+'} ${b}`).toBe(full & 0xff);
-        expect(t.ledByte()).toBe(full & 0xff);
+        expect(t.ledByte(81)).toBe(full & 0xff);
         expect(t.s.portLevel('CARRY')).toBe(full > 0xff ? 1 : 0);
       }
     }
@@ -298,7 +302,8 @@ describe('Flags board', () => {
 
   it('detects zero with U22 NOR pairs and the U23A/U23C/U23B AND tree', () => {
     const nor = [1, 2, 3, 4].map((g) => gate(L, nets, 'U22', g));
-    nor.forEach((g, k) => expect(g.ins).toEqual([`port:SUM${2 * k}`, `port:SUM${2 * k + 1}`].sort()));
+    // netlist: gate 1 = (SUM7, SUM6), gate 2 = (SUM5, SUM4), gate 3 = (SUM3, SUM2), gate 4 = (SUM1, SUM0)
+    nor.forEach((g, k) => expect(g.ins).toEqual([`port:SUM${7 - 2 * k}`, `port:SUM${6 - 2 * k}`].sort()));
     const [a, b, c, d] = [1, 2, 3, 4].map((g) => gate(L, nets, 'U23', g));
     expect(a.ins).toEqual([nor[0].out, nor[1].out].sort()); // U23A
     expect(c.ins).toEqual([nor[2].out, nor[3].out].sort()); // U23C
@@ -364,9 +369,9 @@ describe('A register + ALU + B register + flags, joined by port name', () => {
 
   it('runs ADD and SUB like the microcode does (chip level)', () => {
     const t = sim(scene.layout).set({ CLK: 0, CLR: 0, '~AI': 1, '~AO': 1, '~BI': 1, '~EO': 1, SU: 0, '~FI': 1 });
-    const A = () => t.ledByte('a-register/');
-    const B = () => t.ledByte('b-register/');
-    const SUM = () => t.ledByte('alu/');
+    const A = () => t.ledByte(8, 'a-register/');
+    const B = () => t.ledByte(25, 'b-register/');
+    const SUM = () => t.ledByte(81, 'alu/');
     const CZ = () => [t.s.ledLit('flags/D34'), t.s.ledLit('flags/D35')];
     // bus -> A, bus -> B
     t.byte('BUS', 200).set({ '~AI': 0 }).clock().set({ '~AI': 1 });
@@ -388,4 +393,165 @@ describe('A register + ALU + B register + flags, joined by port name', () => {
 // the catalog chips used here all have models
 it('datapath boards only use catalog chips', () => {
   for (const def of [alu, bRegister, flags]) for (const p of def.layout.parts) if (p.kind === 'chip') expect(CHIPS[p.chip]).toBeDefined();
+});
+
+// ---------------------------------------------------------------------------
+// the LEDs a board shows at chip level are the ones its live bindings light
+
+describe('chip-level LEDs agree with the live bindings', () => {
+  it('A register, B register, ALU and flags, for sums and differences', () => {
+    const scene = composeComputer([aRegister, alu, bRegister, flags]);
+    const ids = Object.keys(scene.live.leds).sort();
+    expect(ids).toEqual(scene.layout.parts.filter((p) => p.kind === 'led').map((p) => p.id).sort());
+    expect(ids).toHaveLength(26);
+    const t = sim(scene.layout).set({ CLK: 0, CLR: 0, '~AI': 1, '~AO': 1, '~BI': 1, '~EO': 1, SU: 0, '~FI': 1 });
+    const m = new Machine();
+    const c = m.computer;
+    const cases: [number, number, 0 | 1][] = [[28, 14, 0], [0, 0, 0], [255, 1, 0], [5, 7, 1], [7, 7, 1], [0x80, 0x7f, 0], [0xa5, 0x5a, 1]];
+    for (let k = 0; k < 10; k++) cases.push([(k * 97 + 13) & 0xff, (k * 59 + 200) & 0xff, (k & 1) as 0 | 1]);
+    for (const [a, b, su] of cases) {
+      t.byte('BUS', a).set({ '~AI': 0 }).clock().set({ '~AI': 1 });
+      t.byte('BUS', b).set({ '~BI': 0 }).clock().set({ '~BI': 1 }).byte('BUS', null);
+      t.set({ SU: su, '~FI': 0 }).clock().set({ '~FI': 1 }); // the flags of A ± B
+      c.a = a;
+      c.b = b;
+      c.setManualControl(su ? SIGNAL_BITS.SU : 0);
+      c.flagC = c.alu.carry;
+      c.flagZ = c.alu.zero;
+      const want = ids.filter((id) => scene.live.leds[id](c, m));
+      const got = ids.filter((id) => t.s.ledLit(id));
+      expect(got, `${a} ${su ? '-' : '+'} ${b}`).toEqual(want);
+    }
+    expect(t.problems()).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// tidy layouts: what a netlist check can't see
+
+/** Drawn outline of a chip, display or LED dome (as src/breadboard/render.ts draws them), board-local. */
+function bodies(L: Layout): { board: string; id: string; x0: number; y0: number; x1: number; y1: number }[] {
+  const out: ReturnType<typeof bodies> = [];
+  for (const p of L.parts) {
+    if (p.kind === 'chip') {
+      const def = CHIPS[p.chip];
+      const n = def.pins.length / 2;
+      const [top, bottom] = dipRows(def.spacing);
+      const c0 = p.rotated ? p.col - n + 1 : p.col;
+      out.push({ board: p.board, id: p.id, x0: colX(c0) - 0.47, x1: colX(c0 + n - 1) + 0.47, y0: ROW_Y[top] + 0.22, y1: ROW_Y[bottom] - 0.22 });
+    } else if (p.kind === 'seg7') {
+      out.push({ board: p.board, id: p.id, x0: colX(p.col) - 0.48, x1: colX(p.col + 4) + 0.48, y0: ROW_Y.d - 0.45, y1: ROW_Y.h + 0.45 });
+    } else if (p.kind === 'led') {
+      const a = holeXY(p.anode), k = holeXY(p.cathode);
+      const dist = Math.hypot(k.x - a.x, k.y - a.y);
+      const t = dist > 2.2 ? Math.min(0.5, 0.9 / dist) : 0.5;
+      const x = a.x + (k.x - a.x) * t, y = a.y + (k.y - a.y) * t;
+      out.push({ board: p.board, id: p.id, x0: x - 0.42, x1: x + 0.42, y0: y - 0.42, y1: y + 0.42 });
+    }
+  }
+  return out;
+}
+
+type Pt = { x: number; y: number };
+const wirePoints = (w: Extract<Part, { kind: 'wire' }>): Pt[] => [holeXY(w.a), ...(w.via ?? []).map(([x, y]) => ({ x, y })), holeXY(w.b)];
+function distToSegment(p: Pt, a: Pt, b: Pt) {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy || 1)));
+  return Math.hypot(a.x + t * dx - p.x, a.y + t * dy - p.y);
+}
+function segmentInBox(a: Pt, b: Pt, r: { x0: number; y0: number; x1: number; y1: number }) {
+  const n = Math.max(2, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 0.05));
+  for (let i = 0; i <= n; i++) {
+    const x = a.x + ((b.x - a.x) * i) / n, y = a.y + ((b.y - a.y) * i) / n;
+    if (x > r.x0 && x < r.x1 && y > r.y0 && y < r.y1) return true;
+  }
+  return false;
+}
+
+/** Everything that would look wrong on the breadboard view. */
+function untidy(def: ModuleBoardDef): string[] {
+  const L = def.layout;
+  const out: string[] = [];
+  const wires = L.parts.filter((p): p is Extract<Part, { kind: 'wire' }> => p.kind === 'wire');
+  const legs = L.parts.flatMap((p) => (p.kind === 'text' ? [] : partPins(p).map((pin) => ({ id: p.id, board: p.board, hole: pin.hole, at: holeXY(pin.hole) }))));
+  const boxes = bodies(L);
+  const segs = wires.flatMap((w) => {
+    const pts = wirePoints(w);
+    return pts.slice(1).map((b, i) => ({ w, a: pts[i], b }));
+  });
+  for (const { w, a, b } of segs) {
+    for (const r of boxes) if (r.board === w.board && segmentInBox(a, b, r)) out.push(`${w.id} (${w.a}-${w.b}) runs under ${r.id}`);
+    for (const l of legs) {
+      if (l.board !== w.board || l.id === w.id || l.hole === w.a || l.hole === w.b) continue;
+      if (distToSegment(l.at, a, b) < 0.3) out.push(`${w.id} (${w.a}-${w.b}) runs over ${l.id} at ${l.hole}`);
+    }
+  }
+  for (const w of wires) for (const [x, y] of w.via ?? []) if (!(x > 0 && x < BOARD_W && y > 0 && y < BOARD_H)) out.push(`${w.id} bends off the board at ${x},${y}`);
+  // two runs on top of each other
+  for (let i = 0; i < segs.length; i++) {
+    for (let j = i + 1; j < segs.length; j++) {
+      const s = segs[i], t = segs[j];
+      if (s.w.board !== t.w.board || s.w.id === t.w.id) continue;
+      const along = (q: typeof s, k: 'x' | 'y') => Math.abs(q.a[k] - q.b[k]) < 1e-9 && q.a[k === 'x' ? 'y' : 'x'] !== q.b[k === 'x' ? 'y' : 'x'];
+      for (const [k, o] of [['y', 'x'], ['x', 'y']] as const) {
+        if (!along(s, k) || !along(t, k) || Math.abs(s.a[k] - t.a[k]) >= 0.3) continue;
+        const ov = Math.min(Math.max(s.a[o], s.b[o]), Math.max(t.a[o], t.b[o])) - Math.max(Math.min(s.a[o], s.b[o]), Math.min(t.a[o], t.b[o]));
+        if (ov > 0.05) out.push(`${s.w.id} and ${t.w.id} overlap at ${k} = ${s.a[k]}`);
+      }
+    }
+  }
+  // two-leg parts lying over other legs or under chips
+  for (const p of L.parts) {
+    if (p.kind !== 'resistor' && p.kind !== 'capacitor') continue;
+    const a = holeXY(p.a), b = holeXY(p.b);
+    for (const l of legs) if (l.board === p.board && l.id !== p.id && distToSegment(l.at, a, b) < 0.3) out.push(`${p.id} lies over ${l.id} at ${l.hole}`);
+    for (const r of boxes) if (r.board === p.board && r.id !== p.id && segmentInBox(a, b, r)) out.push(`${p.id} lies over ${r.id}`);
+  }
+  // port tags point off the board from the outer row and hide nothing
+  for (const p of L.parts) {
+    if (p.kind !== 'port') continue;
+    const row = parseHole(p.hole).row;
+    if ((p.side === 'top' && row !== 'a') || (p.side === 'bottom' && row !== 'j')) out.push(`tag ${p.name} at ${p.hole} points ${p.side} across the board`);
+    const { x, y } = holeXY(p.hole);
+    const len = 0.45 + p.name.replace(/^~/, '').length * 0.42 + 0.55;
+    const box = {
+      top: { x0: x - 0.36, x1: x + 0.36, y0: y - len, y1: y - 0.3 },
+      bottom: { x0: x - 0.36, x1: x + 0.36, y0: y + 0.3, y1: y + len },
+      right: { x0: x + 0.3, x1: x + len, y0: y - 0.36, y1: y + 0.36 },
+      left: { x0: x - len, x1: x - 0.3, y0: y - 0.36, y1: y + 0.36 },
+    }[p.side];
+    for (const l of legs) {
+      if (l.board === p.board && l.id !== p.id && l.at.x > box.x0 && l.at.x < box.x1 && l.at.y > box.y0 && l.at.y < box.y1) out.push(`tag ${p.name} at ${p.hole} hides ${l.id} at ${l.hole}`);
+    }
+    const inner = { x0: box.x0 + 0.1, x1: box.x1 - 0.1, y0: box.y0 + 0.1, y1: box.y1 - 0.1 };
+    for (const s of segs) if (s.w.board === p.board && segmentInBox(s.a, s.b, inner)) out.push(`tag ${p.name} at ${p.hole} hides ${s.w.id}`);
+  }
+  return [...new Set(out)];
+}
+
+describe('layout tidiness: no wire under a chip or over another leg, no hidden ends', () => {
+  for (const def of [aRegister, bRegister, alu, flags, output, control]) {
+    it(def.id, () => expect(untidy(def)).toEqual([]));
+  }
+  it('the checker catches the problems it looks for', () => {
+    const bad: ModuleBoardDef = {
+      id: 'bad', title: 'bad', description: '', videos: [], live: { leds: {}, seg7: {}, controls: {} },
+      layout: {
+        boards: [{ id: 'x', place: { x: 0, y: 0 } }],
+        parts: [
+          { id: 'U1', board: 'x', kind: 'chip', chip: '74LS00', col: 10 },
+          { id: 'w1', board: 'x', kind: 'wire', color: 'blue', a: 'd8', b: 'g20' }, // diagonally under U1
+          { id: 'w2', board: 'x', kind: 'wire', color: 'blue', a: 'b30', b: 'b34' }, // along row b, over the end of w3
+          { id: 'w3', board: 'x', kind: 'wire', color: 'blue', a: 'b32', b: 'b40', via: [[32.5, 5.0], [39.5, 5.0]] },
+          { id: 'w4', board: 'x', kind: 'wire', color: 'blue', a: 'd33', b: 'd41', via: [[33.5, 5.0], [40.5, 5.0]] }, // same lane as w3
+          { id: 'p1', board: 'x', kind: 'port', name: 'CLK', hole: 'c50', side: 'top' }, // across the board, over a50
+          { id: 'R1', board: 'x', kind: 'resistor', ohms: 220, a: 'a50', b: 'tn51' },
+        ],
+      },
+    };
+    const found = untidy(bad);
+    for (const what of ['w1 (d8-g20) runs under U1', 'w2 (b30-b34) runs over w3 at b32', 'w3 and w4 overlap at y = 5', 'tag CLK at c50 points top across the board', 'tag CLK at c50 hides R1 at a50']) {
+      expect(found.some((f) => f.startsWith(what)), `${what} in ${found.join('; ')}`).toBe(true);
+    }
+  });
 });

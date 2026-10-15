@@ -1,7 +1,7 @@
 import type { Machine } from '../../sim/machine';
 import { SIGNALS } from '../../sim/signals';
 import { ROW } from '../computer-layout';
-import { holeXY, parseHole } from '../geometry';
+import { RAIL_COLUMNS, holeXY, parseHole } from '../geometry';
 import { LayoutBuilder, type BoardBuilder, type ChipHandle, type LedColor, type PortSide, type WireColor } from '../layout';
 
 /**
@@ -75,9 +75,12 @@ function cellTop(bb: BoardBuilder, id: string, color: LedColor, col: number, lab
   bb.resistor(`R${id}`, 220, `j${col}`, bb.railHole('bn', col), `R${id} 220`);
   return bb.led(id, color, `e${col}`, `f${col}`, label);
 }
-/** LED across the channel at `col`, signal on the bottom strip: anode f, cathode e, 220 Ω from a to GND. */
-function cellBottom(bb: BoardBuilder, id: string, color: LedColor, col: number, label: string) {
-  bb.resistor(`R${id}`, 220, `a${col}`, bb.railHole('tn', col), `R${id} 220`);
+/**
+ * LED across the channel at `col`, signal on the bottom strip: anode f, cathode e, 220 Ω from a to GND
+ * (to the rail at `railCol`, default the nearest free rail hole).
+ */
+function cellBottom(bb: BoardBuilder, id: string, color: LedColor, col: number, label: string, railCol?: number) {
+  bb.resistor(`R${id}`, 220, `a${col}`, railCol === undefined ? bb.railHole('tn', col) : `tn${railCol}`, `R${id} 220`);
   return bb.led(id, color, `f${col}`, `e${col}`, label);
 }
 /** LED across the channel at `col` that lights when the bottom strip is low: anode e (220 Ω from a to VCC), cathode f. */
@@ -140,6 +143,10 @@ function eepromGroup(id: string, e: number, cells: number, high: boolean) {
   // ---- the three outputs on the bottom row (IO2-IO0) -> LEDs at cells+5..7, nested
   // Below the EEPROM they need lanes under its body (13, 14, 15); past it they climb to
   // 11, 12, 13 so they clear the LED resistors and port tags on row j.
+  // Their resistors go up to the GND rail. cells+5 has no rail hole (26, 56), so all three
+  // lean one column right, in parallel, instead of the first leaning left under the
+  // tag of cells+4.
+  let railCol = cells + 4;
   for (let i = 0; i < 3; i++) {
     const io = 2 - i; // IO2 first (innermost)
     const bit = bit0 + io;
@@ -148,7 +155,8 @@ function eepromGroup(id: string, e: number, cells: number, high: boolean) {
     const src = at('i', U.pin(`IO${io}`));
     const climb = X(e + 13 + i);
     const [y0, y1] = [13.0 + i, 11.0 + i];
-    cellBottom(top, ledOf(bit), 'blue', col, sig).live((c) => ((c.controlWord >> bit) & 1) === 1);
+    do railCol++; while (!RAIL_COLUMNS.includes(railCol) || railCol < col);
+    cellBottom(top, ledOf(bit), 'blue', col, sig, railCol).live((c) => ((c.controlWord >> bit) & 1) === 1);
     top.wire(src, `${'ghi'[i]}${col}`, 'blue', [[x(src), y0], [climb, y0], [climb, y1], [X(col), y1]]);
     top.port(lineName(sig), `j${col}`, 'bottom');
   }

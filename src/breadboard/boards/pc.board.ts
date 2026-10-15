@@ -9,16 +9,19 @@ import { LayoutBuilder } from '../layout';
  *                A5-A8 drive BUS3-BUS0 (the KiCad drawing also uses the
  *                upper four channels). The unused B1-B4 inputs are tied to
  *                GND; the unused A1-A4 outputs stay open.
- *   D82-D85: 4 green LEDs on Q0-Q3, read MSB first from the left.
+ *   D82-D85: 4 green LEDs, numbered MSB first as in the netlist: D82 = Q3,
+ *                D83 = Q2, D84 = Q1, D85 = Q0, read from the left.
  *
  * Ben's parts list for the build video is "1x 74LS161, 1x 74LS245, 4 LEDs"
  * (no resistors, like the A register), so the LEDs go straight from the
  * outputs to GND. The later KiCad schematic adds 220R in series.
  *
- * Routing: the four Q -> B wires are nested in the top half (Q0 on the
- * outer lane), the four bus -> P wires are nested in the bottom half; the
- * channel mapping Qk -> B(8-k) is what makes both bundles nest without
- * crossing and puts the LEDs in MSB-first order.
+ * Routing: the four Q -> B wires are nested in the top half (Q0, the widest,
+ * on the outer lane), the four bus -> P wires are nested in the bottom half
+ * (BUS0 outermost); the channel mapping Qk -> B(8-k) is what makes both
+ * bundles nest without crossing and puts the LEDs in MSB-first order. All
+ * lanes lie between hole rows; the innermost one of each bundle runs between
+ * the chip row and the row its wires end in (d / g).
  */
 
 const b = new LayoutBuilder();
@@ -53,24 +56,30 @@ bb.port('~J', `a${C35 + 7}`, 'top'); // ~PE
 bb.port('~CO', `a${C36 + 1}`, 'top'); // U36 ~OE
 
 // ---- counter outputs -> 245 B side (top half, nested lanes) ------------------
+// Q0 (columns 24 -> 42) spans the others, so it takes the lane nearest the
+// rails; Q3 (27 -> 39) runs between rows d and e.
+const Q_LANES = [4.0, 5.0, 6.0, 7.0];
 for (let k = 0; k < 4; k++) {
   const q = U35.pin(`Q${k}`); // e24..e27
   const bPin = U36.pin(`B${8 - k}`); // e42..e39
-  bb.wireLane(`d${col(q)}`, `d${col(bPin)}`, 4.5 + (3 - k) * 0.5, 'yellow'); // Q0 outermost (4.5)
+  bb.wireLane(`d${col(q)}`, `d${col(bPin)}`, Q_LANES[k], 'yellow');
 }
 
 // ---- bus -> P inputs, 245 A side -> bus (bottom half, nested lanes) ----------
+// BUS0 (41 -> 24) outermost, BUS3 (38 -> 27) between rows f and g.
+const P_LANES = [14.0, 13.0, 12.0, 11.0];
 for (let k = 0; k < 4; k++) {
   const a = U36.pin(`A${8 - k}`); // f41..f38 = BUS0..BUS3
   const p = U35.pin(`P${k}`); // f24..f27
-  bb.wireLane(`g${col(a)}`, `g${col(p)}`, 12.0 + (3 - k) * 0.5, 'blue'); // BUS0 outermost (13.5)
+  bb.wireLane(`g${col(a)}`, `g${col(p)}`, P_LANES[k], 'blue');
   bb.port(`BUS${k}`, `j${col(a)}`, 'bottom');
 }
 
 // ---- LEDs: anode on the B strip (= Qk), cathode in the GND rail ---------------
+// D82 (Q3) ... D85 (Q0), left to right, like the netlist's D82 = Q3 ... D85 = Q0.
 for (let k = 3; k >= 0; k--) {
   const c = col(U36.pin(`B${8 - k}`)); // 39..42 for Q3..Q0
-  bb.led(`D${82 + k}`, 'green', `a${c}`, `tn${c}`, `PC${k}`).live((cpu) => ((cpu.pc >> k) & 1) === 1);
+  bb.led(`D${85 - k}`, 'green', `a${c}`, `tn${c}`, `PC${k}`).live((cpu) => ((cpu.pc >> k) & 1) === 1);
 }
 
 export default b.module({

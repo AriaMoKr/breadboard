@@ -17,9 +17,9 @@ import { LayoutBuilder, type BoardBuilder, type LedColor, type PortSide, type Wi
  *   U32 74LS157 section 4 (Ben's "c", pins 12-14), S = PROG, ~E = GND:
  *     I1 = U31 gate 1 = NAND(RI, CLK edge), I0 = push button SW4 to GND
  *     (program mode writes while it is held), Y = ~WE of both 74189s.
- *     Ben leaves pin 14 floating (LS-TTL reads it high) and the other three
- *     sections unconnected; this board adds a 1k pull-up on pin 14 ("R_SW4",
- *     not in Ben's schematic) so the input is defined while SW4 is open.
+ *     As in the netlist there is no pull-up: with SW4 open, pin 14 floats,
+ *     which LS-TTL reads as high (no write), like the open DIP switches. The
+ *     other three sections are unconnected.
  *   U31 74LS00 gate 1: pin 1 = CLK through C7 0.01 µF, with R58 1k to GND
  *     (a ~10 µs pulse after each rising edge), pin 2 = RI. Gates 2-4 unused,
  *     inputs left open as in the schematic.
@@ -145,7 +145,7 @@ for (let k = 1; k <= 8; k++) {
 
 // ---- write control ------------------------------------------------------------------------------
 
-// SW4 across the channel: top leg = U32 4I0 (pulled up by R_SW4), bottom leg = GND.
+// SW4 across the channel: top leg = U32 4I0 (floats high while open), bottom leg = GND.
 top.button('SW4', `e${SW4_COL}`, `f${SW4_COL}`, {
   kind: 'button',
   press: (m) => {
@@ -153,7 +153,6 @@ top.button('SW4', `e${SW4_COL}`, `f${SW4_COL}`, {
     m.changed();
   },
 }, 'SW4 write');
-top.resistor('R_SW4', 1000, `a${SW4_COL}`, top.railHole('tp', SW4_COL), 'SW4 pull-up (added)');
 gnd(top, `f${SW4_COL}`);
 top.wireLane(`d${SW4_COL}`, at('d', U32.pin('4I0')), 6, 'white');
 // U31 gate 1 -> U32 4I1
@@ -168,7 +167,9 @@ top.resistor('R58', 1000, outer(U31.pin('1A')), `tn${colOf(U31.pin('1A')) + 1}`,
 
 const bot = b.board('ram2', { x: 0, y: ROW }, 'RAM: 74189 memory and output');
 
-const U24 = bot.chip('U24', '74LS189', 2); // bits 7-4, cols 2-9
+// U24 starts at column 3 (not 2), so its VCC (pin 16) has a rail hole right
+// above it and every RA tag can sit on row a; column 11 stays free for ~O3.
+const U24 = bot.chip('U24', '74LS189', 3); // bits 7-4, cols 3-10
 const U28 = bot.chip('U28', '74LS04', 12); // cols 12-18
 const LEDS_HIGH = [21, 22, 23, 24]; // bits 7..4 (D36-D39)
 const U30 = bot.chip('U30', '74LS245', 27); // cols 27-36
@@ -196,39 +197,57 @@ gnd(bot, U24.pin('~CS'));
 gnd(bot, U25.pin('~CS'));
 vcc(bot, U30.pin('DIR'));
 
-// ---- 74189 outputs -> inverters ------------------------------------------------------------------
+// ---- 74189 outputs -> inverters -> LED strip -> 245 A side ------------------------------------------
+//
+// Every wire in the bottom half is a lane wire (down from one hole, along a
+// lane between hole rows, up into another). The hole each wire uses in its
+// strip and its lane are picked so that no two wires lie on top of each
+// other and, in the bottom half, only one pair crosses (bit 5's lane 15 over
+// U30's DIR jumper). In the top half the ~O4 -> 4A/6A wires run on lane 5
+// and the top-row outputs (~O3, 4Y, 6Y) go through the channel on lane 6;
+// on U25's side two crossings there are forced by the pinout.
 
-// Lanes lie between hole rows (bottom 11-14, top 4-7) and are chosen so that
-// no two wires share a lane where they overlap.
-// U24 -> U28 (to its right); ~O3 is on the top row: through the channel at column 10
-bot.wireLane(at('g', U24.pin('~O1')), at('g', U28.pin('1A')), 13, 'yellow');
-bot.wireLane(at('g', U24.pin('~O2')), at('g', U28.pin('2A')), 11, 'yellow');
-across(bot, at('d', U24.pin('~O3')), at('g', U28.pin('3A')), 6, x('a10'), 12, 'yellow');
+/** A lane wire from strip `fromCol` (hole in row `fromRow`) to strip `toCol` (row `toRow`). */
+const hop = (fromRow: Row, fromCol: string, toRow: Row, toCol: string | number, lane: number) =>
+  bot.wireLane(at(fromRow, fromCol), `${toRow}${typeof toCol === 'number' ? toCol : colOf(toCol)}`, lane, 'yellow');
+
+// U24 -> U28 (to its right); ~O3 is on the top row: through the channel at column 11
+hop('g', U24.pin('~O1'), 'g', U28.pin('1A'), 12);
+hop('h', U24.pin('~O2'), 'i', U28.pin('2A'), 14);
+across(bot, at('d', U24.pin('~O3')), at('g', U28.pin('3A')), 6, x('a11'), 11, 'yellow');
 bot.wireLane(at('d', U24.pin('~O4')), at('d', U28.pin('4A')), 5, 'yellow');
 // U25 -> U29 (to its left); ~O3 through the channel at column 52
-bot.wireLane(at('g', U25.pin('~O1')), at('g', U29.pin('3A')), 11, 'yellow');
-bot.wireLane(at('g', U25.pin('~O2')), at('g', U29.pin('2A')), 12, 'yellow');
-across(bot, at('d', U25.pin('~O3')), at('g', U29.pin('1A')), 6, x('a52'), 13, 'yellow');
+hop('h', U25.pin('~O1'), 'i', U29.pin('3A'), 14);
+hop('g', U25.pin('~O2'), 'g', U29.pin('2A'), 12);
+across(bot, at('d', U25.pin('~O3')), at('g', U29.pin('1A')), 6, x('a52'), 11, 'yellow');
 bot.wireLane(at('d', U25.pin('~O4')), at('d', U29.pin('6A')), 5, 'yellow');
 
-// ---- inverter outputs -> LED strip -> 245 A side, one lane per bit ---------------------------------
-
-/** [bit, inverter, output pin, lane] */
-const OUTS: [number, typeof U28, string, number][] = [
-  [7, U28, '1Y', 14], [6, U28, '2Y', 13], [5, U28, '3Y', 12], [4, U28, '4Y', 11],
-  [3, U29, '6Y', 13], [2, U29, '1Y', 12], [1, U29, '2Y', 11], [0, U29, '3Y', 14],
+/**
+ * [bit, inverter, output pin, then inverter -> LED strip: [from row, LED row, lane]
+ * (top-row outputs: [LED row, lane] after the channel), then LED strip -> 245 A:
+ * [LED row, A row, lane]].
+ */
+const OUTS: [number, typeof U28, string, [Row, Row, number], [Row, Row, number]][] = [
+  [7, U28, '1Y', ['g', 'i', 13], ['h', 'h', 13]],
+  [6, U28, '2Y', ['i', 'j', 14], ['i', 'h', 14]],
+  [5, U28, '3Y', ['g', 'g', 12], ['j', 'h', 15]],
+  [4, U28, '4Y', ['d', 'g', 11], ['h', 'g', 12]],
+  [3, U29, '6Y', ['d', 'g', 12], ['h', 'g', 12]],
+  [2, U29, '1Y', ['j', 'j', 15], ['h', 'h', 13]],
+  [1, U29, '2Y', ['i', 'h', 14], ['j', 'i', 14]],
+  [0, U29, '3Y', ['h', 'h', 13], ['g', 'g', 11]],
 ];
-for (const [bit, inv, pin, y] of OUTS) {
+for (const [bit, inv, pin, [fromRow, ledRow, inLane], [outRow, aRow, outLane]] of OUTS) {
   const col = bit >= 4 ? LEDS_HIGH[7 - bit] : LEDS_LOW[3 - bit];
   const out = inv.pin(pin);
   if (isTop(out)) {
     // 4Y / 6Y are on the top row: over the channel in the gap next to the inverter
     const xc = bit >= 4 ? x('a19') : x('a43');
-    across(bot, at('d', out), `g${col}`, 6, xc, y, 'yellow');
+    across(bot, at(fromRow, out), `${ledRow}${col}`, 6, xc, inLane, 'yellow');
   } else {
-    bot.wireLane(at('g', out), `g${col}`, y, 'yellow');
+    hop(fromRow, out, ledRow, col, inLane);
   }
-  bot.wireLane(`h${col}`, at('g', U30.pin(`A${8 - bit}`)), y, 'yellow');
+  hop(outRow, `a${col}`, aRow, U30.pin(`A${8 - bit}`), outLane);
   ledCell(bot, `D${43 - bit}`, 'red', col, `R${57 - bit}`, `RAM${bit}`).live((c) => ((c.ramValue >> bit) & 1) === 1);
 }
 

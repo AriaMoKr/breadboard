@@ -10,6 +10,16 @@ video by video.
   clock by hand or let it run, and watch every control signal and bus transfer. It
   also has an assembler with Ben's programs, a live microcode table you can edit, and a
   microcode-version picker that matches the stage of the series.
+* **Breadboard view** (`#/breadboard`): the same computer laid out as Ben's BB830 boards. It
+  has 49 chips with his reference designators, 88 LEDs, the decimal display and every wire. The
+  running simulation lights the LEDs, and the clock button, mode switches, DIP switches and reset
+  work on the boards themselves. The boards are also real circuits: composed together and
+  simulated chip by chip, they run Ben's 28 + 14 program and latch 42 (see
+  `tests/boards-output-control.test.ts`).
+* **Breadboard sandbox** (`#/sandbox`): an empty breadboard with Ben's parts bin (every 74LS chip
+  in the build, the 28C16, the 555, LEDs, resistors, buttons, switches, DIP switches, 7-segment
+  displays). Wire up your own circuits and the chip-level engine simulates them. It comes with
+  five example circuits. See [docs/BREADBOARD.md](docs/BREADBOARD.md).
 * **Chapter labs** (`#/lab/<id>`): each of the 44 videos maps to an interactive lab
   that rebuilds what that video builds. Examples: the 555 timer modes, SR/D latches,
   flip-flops, JK racing, tri-state buses, registers, two's complement, the ALU, RAM,

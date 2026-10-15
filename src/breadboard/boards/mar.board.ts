@@ -30,7 +30,8 @@ import { LayoutBuilder, type BoardBuilder, type LedColor, type LiveControl, type
  * are the grounded ones), so the switch wires nest without crossing. Each
  * address LED straddles the centre channel (anode = address line in the
  * bottom strip, 220 Ω from the top strip to GND). The RA tags point down at
- * the RAM board. Lanes lie between hole rows.
+ * the RAM board. Lanes lie between hole rows (one short jumper lies along
+ * row h); nothing lies on top of another wire.
  */
 
 const b = new LayoutBuilder();
@@ -115,24 +116,27 @@ gnd(bb, SW5.pin(3, 'top'));
 gnd(bb, SW5.pin(4, 'top'));
 bb.wireLane(at('d', SW5.pin(1, 'top')), at('d', U33.pin('3I0')), 6, 'blue'); // bit 0 (outer)
 bb.wireLane(at('d', SW5.pin(2, 'top')), at('d', U33.pin('4I0')), 7, 'blue'); // bit 1 (inner)
-bb.wireLane(at('g', SW5.pin(3, 'bottom')), at('g', U33.pin('2I0')), 12, 'blue'); // bit 2 (outer)
-bb.wireLane(at('g', SW5.pin(4, 'bottom')), at('g', U33.pin('1I0')), 11, 'blue'); // bit 3 (inner)
+bb.wireLane(at('g', SW5.pin(3, 'bottom')), at('g', U33.pin('2I0')), 11, 'blue'); // bit 2
+bb.wireLane(at('j', SW5.pin(4, 'bottom')), at('j', U33.pin('1I0')), 15, 'blue'); // bit 3, under everything
 
 // ---- MAR outputs -> mux I1 inputs (run mode) --------------------------------------------
 // Q2/Q3 feed the top row of U33: through the channel in the gap after U34.
+// The bottom-half wires below (and PROG) use the holes and lanes that keep
+// them from crossing each other; the only crossings left on this board are
+// three in the top half that the pinout forces.
 
-bb.wireLane(at('g', U34.pin('Q0')), at('g', U33.pin('1I1')), 13, 'yellow'); // bit 3
-bb.wireLane(at('g', U34.pin('Q1')), at('g', U33.pin('2I1')), 13.5, 'yellow'); // bit 2 (no wire ends on row i here)
-across(at('g', U34.pin('Q2')), at('d', U33.pin('4I1')), 12, gapX(O + 12), 5, 'yellow'); // bit 1
+bb.wireLane(at('g', U34.pin('Q0')), at('i', U33.pin('1I1')), 14, 'yellow'); // bit 3
+bb.wireLane(at('g', U34.pin('Q1')), at('g', U33.pin('2I1')), 12, 'yellow'); // bit 2
+across(at('h', U34.pin('Q2')), at('d', U33.pin('4I1')), 13, gapX(O + 12), 5, 'yellow'); // bit 1
 across(at('g', U34.pin('Q3')), at('d', U33.pin('3I1')), 11, gapX(O + 11), 4, 'yellow'); // bit 0
 
 // ---- mux outputs = RAM address -> LED strips (RA tags there) -------------------------------
 // 4Y/3Y are on the top row: through the channel in the gap after U33.
 
-bb.wireLane(at('g', U33.pin('1Y')), `g${LEDS[0]}`, 11, 'yellow'); // RA3
-bb.wireLane(at('g', U33.pin('2Y')), `g${LEDS[1]}`, 12, 'yellow'); // RA2
-across(at('d', U33.pin('4Y')), `g${LEDS[2]}`, 5, gapX(O + 29), 13, 'yellow'); // RA1
-across(at('d', U33.pin('3Y')), `g${LEDS[3]}`, 6, gapX(O + 28), 13.5, 'yellow'); // RA0
+bb.wireLane(at('i', U33.pin('1Y')), `i${LEDS[0]}`, 14, 'yellow'); // RA3
+bb.wire(at('h', U33.pin('2Y')), `h${LEDS[1]}`, 'yellow'); // RA2: a straight jumper along row h
+across(at('d', U33.pin('4Y')), `g${LEDS[2]}`, 5, gapX(O + 29), 11, 'yellow'); // RA1
+across(at('d', U33.pin('3Y')), `g${LEDS[3]}`, 6, gapX(O + 28), 12, 'yellow'); // RA0
 
 for (let i = 0; i < 4; i++) {
   const bit = 3 - i;
@@ -160,8 +164,8 @@ const sw6: LiveControl = {
 b.add({ id: 'SW6', board: 'mar', label: 'SW6', kind: 'slide', a: `h${MODE}`, common: `h${MODE + 1}`, b: `h${MODE + 2}`, initial: 1 });
 b.live.controls.SW6 = sw6;
 gnd(bb, `h${MODE + 1}`);
-// PROG -> U33 S, on the deepest lane (nothing crosses it).
-bb.wire(`i${MODE}`, outer(U33.pin('S')), 'orange', [[x(`i${MODE}`), 14], [x(U33.pin('S')), 14]]);
+// PROG -> U33 S, on lane 13 under the address wires (nothing crosses it).
+bb.wireLane(`i${MODE}`, at('h', U33.pin('S')), 13, 'orange');
 
 export default b.module({
   id: 'mar',

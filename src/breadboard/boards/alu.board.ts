@@ -1,4 +1,4 @@
-import { RAIL_COLUMNS, ROWS, holeXY, parseHole, type Rail, type Row } from '../geometry';
+import { RAIL_COLUMNS, ROWS, holeXY, parseHole, stripOf, type Rail, type Row } from '../geometry';
 import { LayoutBuilder, type BoardBuilder, type ChipHandle, type PortSide, type WireColor } from '../layout';
 
 /**
@@ -12,11 +12,14 @@ import { LayoutBuilder, type BoardBuilder, type ChipHandle, type PortSide, type 
  *     and the U17 74LS245: DIR (1) -> VCC, ~OE (19) = ~EO, B1-B8 -> BUS0-7
  *   So the ALU computes A + (B XOR SU·0xFF) + SU: A + B, or A − B with SU = 1.
  *
- * Choices where the notes are silent: U18 takes the low nibble and U16 the
- * high one (KiCad numbers the upper half of a sheet first, as with U20/U21);
- * which XOR gate and which gate input carries which bit was chosen so each
- * gate's wire to its adder nests inside the next one's (few crossings). No
- * LED resistors, as on the A register.
+ * U18 takes the low nibble and U16 the high one, and the sum LEDs are D74
+ * (bit 7) ... D81 (bit 0), as in the KiCad netlist. No LED resistors (the
+ * schematic's 220 Ω R92-R99 were left out on the breadboard, as on the A
+ * register). Our own choices: which XOR gate and which gate input carries
+ * which bit (the netlist has B0 on gate 4 ... B3 on gate 1, B on input 1 and
+ * SU on input 2) was chosen so each gate's wire to its adder nests inside the
+ * next one's (few crossings); the 245 takes bit k on A(k+1)/B(k+1), where the
+ * netlist puts bit 7 on A1/B1. Both are logically the same circuit.
  *
  * Layout: high nibble on the left, low on the right, the 245 and its LEDs in
  * the middle (bit 7 on the left, like the B register below). All chips are
@@ -123,7 +126,7 @@ const ledBits = [7, 6, 5, 4, 3, 2, 1, 0];
 const ledCols = ledBits.map((bit) => Number(U17.pin(`A${bit + 1}`).slice(1)));
 const cathodes = railCathodes(bb, 'tn', ledCols);
 ledBits.forEach((bit, i) => {
-  bb.led(`D${8 - bit}`, 'red', far(bb, U17.pin(`A${bit + 1}`)), cathodes[i], `Σ${bit}`).live((c) => ((c.alu.value >> bit) & 1) === 1);
+  bb.led(`D${81 - bit}`, 'red', far(bb, U17.pin(`A${bit + 1}`)), cathodes[i], `Σ${bit}`).live((c) => ((c.alu.value >> bit) & 1) === 1);
 });
 
 // ---------------------------------------------------------------------------
@@ -206,7 +209,49 @@ for (const r of order) {
     r.via = [[xa, ya], [r.gx, ya], [r.gx, yb], [xb, yb]];
   }
 }
-for (const r of routes) bb.wire(r.a.hole(), r.b.hole(), r.color, r.via);
+
+// ---- holes: where several wires leave one strip (the SU daisy chains), each
+// end takes the free hole next to its own lane, so the short drops from the
+// holes to the lanes never run over each other or over another wire's end.
+const laneY = (r: Route, end: 'a' | 'b') => (end === 'a' ? r.via![0][1] : r.via![r.via!.length - 1][1]);
+const rowY = (hole: string) => holeXY(hole).y;
+const byStrip = new Map<string, { r: Route; end: 'a' | 'b' }[]>();
+for (const r of routes) {
+  for (const end of ['a', 'b'] as const) {
+    const key = stripOf(r[end].pin);
+    byStrip.set(key, [...(byStrip.get(key) ?? []), { r, end }]);
+  }
+}
+/** Cost of putting the ends on `holes`: drop lengths, plus a penalty for drops that overlap or cross another end's hole. */
+function dropCost(holes: string[], lanes: number[]): number {
+  const spans = holes.map((h, i) => [Math.min(rowY(h), lanes[i]), Math.max(rowY(h), lanes[i])]);
+  let cost = 0;
+  spans.forEach(([lo, hi], i) => {
+    cost += hi - lo;
+    spans.forEach(([lo2, hi2], j) => {
+      if (i === j) return;
+      if (Math.min(hi, hi2) - Math.max(lo, lo2) > 1e-9) cost += 100; // the two drops overlap
+      const y = rowY(holes[j]);
+      if (y > lo + 1e-9 && y < hi - 1e-9) cost += 100; // this drop runs over the other end's hole
+    });
+  });
+  return cost;
+}
+/** Every way to give `n` ends distinct holes out of `free`. */
+const placements = (n: number, free: string[], taken: string[] = []): string[][] =>
+  n === taken.length ? [taken] : free.filter((h) => !taken.includes(h)).flatMap((h) => placements(n, free, [...taken, h]));
+
+const chosen = new Map<Route, Partial<Record<'a' | 'b', string>>>();
+for (const ends of byStrip.values()) {
+  if (ends.length < 2) continue;
+  const pin = ends[0].r[ends[0].end].pin;
+  const lanes = ends.map(({ r, end }) => laneY(r, end));
+  const options = placements(ends.length, bb.freeInStrip(pin));
+  if (!options.length) throw new Error(`ALU board: no room for ${ends.length} wires in the strip of ${pin}`);
+  const holes = options.reduce((best, o) => (dropCost(o, lanes) < dropCost(best, lanes) ? o : best));
+  ends.forEach(({ r, end }, i) => chosen.set(r, { ...chosen.get(r), [end]: holes[i] }));
+}
+for (const r of routes) bb.wire(chosen.get(r)?.a ?? r.a.hole(), chosen.get(r)?.b ?? r.b.hole(), r.color, r.via);
 
 // ---------------------------------------------------------------------------
 // ports

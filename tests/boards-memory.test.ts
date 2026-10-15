@@ -409,11 +409,13 @@ describe('RAM boards', () => {
     expect([pinNet(L, nets, 'C7', 'a'), pinNet(L, nets, 'C7', 'b')].sort()).toEqual(['port:CLK', edge].sort());
     expect(parts.R58.kind === 'resistor' && parts.R58.ohms).toBe(1000);
     expect([pinNet(L, nets, 'R58', 'a'), pinNet(L, nets, 'R58', 'b')].sort()).toEqual([GND_NET, edge].sort());
-    // write button to GND, plus the pull-up added on this board
+    // write button to GND and nothing else on pin 14, as in the netlist (Net-(SW4-Pad2) = U32.14 + SW4.2): no pull-up
     const i0 = net('U32', '4I0');
     expect(internal(i0)).toBe(true);
     expect([pinNet(L, nets, 'SW4', 'a'), pinNet(L, nets, 'SW4', 'b')].sort()).toEqual([GND_NET, i0].sort());
-    expect([pinNet(L, nets, 'R_SW4', 'a'), pinNet(L, nets, 'R_SW4', 'b')].sort()).toEqual([VCC_NET, i0].sort());
+    const onI0 = L.parts.filter((p) => p.kind !== 'wire' && p.kind !== 'port' && partPins(p).some((pin) => nets.netOf(p.board, pin.hole) === i0));
+    expect(onI0.map((p) => p.id).sort()).toEqual(['SW4', 'U32']);
+    expect(L.parts.some((p) => p.kind === 'resistor' && !/^R(5[0-8])$/.test(p.id))).toBe(false); // only R50-R57 (LEDs) and R58 (edge detector)
     expect(pinNet(L, buildNets(L, { buttons: new Set(['SW4']) }), 'U32', '4I0')).toBe(GND_NET);
   });
 
@@ -578,7 +580,7 @@ describe('MAR, RAM and IR on the bus (composed scene)', () => {
 
   it('runs LDA 14 through fetch and decode at chip level (T0 MI|CO, T1 RO|II, T2 IO|MI, T3 RO)', () => {
     const t = bench(L);
-    const busLeds = () => t.leds(range('bus/D', 8, 74));
+    const busLeds = () => t.leds(range('bus/D', 8, 2).reverse()); // bit 0 = D9 ... bit 7 = D2
     const irLeds = () => t.leds(range('ir/D', 8, 26).reverse());
     const ramLeds = () => t.leds(range('ram/D', 8, 36).reverse());
     t.set({ CLK: 0, CLR: 0, '~MI': 1, RI: 0, '~RO': 1, '~II': 1, '~IO': 1 });

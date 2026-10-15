@@ -21,9 +21,9 @@ import { LayoutBuilder, type BoardBuilder, type LedColor, type PortSide } from '
  * each nibble's bus wires stay on their own side. Each LED straddles the
  * centre channel in a column of its own: anode in the bottom strip (the
  * signal), cathode in the top strip, which its 220 Ω resistor takes to the
- * top GND rail. The low nibble runs 173 Q -> LED strip -> 245 A on one lane
- * per bit. Lanes lie between hole rows. Every pin of the three chips is
- * used, so nothing is left floating.
+ * top GND rail. The low nibble runs 173 Q -> LED strip -> 245 A. Lanes lie
+ * between hole rows; no two wires lie on top of each other and only one pair
+ * crosses. Every pin of the three chips is used, so nothing is left floating.
  */
 
 const b = new LayoutBuilder();
@@ -89,23 +89,39 @@ for (let k = 1; k <= 4; k++) gnd(bb, U13.pin(`A${k}`)); // the 245 drives BUS7-4
 for (const u of [U14, U15]) bb.wire(at('d', u.pin('~G2')), at('d', u.pin('~G1')), 'white');
 
 // ---- bus -> D inputs (blue), from the 245's B strips --------------------------------
+// Each bundle is a staircase (every wire shifted one column from the last).
+// The first wire runs on the lane between rows d and e; each next one takes
+// the next lane out and starts one hole further from the chip, so it leaves
+// above the lanes already used and no two wires cross.
 
+const STAIR_ROWS: Row[] = ['d', 'd', 'c', 'b'];
 for (let k = 0; k < 4; k++) {
+  const y = 7 - k;
   // U14 D(k) = BUS(7-k) = U13 B(k+1); U15 D(k) = BUS(3-k) = U13 B(k+5)
-  bb.wireLane(at('d', U14.pin(`D${k}`)), at('d', U13.pin(`B${k + 1}`)), 4 + k, 'blue');
-  bb.wireLane(at('d', U13.pin(`B${k + 5}`)), at('d', U15.pin(`D${k}`)), 7 - k, 'blue');
+  bb.wireLane(at(STAIR_ROWS[k], U14.pin(`D${k}`)), at('d', U13.pin(`B${k + 1}`)), y, 'blue');
+  bb.wireLane(at(STAIR_ROWS[k], U13.pin(`B${k + 5}`)), at('d', U15.pin(`D${k}`)), y, 'blue');
 }
 
 // ---- outputs (yellow) and LEDs ---------------------------------------------------------
+// High nibble: U14 Q(k) = IR(7-k) -> its LED strip (the IR tag sits there
+// too), a staircase like the bus wires: lane 11 + k, starting one hole
+// deeper each time.
+// Low nibble: U15 Q(k) = IR(3-k) -> LED strip -> U13 A(k+5). The two wires
+// of a bit use different holes of the LED strip and lanes that keep their
+// ends apart, so no two wires lie on top of each other and none cross
+// (except IR0's lane 15, over U13's short ground jumper).
+// [Q row, LED row, lane] for Q -> LED, then [LED row, A row, lane] for LED -> A.
+const HIGH_ROWS: Row[] = ['g', 'g', 'h', 'i'];
+const LOW_IN: [Row, Row, number][] = [['g', 'g', 11], ['h', 'i', 13], ['g', 'g', 12], ['g', 'i', 14]];
+const LOW_OUT: [Row, Row, number][] = [['h', 'g', 12], ['g', 'h', 13], ['i', 'i', 14], ['j', 'j', 15]];
 
 for (let k = 0; k < 4; k++) {
   const hi = 7 - k, lo = 3 - k;
-  const y = 11 + k;
-  // high nibble: U14 Q(k) = IR(7-k) -> its LED strip (the IR tag sits there too)
-  bb.wireLane(at('g', U14.pin(`Q${k}`)), `g${LEDS_HIGH[k]}`, y, 'yellow');
-  // low nibble: U15 Q(k) = IR(3-k) -> LED strip -> U13 A(k+5), one lane per bit
-  bb.wireLane(at('g', U15.pin(`Q${k}`)), `g${LEDS_LOW[k]}`, y, 'yellow');
-  bb.wireLane(`h${LEDS_LOW[k]}`, at('g', U13.pin(`A${k + 5}`)), y, 'yellow');
+  bb.wireLane(at(HIGH_ROWS[k], U14.pin(`Q${k}`)), `g${LEDS_HIGH[k]}`, 11 + k, 'yellow');
+  const [qRow, inRow, inLane] = LOW_IN[k];
+  const [outRow, aRow, outLane] = LOW_OUT[k];
+  bb.wireLane(at(qRow, U15.pin(`Q${k}`)), `${inRow}${LEDS_LOW[k]}`, inLane, 'yellow');
+  bb.wireLane(`${outRow}${LEDS_LOW[k]}`, at(aRow, U13.pin(`A${k + 5}`)), outLane, 'yellow');
 
   ledCell(bb, `D${26 + k}`, 'blue', LEDS_HIGH[k], `R${40 + k}`, `IR${hi}`).live((c) => ((c.ir >> hi) & 1) === 1);
   ledCell(bb, `D${30 + k}`, 'yellow', LEDS_LOW[k], `R${44 + k}`, `IR${lo}`).live((c) => ((c.ir >> lo) & 1) === 1);

@@ -12,11 +12,14 @@ import { LayoutBuilder, type WireColor } from '../layout';
  *   U3 NE555 bistable: R5 1k pull-up on TRIG, R6 1k pull-up on RESET,
  *      SW2 common -> GND, throws -> TRIG (auto) / RESET (manual),
  *      THR -> GND, DIS open, C4 0.01uF on CV.
- *   Logic: U5A = AST & SEL, U4A = !SEL, U5B = MONO & !SEL, U6A = U5A | U5B,
- *      U4D = !HLT, CLK = U5C = U6A & U4D, ~CLK = U4F = !CLK.
- *   D1 blue CLK LED with 220R (R7: the gap between the 555 resistors R1-R6
- *   and the bus pull-downs R8-R15 in the KiCad numbering; inferred).
- *   One LED (330R, the value in the video parts lists) on each 555 output.
+ *   Logic, pin for pin as in the netlist: U5A = AST (pin 1) & SEL (pin 2),
+ *      U4A = !SEL, U5B = !SEL (pin 4) & MONO (pin 5), U6A = U5A | U5B,
+ *      U4D = !HLT, CLK = U5C = U6A (pin 9) & U4D (pin 10), ~CLK = U4F = !CLK.
+ *   D1 blue CLK LED: anode on CLK, R7 220R from its cathode to GND.
+ *   No LEDs on the 555 outputs: Ben uses them while building parts 1-3 and
+ *   removes these debug LEDs at the end of part 4 (videos.md); the netlist
+ *   has only D1. So the board shows what the finished module shows: the
+ *   CLK LED, and the mode on the position of SW2.
  *
  * Unused gate inputs (U4 2A/3A/5A, U5D, U6B-D) are tied to GND; Ben leaves
  * them open, which LS-TTL reads as high, so the logic is the same.
@@ -70,8 +73,6 @@ bb.wire('e4', at(U1, 'TRIG', 'g'), 'green', [[X(4), 11.0], [X(7), 11.0]]); // po
 bb.capacitor('C6', 1e-6, at(U1, 'TRIG', 'i'), 'bn7', true); // timing cap, + on TRIG/THR
 bb.capacitor('C5', 1e-8, at(U1, 'CV', 'a'), 'tn9');
 toRail(at(U1, '~RESET', 'j'), 'bp');
-bb.resistor('R_AST', 330, at(U1, 'OUT', 'i'), 'i10');
-bb.led('D_AST', 'blue', 'j10', 'bn10', 'Astable').live((c, m) => m.mode === 'auto' && c.clk === 1);
 
 // ---- U2 monostable --------------------------------------------------------------
 bb.wire(at(U2, 'DIS', 'd'), at(U2, 'THR', 'd'), 'green'); // DIS-THR tie
@@ -92,41 +93,40 @@ bb.button('SW1', 'e13', 'f13', {
 }, 'SW1 step');
 toRail('a13', 'tn'); // SW1 -> GND
 bb.wire('h13', at(U2, 'TRIG', 'h'), 'green'); // SW1 -> TRIG
-bb.resistor('R_MONO', 330, at(U2, 'OUT', 'i'), 'i19');
-bb.led('D_MONO', 'blue', 'j19', 'bn19', 'Monostable').live((c, m) => m.mode === 'manual' && c.clk === 1);
 
 // ---- U3 bistable ----------------------------------------------------------------
 toRail(at(U3, 'THR', 'a'), 'tn'); // THR -> GND
 bb.capacitor('C4', 1e-8, at(U3, 'CV', 'a'), 'tn30');
 bb.resistor('R5', 1000, at(U3, 'TRIG', 'j'), 'bp28'); // TRIG pull-up
 bb.resistor('R6', 1000, at(U3, '~RESET', 'j'), 'bp30'); // RESET pull-up
-// SW2: position 1 grounds TRIG (Q = 1, auto), position 0 grounds RESET (Q = 0, manual)
+// SW2: position 1 grounds TRIG (Q = 1, auto), position 0 grounds RESET (Q = 0, manual).
+// The slide shows the selected mode, like the latch: auto stays auto while the
+// app's Run button pauses the astable (then the step button still does
+// nothing, as on Ben's board), and a click selects manual.
 bb.slide('SW2', 'i22', 'i23', 'i24', {
   kind: 'slide',
-  get: (m: Machine) => (m.mode === 'auto' && m.running ? 1 : 0),
+  get: (m: Machine) => (m.mode === 'auto' ? 1 : 0),
   set: (m: Machine, pos: 0 | 1) => (pos ? m.start() : m.setMode('manual')),
 }, 'SW2 auto/manual');
 toRail('j23', 'bn'); // SW2 common -> GND
 bb.wire('h24', at(U3, 'TRIG', 'h'), 'green'); // throw -> TRIG
 bb.wire('g22', at(U3, '~RESET', 'h'), 'green', [[X(22), 12.0], [X(30), 12.0]]); // throw -> RESET
-bb.resistor('R_BI', 330, at(U3, 'OUT', 'i'), 'i31');
-bb.led('D_BI', 'blue', 'j31', 'bn31', 'Bistable (auto)').live((_c, m) => m.mode === 'auto');
 
 // ---- 555 outputs -> logic -----------------------------------------------------------
 // AST: U1 OUT -> up through the free column 11 -> lane 4.5 -> down at column 36 -> U5 1A
 bb.wire(at(U1, 'OUT', 'g'), at(U5, '1A', 'g'), 'orange', [
   [X(8), 11.0], [X(11), 11.0], [X(11), 4.5], [X(36), 4.5], [X(36), 11.0], [X(46), 11.0],
 ]);
-// MONO: U2 OUT -> up through column 20 -> lane 5.0 -> down at column 35 -> U5 2A
-bb.wire(at(U2, 'OUT', 'g'), at(U5, '2A', 'g'), 'purple', [
-  [X(17), 11.0], [X(20), 11.0], [X(20), 5.0], [X(35), 5.0], [X(35), 12.0], [X(49), 12.0],
+// MONO: U2 OUT -> up through column 20 -> lane 5.0 -> down at column 35 -> U5 2B (pin 5, as in the netlist)
+bb.wire(at(U2, 'OUT', 'g'), at(U5, '2B', 'g'), 'purple', [
+  [X(17), 11.0], [X(20), 11.0], [X(20), 5.0], [X(35), 5.0], [X(35), 12.0], [X(50), 12.0],
 ]);
 // SEL: U3 OUT -> along the bottom half -> U4 1A, then on to U5 1B
 bb.wire(at(U3, 'OUT', 'g'), at(U4, '1A', 'h'), 'green', [[X(29), 11.0], [X(34), 11.0], [X(34), 12.5]]);
 bb.wireLane(at(U4, '1A', 'i'), at(U5, '1B', 'i'), 14.0, 'green');
 
 // ---- clock logic ------------------------------------------------------------------
-bb.wireLane(at(U4, '1Y', 'h'), at(U5, '2B', 'h'), 13.0, 'yellow'); // !SEL -> U5B
+bb.wireLane(at(U4, '1Y', 'h'), at(U5, '2A', 'h'), 13.0, 'yellow'); // !SEL -> U5B (pin 4)
 bb.wire(at(U5, '1Y', 'i'), at(U6, '1A', 'i'), 'yellow'); // U5A -> U6A
 bb.wire(at(U5, '2Y', 'g'), at(U6, '1B', 'g'), 'yellow'); // U5B -> U6A
 // U6A -> U5C: round the right end of U5, through the free column 53
@@ -136,8 +136,9 @@ bb.wireLane(at(U5, '3Y', 'c'), at(U4, '6A', 'c'), 5.0, 'white'); // CLK -> U4F
 bb.port('CLK', at(U5, '3Y', 'a'), 'top');
 bb.port('~CLK', at(U4, '6Y', 'a'), 'top');
 bb.port('HLT', at(U4, '4A', 'a'), 'top');
-bb.resistor('R7', 220, at(U5, '3Y', 'b'), 'b54');
-bb.led('D1', 'blue', 'a54', 'tn54', 'CLK').live((c) => c.clk === 1);
+// D1 as in the netlist: anode on CLK (U5 3Y's strip), R7 from the cathode to GND
+bb.led('D1', 'blue', at(U5, '3Y', 'b'), 'b54', 'CLK').live((c) => c.clk === 1);
+bb.resistor('R7', 220, 'a54', 'tn54', 'R7');
 
 // unused inputs -> GND
 for (const p of ['2A', '3A']) toRail(at(U4, p, 'j'), 'bn');

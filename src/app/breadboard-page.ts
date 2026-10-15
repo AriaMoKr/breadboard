@@ -62,7 +62,7 @@ export function mountBreadboardPage(root: HTMLElement, opts: { machine?: Machine
     linkGroups[kind].style.display = on ? '' : 'none';
     return new Toggle({ label, value: on, onChange: (v) => (linkGroups[kind].style.display = v ? '' : 'none') }).el;
   };
-  const linkToggles = h('div', { class: 'row bb-link-toggles' }, h('span', { class: 'dim small' }, 'Wires between boards:'), linkToggle('bus', 'Bus', true), linkToggle('clock', 'Clock', true), linkToggle('control', 'Control lines', false), linkToggle('data', 'Data', false));
+  const linkToggles = h('div', { class: 'row bb-link-toggles' }, h('span', { class: 'dim small' }, 'Wires between boards:'), linkToggle('bus', 'Bus', true), linkToggle('clock', 'Clock', false), linkToggle('control', 'Control lines', false), linkToggle('data', 'Data', false));
   const b = layoutBounds(scene.layout);
   const pz = new PanZoom(view.el, { x: b.x - 4, y: b.y - 4, w: b.w + 8, h: b.h + 8 }, { hint: 'Drag to pan · wheel or pinch to zoom · click switches and buttons' });
   d.add(() => pz.dispose());

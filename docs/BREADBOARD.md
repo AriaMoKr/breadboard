@@ -45,24 +45,37 @@ A 7-segment display (`seg7`) is a 10-pin 0.6" part.
 
 ## Building a module board
 
-See `src/breadboard/boards/a-register.board.ts` (the reference) and its test in
-`tests/breadboard.test.ts`.
+See `src/breadboard/boards/a-register.board.ts` (the reference) and its tests in
+`tests/breadboard.test.ts` and `tests/boards-datapath.test.ts`.
 
 ```ts
 const b = new LayoutBuilder();
 const bb = b.board('a', { x: 0, y: 0 }, 'A register');     // more boards: b.board('ram2', { y: ROW }) …
-const U9 = bb.chip('U9', '74LS173', 4);                       // pin 1 at f4
-bb.toVcc(U9.pin('VCC')); bb.toGnd(U9.pin('GND'));             // red/black wires to the rails
-bb.wire(U9.free('~G1'), U9.free('~G2'), 'white');             // free(): next empty hole in that pin's strip
-bb.wireLane(a, b, 11.5, 'yellow');                            // long runs on their own lane (board-local y)
-bb.port('BUS0', U7.free('B1'), 'top');                        // off-board net, joined by name
-bb.led('D1', 'red', anodeHole, bb.railHole('bn', col)).live((c) => (c.a & 1) === 1);
+const U8 = bb.chip('U8', '74LS173', 4);                       // pin 1 at f4, notch left
+bb.toVcc(U8.pin('VCC')); bb.toGnd(U8.pin('GND'));             // red/black wires to the rails
+bb.wire(U8.free('~G1'), U8.free('~G2'), 'white');             // free(): next empty hole in that pin's strip
+bb.wireLane(fromHole, toHole, 11.0, 'yellow');                // long runs on their own lane (board-local y)
+bb.port('BUS7', 'a22', 'top');                                // off-board net, joined by name
+bb.led('D1', 'red', anodeHole, cathodeRailHole, 'A7').live((c) => (c.a >> 7 & 1) === 1);
 export default b.module({ id: 'a-register', title: 'A register', description: '…', videos: [11, 12, 13] });
 ```
 
 `LayoutBuilder` throws when two legs land in one hole or a hole doesn't exist. Use the Ben
 schematic reference designators as part ids (U8, D1, SW2, R58, C7 …) wherever the research notes
-give them.
+give them, and follow the netlist's bit order (Ben wires bit 7 to the lowest-numbered pin of each
+173/245).
+
+### Tidiness rules
+
+These are enforced by the "layout tidiness" checks in `tests/boards-datapath.test.ts`; copy them
+for new boards.
+
+* No wire passes under a chip, display or LED body, or over another part's leg.
+* No two wires lie on top of each other. Give each long run its own lane **between** hole rows
+  (e.g. 11.0, 12.0), and enter a strip from the hole right next to the lane.
+* Port tags sit on the outer rows (a or j) and point off the board, not across it.
+* Power wires go to a rail column that exists. Columns 8, 14, 20 … have no rail holes, so pick
+  the neighbouring column on the clear side.
 
 ### Port names (the contract between boards)
 

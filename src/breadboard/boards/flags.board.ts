@@ -5,16 +5,19 @@ import { LayoutBuilder, type BoardBuilder, type ChipHandle, type LiveLed, type W
  * Flags register (video 43), wired like Ben's alu.png / control.png and the
  * research notes:
  *   Zero detect on the ALU sum (SUM0-SUM7), zero = 1 when all eight are 0:
- *     U22 74LS02 NORs the pairs (SUM0,SUM1) (SUM2,SUM3) (SUM4,SUM5) (SUM6,SUM7)
- *     U23 74LS08: U23A = NOR1·NOR2, U23C = NOR3·NOR4, U23B = U23A·U23C = zero
+ *     U22 74LS02 NORs the pairs (SUM7,SUM6) (SUM5,SUM4) (SUM3,SUM2) (SUM1,SUM0),
+ *     gates 1-4 as in the KiCad netlist
+ *     U23 74LS08: U23A = NOR1·NOR2 (high nibble zero), U23C = NOR3·NOR4 (low
+ *     nibble zero), U23B = U23A·U23C = zero
  *   U19 74LS173: D0 = CARRY (ALU U20 C4), D1 = zero, D2/D3 unused -> GND
  *     ~G1/~G2 = ~FI, CP = CLK, MR = CLR, ~M/~N = GND (outputs always on)
  *     Q0 -> CF and green LED D34, Q1 -> ZF and green LED D35, each through
  *     220 Ω as in the schematic. CF/ZF go to the control EEPROMs' A8/A9.
  *
- * Choices where the notes are silent: the unused fourth AND gate (U23D) has
- * its inputs tied to VCC (where floating LS-TTL inputs would sit anyway);
- * which NOR/AND input takes which signal was chosen for uncrossed wires; the
+ * Choices of our own: the unused fourth AND gate (U23D, left open in the
+ * netlist) has its inputs tied to VCC (where floating LS-TTL inputs would sit
+ * anyway); the two inputs of U23A and of U23C are swapped against the
+ * netlist (an AND does not care) so the wires nest without crossing; the
  * LED resistors (our ids R_D34/R_D35, not Ben's numbers) sit between Q and
  * the LED.
  */
@@ -59,16 +62,18 @@ bb.wire(`d${col(U19.pin('~N'))}`, `d${col(U19.pin('~M'))}`, 'black');
 bb.toGnd(U19.pin('~M'));
 bb.toGnd(U19.pin('D3')); // unused flag bits (D3 first: it gets the rail hole below it, D2 leans right, clear of the ~FI tag)
 bb.toGnd(U19.pin('D2'));
-// unused AND gate U23D: 4B to the VCC strip next to it, 4A to 4B
-bb.wire(`c${col(U23.pin('VCC'))}`, `c${col(U23.pin('4B'))}`, 'red');
+// unused AND gate U23D: 4B straight up to the + rail, 4A to 4B
+bb.wire(`a${col(U23.pin('4B'))}`, `tp${col(U23.pin('4B'))}`, 'red');
 bb.wire(`d${col(U23.pin('4B'))}`, `d${col(U23.pin('4A'))}`, 'red');
 
 // ---------------------------------------------------------------------------
 // zero detector
 
-// SUM pairs into the NOR gates (gates 1, 2 face the bottom, 3, 4 the top)
+// SUM pairs into the NOR gates as in the netlist: U20 S4..S1 (bits 7-4) on
+// pins 2, 3, 5, 6 and U21 S4..S1 (bits 3-0) on pins 8, 9, 11, 12. Gates 1, 2
+// face the bottom, 3, 4 the top.
 const NOR_IN: [number, string][] = [
-  [0, '1A'], [1, '1B'], [2, '2A'], [3, '2B'], [4, '3A'], [5, '3B'], [6, '4A'], [7, '4B'],
+  [7, '1A'], [6, '1B'], [5, '2A'], [4, '2B'], [3, '3A'], [2, '3B'], [1, '4A'], [0, '4B'],
 ];
 for (const [bit, pin] of NOR_IN) portAt(`SUM${bit}`, U22.pin(pin));
 
