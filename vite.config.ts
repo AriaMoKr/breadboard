@@ -1,4 +1,5 @@
 import { defineConfig } from 'vitest/config';
+import { buildInfo } from './scripts/lib/build-info.mjs';
 
 // `npm run build` runs two builds into dist/: the app (index.html), then with `--mode vr` the VR
 // view (vr.html), so the app doesn't carry three.js. Each is one JS and one CSS file, so a plain
@@ -7,6 +8,8 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig(({ mode }) => ({
   base: './',
   server: { port: 5173 },
+  // the commit the pages are built from, and its date (src/build-info.ts shows them)
+  define: { __BUILD__: JSON.stringify(buildInfo()) },
   build: {
     cssCodeSplit: false,
     chunkSizeWarningLimit: 1500,

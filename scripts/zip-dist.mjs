@@ -3,11 +3,11 @@
 // Plain Node, no dependencies: deflated entries plus a central directory.
 // Reproducible: the same site makes the same zip, byte for byte, so rsync -c and caches see no
 // change after a rebuild. Every entry gets one date (see `stamp`) instead of its file's time.
-import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { deflateRawSync } from 'node:zlib';
+import { sourceDate } from './lib/build-info.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const dist = join(root, 'dist');
@@ -51,20 +51,12 @@ function crc32(buf) {
 }
 
 /**
- * The date of every entry: SOURCE_DATE_EPOCH when set (the reproducible-builds convention), else
- * the last commit's time, else 1980-01-01 (the earliest date a zip can hold).
+ * The date of every entry: SOURCE_DATE_EPOCH when set, else the last commit's time (see
+ * lib/build-info.mjs), else 1980-01-01 (the earliest date a zip can hold).
  */
 function stamp() {
   const DOS_EPOCH = Date.UTC(1980, 0, 1);
-  let seconds = Number(process.env.SOURCE_DATE_EPOCH || NaN);
-  if (!Number.isFinite(seconds)) {
-    try {
-      seconds = Number(execFileSync('git', ['log', '-1', '--format=%ct'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() || NaN);
-    } catch {
-      /* no git, or not a checkout */
-    }
-  }
-  return new Date(Number.isFinite(seconds) ? Math.max(DOS_EPOCH, seconds * 1000) : DOS_EPOCH);
+  return new Date(Math.max(DOS_EPOCH, sourceDate()?.getTime() ?? DOS_EPOCH));
 }
 
 /** MS-DOS time and date fields (2 s resolution), in UTC so every time zone makes the same zip. */

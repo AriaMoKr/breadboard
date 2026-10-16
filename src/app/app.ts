@@ -1,3 +1,4 @@
+import { buildLabel } from '../build-info';
 import type { Lab } from '../labs/types';
 import { Machine } from '../sim/machine';
 import { h } from '../ui/dom';
@@ -73,6 +74,7 @@ export class App {
       h('a', { class: 'nav-computer', href: '#/sandbox', dataset: { route: 'sandbox' } }, '✎ Breadboard sandbox'),
       h('a', { class: 'nav-computer', href: 'vr.html', dataset: { route: 'vr' }, title: 'The breadboard computer in 3D: VR headsets, or mouse and touch' }, '◈ VR view'),
       h('ol', { class: 'nav-chapters' }, items),
+      h('p', { class: 'nav-build', title: 'The commit this site was built from, and its date' }, buildLabel()),
     );
   }
 

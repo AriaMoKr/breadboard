@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { VRButton } from 'three/addons/webxr/VRButton.js';
 import { decodeLayout } from '../breadboard/share';
+import { buildLabel } from '../build-info';
 import { Carry, twist } from './carry';
 import { EXAMPLE_IDS, circuitExhibit, computerExhibit, exampleExhibit, exhibitHash, parseExhibitHash, type Exhibit, type ExhibitChoice, type Hold } from './exhibits';
 import { BOARD_T, buildComputerModel, disposeTree, type ComputerModel, type ControlHit } from './model';
@@ -39,6 +40,7 @@ renderer.xr.enabled = true;
 host.appendChild(renderer.domElement);
 document.body.appendChild(VRButton.createButton(renderer));
 const inVR = () => renderer.xr.isPresenting;
+document.querySelector('.vr-bar')?.append(Object.assign(document.createElement('span'), { className: 'vr-build', title: 'The commit this was built from, and its date', textContent: buildLabel() }));
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#111318');
@@ -158,6 +160,7 @@ function setExhibit(next: Exhibit, c: ExhibitChoice) {
       { label: () => (inVR() ? 'Put back' : 'Fit view'), run: () => (putBack(), inVR() || homeView()) },
     ],
     next.title,
+    buildLabel(),
   );
   panel.group.position.set(0, TABLE_TOP + 0.3, TABLE_Z - 0.62);
   panel.group.rotation.x = -0.12;

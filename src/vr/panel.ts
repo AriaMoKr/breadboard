@@ -45,7 +45,8 @@ export class ControlPanel {
   private status: CanvasPlane;
   private statusText = '';
 
-  constructor(actions: PanelAction[], title: string) {
+  /** `note`: small print in the bottom right corner (which version this is). */
+  constructor(actions: PanelAction[], title: string, note = '') {
     const cols = 4, rows = Math.ceil(actions.length / cols);
     const W = 0.6, H = 0.196 + rows * 0.072; // 0.34 for two rows of buttons
     const back = new CanvasPlane(W, H);
@@ -59,6 +60,10 @@ export class ControlPanel {
       g.fillStyle = '#e6e8ee';
       g.font = '600 34px system-ui, sans-serif';
       g.fillText(title, 28, 52);
+      g.fillStyle = '#6b7385';
+      g.font = '400 17px ui-monospace, Consolas, monospace';
+      g.textAlign = 'right';
+      g.fillText(note, w - 24, h - 14);
     });
     this.group.add(back.mesh);
 
