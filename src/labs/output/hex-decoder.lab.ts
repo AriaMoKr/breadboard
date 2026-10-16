@@ -12,7 +12,7 @@ import {
 } from './_shared';
 
 const CSS = `
-.hexdec .sevenseg .seg { cursor: pointer; }
+.hexdec .sevenseg .seg { cursor: pointer; stroke: transparent; stroke-width: 10; } /* the stroke widens the thin segments' hit area */
 .hexdec .sevenseg .seg.picked { stroke: var(--accent-2); stroke-width: 2.5; }
 .hexdec .expr { font-family: var(--mono); font-size: 0.9rem; line-height: 1.7; word-break: break-word; }
 .hexdec .expr .term { padding: 1px 3px; border-radius: 4px; }

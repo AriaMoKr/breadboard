@@ -38,6 +38,7 @@ const DP_CSS = `
 .dp-bit button.bad { outline: 2px solid var(--danger); outline-offset: 1px; }
 .dp-bit button.neg { border-style: dashed; }
 .dp-bit .dp-w { font: 0.62rem var(--mono); color: var(--fg-faint); white-space: nowrap; }
+@media (pointer: coarse) { .dp-bit button { width: 32px; height: 36px; } }
 .dp-bit .dp-w.neg { color: var(--danger); font-weight: 700; }
 /* checklist */
 .dp-check { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; counter-reset: dpstep; }

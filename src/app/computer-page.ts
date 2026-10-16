@@ -3,7 +3,7 @@ import { MICROCODE_VERSIONS, type MicrocodeVersionId } from '../sim/microcode';
 import type { ModuleId, Signal } from '../sim/signals';
 import { Button, select } from '../ui/components';
 import { ComputerView } from '../ui/computer-view';
-import { Disposer, h, setText } from '../ui/dom';
+import { Disposer, h, media, setText } from '../ui/dom';
 import { MicrocodePanel } from '../ui/microcode-panel';
 import { ProgramPanel } from '../ui/program-panel';
 
@@ -56,8 +56,8 @@ export function mountComputerWorkbench(root: HTMLElement, opts: ComputerWorkbenc
 
   // ---- toolbar ----
   const runBtn = new Button({ label: 'Run', kind: 'primary', title: 'Start/stop the astable clock (R)', onClick: () => (machine.running && machine.mode === 'auto' ? machine.stop() : machine.start()) });
-  const stepBtn = new Button({ label: 'Clock pulse', title: 'One clock cycle (Space)', onClick: () => machine.pulse() });
-  const instrBtn = new Button({ label: 'Step instruction', title: 'Run until the next T0 (I)', onClick: () => machine.stepInstruction() });
+  const stepBtn = new Button({ label: 'Clock pulse', shortLabel: 'Pulse', title: 'One clock cycle (Space)', onClick: () => machine.pulse() });
+  const instrBtn = new Button({ label: 'Step instruction', shortLabel: 'Step', title: 'Run until the next T0 (I)', onClick: () => machine.stepInstruction() });
   const resetBtn = new Button({ label: 'Reset', kind: 'danger', title: 'Reset (Backspace)', onClick: () => machine.reset() });
   const status = h('span', { class: 'mono dim status' });
   const versionPicker = opts.versionPicker
@@ -68,7 +68,16 @@ export function mountComputerWorkbench(root: HTMLElement, opts: ComputerWorkbenc
         'Microcode',
       )
     : null;
-  const toolbar = h('div', { class: 'toolbar' }, runBtn.el, stepBtn.el, instrBtn.el, resetBtn.el, versionPicker, status);
+  // Sticks to the top of the screen (CSS), so Run and Step stay in reach while you scroll the modules.
+  const toolbar = h('div', { class: 'toolbar workbench-toolbar' }, runBtn.el, stepBtn.el, instrBtn.el, resetBtn.el, versionPicker, status);
+  const narrow = media('(max-width: 860px)');
+  if (versionPicker && narrow) {
+    // On narrow screens, keep the sticky bar to one row of run controls: the picker goes underneath.
+    const placePicker = () => (narrow.matches ? toolbar.after(versionPicker) : toolbar.insertBefore(versionPicker, status));
+    narrow.addEventListener('change', placePicker);
+    d.add(() => narrow.removeEventListener('change', placePicker));
+    queueMicrotask(placePicker); // once the toolbar is in the page
+  }
 
   // ---- side tabs ----
   const tabs = opts.tabs ?? ['program', 'microcode', 'output'];

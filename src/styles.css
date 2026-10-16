@@ -32,6 +32,7 @@
   --wire-x: #ffb020;
 
   --radius: 10px;
+  --topbar-h: 44px; /* sticky bars sit right under the top bar */
   --mono: ui-monospace, 'Cascadia Code', 'JetBrains Mono', Consolas, monospace;
   --sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
@@ -76,7 +77,7 @@ code, pre { font-family: var(--mono); }
    ========================================================================== */
 .shell { min-height: 100vh; display: flex; flex-direction: column; }
 .topbar {
-  position: sticky; top: 0; z-index: 20;
+  position: sticky; top: 0; z-index: 20; min-height: var(--topbar-h);
   display: flex; align-items: center; gap: 14px;
   padding: 10px 18px; background: color-mix(in srgb, var(--bg) 88%, transparent);
   backdrop-filter: blur(8px); border-bottom: 1px solid var(--border);
@@ -291,6 +292,8 @@ pre.error { color: var(--danger); white-space: pre-wrap; }
 .workbench-side { position: sticky; top: 66px; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; max-height: calc(100vh - 80px); display: flex; flex-direction: column; }
 .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .toolbar .status { margin-left: auto; font-size: 0.8rem; }
+.workbench-toolbar { position: sticky; top: var(--topbar-h); z-index: 10; background: var(--bg); padding: 6px 0; border-bottom: 1px solid var(--border); }
+.btn-label-short { display: none; }
 .tabs { display: flex; border-bottom: 1px solid var(--border); background: var(--panel-2); }
 .tabs button { flex: 1; font: inherit; font-size: 0.84rem; font-weight: 600; background: none; border: 0; color: var(--fg-dim); padding: 9px 8px; cursor: pointer; border-bottom: 2px solid transparent; }
 .tabs button.active { color: var(--fg); border-bottom-color: var(--accent); }
@@ -384,6 +387,7 @@ table.microcode td.uc-cell[tabindex]:hover { outline: 1px solid var(--accent); }
 .schematic .sch-switch.l1 .switch-body { stroke: var(--wire-1); }
 .schematic .sch-switch, .schematic .sch-probe { stroke: none; stroke-dasharray: none; }
 .schematic .sch-switch:focus-visible .switch-body { stroke: var(--accent); stroke-width: 2.5; }
+.schematic .switch-hit { fill: transparent; stroke: none; }
 .schematic .probe-led { fill: var(--led-off); stroke: rgba(0, 0, 0, 0.4); stroke-width: 1; }
 .schematic .sch-probe.l1.probe-red .probe-led { fill: var(--led-red); filter: drop-shadow(0 0 4px var(--led-red)); }
 .schematic .sch-probe.l1.probe-green .probe-led { fill: var(--led-green); filter: drop-shadow(0 0 4px var(--led-green)); }
@@ -398,15 +402,18 @@ table.microcode td.uc-cell[tabindex]:hover { outline: 1px solid var(--accent); }
    Responsive
    ========================================================================== */
 @media (max-width: 1250px) {
-  .workbench { grid-template-columns: minmax(0, 1fr); }
+  /* One column. Without the main column's own box the sticky toolbar stays up over the side panel too. */
+  .workbench { display: flex; flex-direction: column; align-items: stretch; gap: 10px; }
+  .workbench-main { display: contents; }
   .workbench-side { position: static; max-height: none; }
 }
 @media (max-width: 860px) {
+  :root { --topbar-h: 53px; }
   .shell-body { grid-template-columns: minmax(0, 1fr); }
   .btn.menu-btn { display: inline-flex; }
   .topbar-sub { display: none; }
   .topbar { padding: 8px 12px; }
-  .sidebar { position: fixed; top: 49px; left: 0; bottom: 0; width: min(320px, 86vw); height: auto; z-index: 30; transform: translateX(-102%); transition: transform 0.2s; box-shadow: 0 0 40px rgba(0, 0, 0, 0.5); }
+  .sidebar { position: fixed; top: var(--topbar-h); left: 0; bottom: 0; width: min(320px, 86vw); height: auto; z-index: 30; transform: translateX(-102%); transition: transform 0.2s; box-shadow: 0 0 40px rgba(0, 0, 0, 0.5); }
   .shell.nav-open .sidebar { transform: none; }
   .content { padding: 16px 16px 50px; }
   .computer {
@@ -418,4 +425,27 @@ table.microcode td.uc-cell[tabindex]:hover { outline: 1px solid var(--accent); }
   .lab-grid.two { grid-template-columns: minmax(0, 1fr); }
   .slider input { width: 110px; }
   .output-log { columns: 3; }
+  .btn-label-long { display: none; }
+  .btn-label-short { display: inline; }
+}
+
+/* Touch screens: a fingertip needs bigger targets than a mouse pointer (aim for 32 px or more). */
+@media (pointer: coarse) {
+  .btn, select { min-height: 38px; }
+  .topbar .btn { min-height: 0; }
+  .toggle { min-height: 34px; }
+  .toggle-track { width: 42px; height: 24px; border-radius: 12px; }
+  .toggle-knob { width: 18px; height: 18px; }
+  .toggle input:checked + .toggle-track .toggle-knob { transform: translateX(18px); }
+  .dip-bank { gap: 4px; padding: 4px; }
+  .dip { width: 24px; height: 40px; }
+  .dip-knob { height: 15px; }
+  .dip.on .dip-knob { bottom: 23px; }
+  .bits { gap: 4px; }
+  .bit { width: 24px; height: 24px; }
+  .bit.lo:nth-child(5) { margin-left: 8px; }
+  /* Schematics shrink to fit the screen. Stop at 3/4 of their size, so labels stay readable and
+     switches tappable, and let the panel scroll sideways. --sch-w is the drawing's own width. */
+  .schematic { min-width: calc(var(--sch-w, 0) * 0.75px); }
+  :has(> .schematic) { overflow-x: auto; }
 }

@@ -970,6 +970,21 @@ describe('shared UI pieces (fake DOM)', () => {
     expect(raf.size).toBe(0);
   });
 
+  it('Schematic: switch hit areas are bigger than the switch but never reach into a neighbour', () => {
+    const c = new Circuit();
+    const sch = new Schematic(c, { width: 300, height: 200 });
+    expect(asEl(sch.el).attributes.style).toContain('--sch-w: 300'); // touch screens keep it >= 3/4 size
+    const hit = (g: Element) => asEl(g).querySelector('.switch-hit')!.attributes;
+    const lone = sch.switch(c.input('x', 0), [200, 20]);
+    const a = sch.switch(c.input('a', 0), [40, 100]);
+    const b = sch.switch(c.input('b', 0), [40, 120]); // stacked 20 apart, as in the ALU labs
+    const d = sch.switch(c.input('d', 0), [40, 150]); // 30 below b
+    expect([hit(lone).y, hit(lone).height]).toEqual(['-18', '36']);
+    expect([hit(a).y, hit(a).height]).toEqual(['-10', '20']);
+    expect([hit(b).y, hit(b).height]).toEqual(['-10', '20']);
+    expect([hit(d).y, hit(d).height]).toEqual(['-15', '30']);
+  });
+
   it('select() exposes its <select>; SevenSegment dims segments', () => {
     let changed = 0;
     const sel = select([{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }], 'a', () => changed++, 'pick');

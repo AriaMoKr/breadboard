@@ -83,6 +83,8 @@ export class Schematic {
   private layerWires: SVGGElement;
   private layerParts: SVGGElement;
   private layerTop: SVGGElement;
+  /** Hit areas of the switches placed so far, so neighbouring ones don't overlap (see `switch`). */
+  private switchHits: { x: number; y: number; rect: SVGRectElement; half: number }[] = [];
 
   constructor(
     readonly circuit: Circuit,
@@ -95,7 +97,7 @@ export class Schematic {
     this.layerTop = s('g', { class: 'sch-top' });
     this.el = s(
       'svg',
-      { viewBox: `${opts.x0 ?? 0} ${opts.y0 ?? 0} ${opts.width} ${opts.height}`, class: `schematic ${opts.class ?? ''}`, role: 'img', preserveAspectRatio: 'xMidYMid meet' },
+      { viewBox: `${opts.x0 ?? 0} ${opts.y0 ?? 0} ${opts.width} ${opts.height}`, class: `schematic ${opts.class ?? ''}`, role: 'img', preserveAspectRatio: 'xMidYMid meet', style: `--sch-w: ${opts.width}` },
       this.layerBack,
       this.layerBus,
       this.layerWires,
@@ -380,7 +382,22 @@ export class Schematic {
     const g = s('g', { class: `sch-switch ${opts.momentary ? 'momentary' : ''}`, transform: `translate(${p.x},${p.y})`, tabindex: 0, role: 'button', 'aria-label': opts.label ?? net.name });
     const box = s('rect', { x: -22, y: -10, width: 22, height: 20, rx: 4, class: 'switch-body' });
     const knob = s('circle', { cx: -11, cy: 0, r: 5, class: 'switch-knob' });
-    g.append(box, knob);
+    // Invisible hit area, bigger than the switch so a fingertip finds it: wide (over the label)
+    // and up to 36 tall, but never reaching into a neighbouring switch's area.
+    const hit = s('rect', { x: -40, y: -18, width: 54, height: 36, class: 'switch-hit' });
+    const me = { x: p.x, y: p.y, rect: hit, half: 18 };
+    for (const o of this.switchHits) {
+      if (Math.abs(o.x - p.x) >= 54) continue;
+      const half = Math.max(10, Math.min(18, Math.abs(o.y - p.y) / 2));
+      for (const sw of [o, me]) {
+        if (half >= sw.half) continue;
+        sw.half = half;
+        sw.rect.setAttribute('y', String(-half));
+        sw.rect.setAttribute('height', String(2 * half));
+      }
+    }
+    this.switchHits.push(me);
+    g.append(hit, box, knob);
     if (opts.label) g.appendChild(s('text', { x: -28, y: 0, 'text-anchor': 'end', 'dominant-baseline': 'middle', class: 'sch-text', 'font-size': 13 }, opts.label));
     this.bind(net, g);
     const act = () => (opts.onToggle ? opts.onToggle(net) : this.circuit.toggle(net));

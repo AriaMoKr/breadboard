@@ -43,7 +43,7 @@ export default defineLab({
     // =====================================================================
     const tp = { v: [1, 0] as Bit[], en: [true, true], tri: false };
     const X1 = 80, X2 = 340, Y_RAIL = 30, Y_T1 = 50, Y_T2 = 96, Y_NODE = 126, Y_B1 = 156, Y_B2 = 202, Y_GND = 222;
-    const tpSvg = s('svg', { viewBox: '0 0 420 250', class: 'schematic ts-svg', role: 'img', 'aria-label': 'Two output stages wired together' });
+    const tpSvg = s('svg', { viewBox: '0 0 420 250', class: 'schematic ts-svg', role: 'img', 'aria-label': 'Two output stages wired together', style: '--sch-w: 420' });
     tpSvg.style.maxWidth = '480px';
     const seg = (x1: number, y1: number, x2: number, y2: number, cls: string) => {
       const l = s('line', { x1, y1, x2, y2, class: `wire ${cls}` });

@@ -243,7 +243,9 @@ export class Kit {
   pushButton(x: number, y1: number, y2: number) {
     const bar = s('line', { x1: x - 9, y1: y1 + 2, x2: x - 9, y2: y2 - 2, class: 'lever' });
     const stem = s('path', { d: `M${x - 9},${(y1 + y2) / 2} h-12 M${x - 21},${(y1 + y2) / 2 - 7} v14`, class: 'part' });
-    const g = s('g', { class: 'pushbutton' }, bar, stem);
+    // invisible hit area around the drawing, so the button is easy to tap
+    const hit = s('rect', { x: x - 30, y: y1 - 4, width: 38, height: y2 - y1 + 8, fill: 'transparent', stroke: 'none' });
+    const g = s('g', { class: 'pushbutton' }, hit, bar, stem);
     g.append(s('circle', { cx: x, cy: y1, r: 3.5, class: 'contact' }), s('circle', { cx: x, cy: y2, r: 3.5, class: 'contact' }));
     this.over.appendChild(g);
     let closed = false;

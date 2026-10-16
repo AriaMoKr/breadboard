@@ -346,6 +346,7 @@ const EXERCISE_CSS = `
 .cu-ex .cu-switches { display: flex; flex-wrap: wrap; gap: 5px; }
 .cu-ex .cu-switches button.sig { cursor: pointer; font-size: 0.8rem; padding: 4px 8px; background: var(--panel-2); min-width: 40px; }
 .cu-ex .cu-switches button.sig.on { background: var(--led-blue); color: #fff; }
+@media (pointer: coarse) { .cu-ex .cu-switches button.sig { padding: 8px 10px; } }
 .cu-ex .cu-prog { display: flex; flex-wrap: wrap; gap: 6px; }
 .cu-ex .cu-prog span { font-family: var(--mono); font-size: 0.78rem; border: 1px solid var(--border); border-radius: 6px; padding: 2px 7px; color: var(--fg-dim); }
 .cu-ex .cu-prog span.cur { border-color: var(--led-green); color: var(--fg); box-shadow: inset 3px 0 0 var(--led-green); }

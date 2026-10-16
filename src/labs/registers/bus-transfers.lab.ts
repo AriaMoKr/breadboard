@@ -43,6 +43,7 @@ const CSS = `
 .bt-svg .bt-led.blue.on { fill: var(--led-blue); }
 .bt-svg .bt-led.yellow.on { fill: var(--led-yellow); }
 .bt-svg .bt-sw { cursor: pointer; }
+.bt-svg .bt-sw rect.hit { fill: transparent; }
 .bt-svg .bt-sw rect.body { fill: #c0392b; }
 .bt-svg .bt-sw rect.knob { fill: #f4f4f4; transition: y 0.1s; }
 .bt-svg .bt-sw:focus-visible rect.body { stroke: var(--accent); stroke-width: 2; }
@@ -82,7 +83,7 @@ export default defineLab({
     const log: { text: string; bad: boolean }[] = [];
 
     // ---- SVG ----
-    const svg = s('svg', { viewBox: `0 0 ${W} ${H}`, class: 'schematic bt-svg', role: 'img', 'aria-label': 'Bus with six modules' });
+    const svg = s('svg', { viewBox: `0 0 ${W} ${H}`, class: 'schematic bt-svg', role: 'img', 'aria-label': 'Bus with six modules', style: `--sch-w: ${W}` });
     svg.style.maxWidth = `${W + 60}px`;
     const gStubs = s('g');
     const gBus = s('g');
@@ -133,7 +134,8 @@ export default defineLab({
         const cx = x + 18 + i * 16 + (i >= 4 ? 4 : 0);
         if (m.id === 'sw') {
           const g = s('g', { class: 'bt-sw', tabindex: 0, role: 'button', 'aria-label': `switch bit ${bit}` });
-          g.append(s('rect', { x: cx - 6, y: y + 28, width: 12, height: 20, rx: 2, class: 'body' }), s('rect', { x: cx - 4, y: y + 38, width: 8, height: 8, rx: 1, class: 'knob' }));
+          // hit: the switch's whole 16-unit slot and a bit above and below, for fingertips
+          g.append(s('rect', { x: cx - 8, y: y + 22, width: 16, height: 32, class: 'hit' }), s('rect', { x: cx - 6, y: y + 28, width: 12, height: 20, rx: 2, class: 'body' }), s('rect', { x: cx - 4, y: y + 38, width: 8, height: 8, rx: 1, class: 'knob' }));
           const flip = () => {
             if (anim) return;
             vals = { ...vals, sw: vals.sw ^ (1 << bit) };

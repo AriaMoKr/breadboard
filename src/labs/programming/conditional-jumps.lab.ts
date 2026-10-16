@@ -16,6 +16,7 @@ const CSS = `
 .cj-lab .quad h5 { margin: 0 0 4px; font-family: var(--mono); font-size: 0.74rem; display: flex; justify-content: space-between; gap: 4px; flex-wrap: wrap; }
 .cj-lab .quad svg { width: 100%; height: auto; display: block; }
 .cj-lab .quad rect { cursor: pointer; }
+@media (pointer: coarse) and (max-width: 600px) { .cj-lab .quads { grid-template-columns: minmax(0, 1fr); } } /* bigger cells for fingertips */
 .cj-lab .quad rect.z { fill: var(--panel); }
 .cj-lab .quad rect.nz { fill: color-mix(in srgb, var(--led-blue) 55%, var(--panel)); }
 .cj-lab .quad rect.diff { stroke: var(--accent-2); stroke-width: 1.6; }

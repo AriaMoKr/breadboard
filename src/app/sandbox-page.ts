@@ -6,7 +6,7 @@ import type { BoardSimulator, SimProblem } from '../breadboard/sim/types';
 import { PanZoom } from '../breadboard/viewer';
 import type { Level } from '../logic/circuit';
 import { Button, Slider, select } from '../ui/components';
-import { Disposer, animate, h, s, setText } from '../ui/dom';
+import { Disposer, animate, h, media, s, setText } from '../ui/dom';
 
 /**
  * Breadboard sandbox: place chips and parts on a BB830, wire them, and the
@@ -81,7 +81,12 @@ export function mountSandboxPage(root: HTMLElement): () => void {
     const b = layoutBounds(layout);
     return { x: b.x - 3, y: b.y - 3, w: b.w + 6, h: b.h + 6 };
   };
-  const pz = new PanZoom(view.el, content(), { height: '58vh', hint: 'Pick a part, then click holes · drag to pan · wheel to zoom' });
+  const pz = new PanZoom(view.el, content(), {
+    height: '58vh',
+    hint: 'Pick a part, then click holes · drag to pan · wheel to zoom',
+    touchHint: 'Pick a part, tap to zoom in, then tap holes · drag to pan · pinch to zoom',
+    tapZoom: true,
+  });
   d.add(() => pz.dispose());
   const ghost = s('g', { class: 'sb-ghost' });
 
@@ -275,6 +280,7 @@ export function mountSandboxPage(root: HTMLElement): () => void {
         return;
       }
       const hit = view.holeAt(view.scenePoint(e.clientX, e.clientY));
+      if (hit) setStatus(holeInfo(hit.board, hit.hole)); // touch screens have no hover
       if (!hit || tool.kind === 'select' || tool.kind === 'probe') return;
       if (twoPoint()) {
         if (!pending) {
@@ -308,6 +314,10 @@ export function mountSandboxPage(root: HTMLElement): () => void {
   };
 
   // ---- palette ----------------------------------------------------------------
+  // On narrow screens the palette is a drawer above the board, closed once you pick a part,
+  // so the board isn't pushed off the screen. Its summary names the part in hand.
+  const narrow = media('(max-width: 860px)');
+  const toolName = h('span', { class: 'sb-drawer-tool mono' }, 'Use');
   const toolButtons: { el: HTMLButtonElement; matches: (t: Tool) => boolean }[] = [];
   const toolBtn = (label: string, t: Tool, title: string, swatch?: string) => {
     const el = h('button', { type: 'button', class: 'sb-tool', title }, swatch ? h('i', { style: `background:${swatch}` }) : null, label);
@@ -317,6 +327,8 @@ export function mountSandboxPage(root: HTMLElement): () => void {
       drawGhost(null);
       toolButtons.forEach((b) => b.el.classList.toggle('active', b.matches(tool)));
       setStatus(hintFor(t));
+      setText(toolName, t.kind === 'chip' ? t.chip : label && t.kind !== 'led' ? label : title.replace(' (anode first)', ''));
+      if (narrow?.matches) drawer.open = false;
     });
     toolButtons.push({ el, matches: (x) => JSON.stringify(x) === JSON.stringify(t) });
     return el;
@@ -350,6 +362,9 @@ export function mountSandboxPage(root: HTMLElement): () => void {
     ),
   );
   toolButtons[0].el.classList.add('active');
+  const drawer = h('details', { class: 'sb-drawer' }, h('summary', null, h('span', null, 'Parts'), toolName), palette);
+  drawer.open = !narrow?.matches;
+  if (narrow) d.listen(narrow, 'change', () => (drawer.open = !narrow.matches));
 
   // ---- toolbar ----------------------------------------------------------------
   const runBtn = new Button({ label: 'Pause', onClick: () => { running = !running; runBtn.setLabel(running ? 'Pause' : 'Run'); } });
@@ -426,7 +441,7 @@ export function mountSandboxPage(root: HTMLElement): () => void {
 
   root.append(
     toolbar,
-    h('div', { class: 'sb-layout' }, palette, h('div', { class: 'sb-main' }, pz.el, status, partsEl)),
+    h('div', { class: 'sb-layout' }, drawer, h('div', { class: 'sb-main' }, pz.el, status, partsEl)),
     h('div', { class: 'sb-side' }, h('h4', null, 'Checks'), problemsEl),
   );
   view.layerOverlay.appendChild(ghost);

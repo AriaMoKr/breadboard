@@ -65,7 +65,11 @@ export function mountBreadboardPage(root: HTMLElement, opts: { machine?: Machine
   };
   const linkToggles = h('div', { class: 'row bb-link-toggles' }, h('span', { class: 'dim small' }, 'Wires between boards:'), linkToggle('bus', 'Bus', true), linkToggle('clock', 'Clock', false), linkToggle('control', 'Control lines', false), linkToggle('data', 'Data', false));
   const b = layoutBounds(scene.layout);
-  const pz = new PanZoom(view.el, { x: b.x - 4, y: b.y - 4, w: b.w + 8, h: b.h + 8 }, { hint: 'Drag to pan · wheel or pinch to zoom · click switches and buttons' });
+  const pz = new PanZoom(view.el, { x: b.x - 4, y: b.y - 4, w: b.w + 8, h: b.h + 8 }, {
+    hint: 'Drag to pan · wheel or pinch to zoom · click switches and buttons',
+    touchHint: 'Tap to zoom in, then tap switches and buttons · drag to pan · pinch to zoom',
+    tapZoom: true,
+  });
   d.add(() => pz.dispose());
 
   // ---- live state ----
@@ -86,8 +90,8 @@ export function mountBreadboardPage(root: HTMLElement, opts: { machine?: Machine
 
   // ---- toolbar ----
   const run = new Button({ label: 'Run', kind: 'primary', onClick: () => (machine.running && machine.mode === 'auto' ? machine.stop() : machine.start()) });
-  const pulse = new Button({ label: 'Clock pulse', onClick: () => machine.pulse() });
-  const step = new Button({ label: 'Step instruction', onClick: () => machine.stepInstruction() });
+  const pulse = new Button({ label: 'Clock pulse', shortLabel: 'Pulse', onClick: () => machine.pulse() });
+  const step = new Button({ label: 'Step instruction', shortLabel: 'Step', onClick: () => machine.stepInstruction() });
   const reset = new Button({ label: 'Reset', kind: 'danger', onClick: () => machine.reset() });
   // Same clock as the pot RV1 on the clock board: each follows the other.
   const speed = speedSlider(machine);

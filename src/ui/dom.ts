@@ -66,6 +66,11 @@ export function setClass(el: Element, cls: string, on: boolean) {
   if (el.classList.contains(cls) !== on) el.classList.toggle(cls, on);
 }
 
+/** `matchMedia(query)`, or null where there is none (the tests' fake DOM). */
+export function media(query: string): MediaQueryList | null {
+  return typeof matchMedia === 'undefined' ? null : matchMedia(query);
+}
+
 /**
  * requestAnimationFrame loop. `cb` gets the elapsed ms since the last frame.
  * Returns a stop function. Safe to call in non-browser environments (no-op).

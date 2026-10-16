@@ -22,6 +22,7 @@ const CSS = `
 .tr-cell.cur { outline: 2px solid var(--accent); outline-offset: 1px; }
 .tr-wires { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 4px; max-width: 330px; }
 .tr-wires button { font: 600 0.75rem var(--mono); padding: 5px 0; border-radius: 6px; border: 1px solid var(--border); background: var(--panel-2); color: var(--fg); cursor: pointer; }
+@media (pointer: coarse) { .tr-cell { width: 32px; height: 32px; } .tr-wires button { padding: 9px 0; } }
 .tr-wires button.fixed { background: color-mix(in srgb, var(--ok) 30%, var(--panel)); border-color: var(--ok); }
 .tr-wires button.fine { color: var(--fg-faint); }
 .tr-wires button.probe { border-style: dashed; }

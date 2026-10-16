@@ -26,6 +26,7 @@ const MO_CSS = `
 .mo-lab .select { max-width: 100%; min-width: 0; flex-wrap: wrap; }
 .mo-lab .select select { max-width: 100%; min-width: 0; }
 .mo-lab .panel-body > * { min-width: 0; max-width: 100%; }
+@media (pointer: coarse) { .mo-lab .panel-body > .schematic { min-width: calc(var(--sch-w, 0) * 0.75px); max-width: none; } } /* as in styles.css */
 .mo-lab .truth-table td.sel, .mo-lab .truth-table th.sel { outline: 2px solid var(--accent-2); outline-offset: -2px; }
 .mo-lab .truth-table td.on { color: var(--led-red); font-weight: 700; }
 .mo-lab .truth-table td.bad { background: color-mix(in srgb, var(--danger) 25%, transparent); }
