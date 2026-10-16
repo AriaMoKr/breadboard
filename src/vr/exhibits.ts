@@ -1,4 +1,5 @@
 import { MODULE_BOARDS } from '../breadboard/boards';
+import { hzFromPot } from '../breadboard/boards/clock.board';
 import { composeComputer } from '../breadboard/computer-layout';
 import { EXAMPLES } from '../breadboard/examples';
 import type { Layout } from '../breadboard/layout';
@@ -61,6 +62,19 @@ export const exhibitHash = (c: ExhibitChoice) => (c.kind === 'circuit' ? `#${c.c
 
 // ---- Ben's computer ----
 
+/**
+ * RV1 as the VR knob turns it: like a log-taper pot, its travel spreads Ben's 0.72–480 Hz evenly
+ * (a decade per ~100°), and 0 is still the fast end. Ben's pot is linear: its fastest tenth spans
+ * 7–480 Hz, a few degrees of wrist per octave, too fine to set with a controller. Only the knob's
+ * angle in VR differs; the speeds and the board are Ben's.
+ */
+const HZ_FAST = hzFromPot(0);
+const HZ_SLOW = hzFromPot(1);
+export const speedDial = {
+  get: (m: Machine) => Math.max(0, Math.min(1, Math.log(HZ_FAST / m.hz) / Math.log(HZ_FAST / HZ_SLOW))),
+  set: (m: Machine, t: number) => m.setHz(HZ_FAST * (HZ_SLOW / HZ_FAST) ** t),
+};
+
 export function computerExhibit(): Exhibit & { machine: Machine } {
   const composed = composeComputer([...MODULE_BOARDS.values()]);
   const live = composed.live.controls;
@@ -106,7 +120,7 @@ export function computerExhibit(): Exhibit & { machine: Machine } {
       const c = machine.computer;
       for (const id of ledIds) model.setLed(id, composed.live.leds[id](c, machine));
       for (const id of segIds) model.setSeg7(id, composed.live.seg7[id](c, machine));
-      for (const [id, ctl] of Object.entries(live)) model.setControl(id, ctl.kind === 'button' ? +pressed.has(id) : ctl.get(machine));
+      for (const [id, ctl] of Object.entries(live)) model.setControl(id, ctl.kind === 'button' ? +pressed.has(id) : (id === 'clock/RV1' ? speedDial : ctl).get(machine));
     },
     status() {
       const c = machine.computer;
@@ -132,8 +146,9 @@ export function computerExhibit(): Exhibit & { machine: Machine } {
         case 'dip':
           return { end: (click) => click && (ctl.set(machine, ctl.get(machine) ^ (1 << (hit.bit ?? 0))), notify()) };
         case 'pot': {
-          const t0 = ctl.get(machine);
-          return { end() {}, turn: (by) => (ctl.set(machine, Math.max(0, Math.min(1, t0 + by))), notify()) };
+          const dial = hit.part === 'clock/RV1' ? speedDial : ctl;
+          const t0 = dial.get(machine);
+          return { end() {}, turn: (by) => (dial.set(machine, Math.max(0, Math.min(1, t0 + by))), notify()) };
         }
       }
       return null;

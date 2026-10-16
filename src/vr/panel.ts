@@ -125,6 +125,11 @@ export class ControlPanel {
     this.refresh();
   }
 
+  /** The label of the button `target` is. */
+  labelOf(target: THREE.Object3D) {
+    return this.buttons.find((x) => x.plane.mesh === target)?.action.label();
+  }
+
   press(target: THREE.Object3D) {
     const b = this.buttons.find((x) => x.plane.mesh === target);
     if (!b || b.action.disabled?.()) return;

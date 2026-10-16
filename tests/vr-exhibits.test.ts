@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { EXAMPLES } from '../src/breadboard/examples';
-import { circuitExhibit, computerExhibit, exampleExhibit, exhibitHash, parseExhibitHash, type Exhibit } from '../src/vr/exhibits';
+import { hzFromPot } from '../src/breadboard/boards/clock.board';
+import { circuitExhibit, computerExhibit, exampleExhibit, exhibitHash, parseExhibitHash, speedDial, type Exhibit } from '../src/vr/exhibits';
 import { buildComputerModel, type ComputerModel, type ControlHit } from '../src/vr/model';
 
 /** A press and release, as a click on a control. */
@@ -106,5 +107,30 @@ describe('the computer in VR', () => {
     expect(e.machine.computer.programMode).toBe(true);
     expect(e.describe({ part: 'mar/SW6' }, false)).toBe('SW6 program/run: program');
     expect(e.describe({ part: 'clock/RV1' }, true)).toMatch(/^RV1 speed: .* Hz · hold the trigger and twist$/);
+  });
+
+  it('spreads the speed evenly over RV1, a decade per ~100° of twist', () => {
+    const e = computerExhibit();
+    const m = e.machine;
+    speedDial.set(m, 0);
+    expect(m.hz).toBeCloseTo(hzFromPot(0)); // ~480 Hz, as Ben's pot turned fully fast
+    speedDial.set(m, 1);
+    expect(m.hz).toBeCloseTo(hzFromPot(1)); // ~0.72 Hz
+    speedDial.set(m, 0.5);
+    expect(m.hz).toBeCloseTo(Math.sqrt(hzFromPot(0) * hzFromPot(1))); // halfway, on a log scale: ~19 Hz
+    expect(speedDial.get(m)).toBeCloseTo(0.5);
+    // a twist of a tenth of the travel (27°) changes the speed by the same factor anywhere
+    const turned = (from: number) => {
+      speedDial.set(m, from);
+      const hz = m.hz;
+      e.begin({ part: 'clock/RV1' })!.turn!(-0.1);
+      return m.hz / hz;
+    };
+    expect(turned(0.15)).toBeCloseTo(turned(0.85));
+    expect(turned(0.15)).toBeGreaterThan(1.8); // and faster, as on the board
+    expect(turned(0.15)).toBeLessThan(2.1);
+    // beyond 480 Hz (Faster on the panel) the knob rests at the fast end
+    m.setHz(10_000);
+    expect(speedDial.get(m)).toBe(0);
   });
 });

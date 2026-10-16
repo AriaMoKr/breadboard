@@ -304,7 +304,7 @@ for (const i of [0, 1]) {
     const o = found?.object;
     const hit = hitOf(o);
     const hold = hit && begin(hit);
-    debugLog('trigger', { hand: i, on: hit ? `${hit.part}${hit.bit === undefined ? '' : `#${hit.bit}`}` : isPanel(o) ? 'panel' : 'nothing', m: found && +found.distance.toFixed(3) });
+    debugLog('trigger', { hand: i, on: hit ? `${hit.part}${hit.bit === undefined ? '' : `#${hit.bit}`}` : isPanel(o) ? `panel: ${panel!.labelOf(o!)}` : 'nothing', m: found && +found.distance.toFixed(3) });
     if (hold) ray.hold = { hold, object: o!, twist: new Twist(ctrl.quaternion) };
     else if (isPanel(o)) panel!.press(o!);
   });
