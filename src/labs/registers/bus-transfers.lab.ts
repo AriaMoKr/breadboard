@@ -1,5 +1,5 @@
 import { Button, note, panel, row } from '../../ui/components';
-import { Disposer, animate, h, s, setClass, setText } from '../../ui/dom';
+import { Disposer, animate, h, media, s, setClass, setText } from '../../ui/dom';
 import { levelClass } from '../../ui/schematic';
 import { defineLab } from '../types';
 import { BUS_MODULES, busControlWord, busModuleOutput, clockBus, resolveBus, type BusModuleId, type BusRegId, type BusTransfer, type BusValues } from './_model';
@@ -12,10 +12,17 @@ import { Checklist, bin8, labFrame, levelLegend } from './_shared';
  * animated as a packet travelling along the bus.
  */
 
-const W = 400, H = 444;
+/**
+ * Touch screens: the input switches sit in two rows of four (high nibble on top), twice as far
+ * apart, so a fingertip hits one switch. The switch box grows and the rows below move down.
+ */
+const TOUCH = media('(pointer: coarse)')?.matches ?? false;
+const SW_ROW = TOUCH ? 34 : 0; // the second row of switches
+const SW_PITCH = TOUCH ? 32 : 16;
+const W = 400, H = 444 + SW_ROW;
 const BUS_X = 200;
 const busLineX = (bit: number) => 186 + (7 - bit) * 4;
-const ROW_Y = [28, 168, 308];
+const ROW_Y = [28, 168 + SW_ROW, 308 + SW_ROW];
 const BOX_W = 150, BOX_H = 112;
 const LAYOUT: Record<BusModuleId, { side: 'l' | 'r'; row: number }> = {
   sw: { side: 'l', row: 0 },
@@ -111,6 +118,8 @@ export default defineLab({
       pills: { kind: 'in' | 'out'; g: SVGGElement }[];
     }
     const views = new Map<BusModuleId, ModView>();
+    /** Top of each input switch (its row), for placing the knob. */
+    const swTop = new Map<SVGElement, number>();
 
     const pill = (x: number, y: number, label: string, onClick: () => void) => {
       const g = s('g', { class: 'bt-pill', tabindex: 0, role: 'button', 'aria-pressed': 'false', 'aria-label': label });
@@ -125,7 +134,8 @@ export default defineLab({
 
     for (const m of BUS_MODULES) {
       const x = boxX(m.id), y = ROW_Y[LAYOUT[m.id].row];
-      const box = s('rect', { x, y, width: BOX_W, height: BOX_H, rx: 8, class: 'bt-box' });
+      const extra = m.id === 'sw' ? SW_ROW : 0; // the switch box's second row (touch screens)
+      const box = s('rect', { x, y, width: BOX_W, height: BOX_H + extra, rx: 8, class: 'bt-box' });
       gBoxes.appendChild(box);
       gBoxes.appendChild(s('text', { x: x + 9, y: y + 18, class: 'bt-title' }, m.name));
       const leds: SVGElement[] = [];
@@ -134,8 +144,11 @@ export default defineLab({
         const cx = x + 18 + i * 16 + (i >= 4 ? 4 : 0);
         if (m.id === 'sw') {
           const g = s('g', { class: 'bt-sw', tabindex: 0, role: 'button', 'aria-label': `switch bit ${bit}` });
-          // hit: the switch's whole 16-unit slot and a bit above and below, for fingertips
-          g.append(s('rect', { x: cx - 8, y: y + 22, width: 16, height: 32, class: 'hit' }), s('rect', { x: cx - 6, y: y + 28, width: 12, height: 20, rx: 2, class: 'body' }), s('rect', { x: cx - 4, y: y + 38, width: 8, height: 8, rx: 1, class: 'knob' }));
+          const sx = TOUCH ? x + 18 + (i % 4) * SW_PITCH : cx;
+          const sy = TOUCH && i >= 4 ? y + SW_ROW : y; // touch: bits 3-0 on a second row
+          swTop.set(g, sy);
+          // hit: the switch's whole slot and a bit above and below, for fingertips
+          g.append(s('rect', { x: sx - SW_PITCH / 2, y: sy + 22, width: SW_PITCH, height: 32, class: 'hit' }), s('rect', { x: sx - 6, y: sy + 28, width: 12, height: 20, rx: 2, class: 'body' }), s('rect', { x: sx - 4, y: sy + 38, width: 8, height: 8, rx: 1, class: 'knob' }));
           const flip = () => {
             if (anim) return;
             vals = { ...vals, sw: vals.sw ^ (1 << bit) };
@@ -155,7 +168,7 @@ export default defineLab({
           leds.push(c);
         }
       }
-      const val = s('text', { x: x + 9, y: y + 66, class: 'bt-val' }, '');
+      const val = s('text', { x: x + 9, y: y + 66 + extra, class: 'bt-val' }, '');
       gBoxes.appendChild(val);
       // stub to the bus
       const ex = edgeX(m.id), my = midY(m.id);
@@ -170,7 +183,7 @@ export default defineLab({
       gTop.append(arrowOut, arrowIn);
       // control pills
       const pills: ModView['pills'] = [];
-      const py = y + 80;
+      const py = y + 80 + extra;
       const sigs: { kind: 'in' | 'out'; label: string }[] = [];
       if (m.inSig) sigs.push({ kind: 'in', label: m.inSig });
       if (m.outSig) sigs.push({ kind: 'out', label: m.id === 'b' ? 'BO*' : m.id === 'sw' ? 'ON BUS' : m.outSig });
@@ -260,7 +273,7 @@ export default defineLab({
           const on = ((value >> (7 - i)) & 1) === 1;
           if (m.id === 'sw') {
             const knob = el.lastChild as SVGRectElement;
-            knob.setAttribute('y', String(ROW_Y[LAYOUT[m.id].row] + (on ? 30 : 38)));
+            knob.setAttribute('y', String(swTop.get(el)! + (on ? 30 : 38)));
             el.setAttribute('aria-pressed', String(on));
           } else setClass(el, 'on', on);
         });

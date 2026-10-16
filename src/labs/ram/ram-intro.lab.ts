@@ -2,7 +2,7 @@ import { Circuit, type Level, type Net } from '../../logic/circuit';
 import { bin, hex } from '../../sim/assembler';
 import { Button, DipSwitch, Led, Toggle, note, panel, row } from '../../ui/components';
 import { Disposer, h, setClass, setText } from '../../ui/dom';
-import { Schematic } from '../../ui/schematic';
+import { Schematic, switchPitch } from '../../ui/schematic';
 import { defineLab } from '../types';
 import { Ls189, ls189Mode } from './_shared';
 import { ledRow, makeTable, scopedStyle } from './_ui';
@@ -60,7 +60,9 @@ export default defineLab({
     c.settle();
 
     // ---- schematic ----
-    const sch = new Schematic(c, { width: 520, height: 268 });
+    const chipH = 11 * switchPitch(); // 10 switched pins on the left
+    const grow = chipH - 220; // 0 with a mouse; touch screens space the switches out
+    const sch = new Schematic(c, { width: 520, height: 268 + grow });
     const leftPins = [
       { name: '1 A0', net: A[0] }, { name: '15 A1', net: A[1] }, { name: '14 A2', net: A[2] }, { name: '13 A3', net: A[3] },
       { name: '4 D1', net: D[0] }, { name: '6 D2', net: D[1] }, { name: '10 D3', net: D[2] }, { name: '12 D4', net: D[3] },
@@ -70,6 +72,7 @@ export default defineLab({
       label: '74LS189',
       sublabel: 'U25 · bits 3-0',
       width: 124,
+      height: chipH,
       left: leftPins,
       right: [5, 7, 9, 11].map((p, i) => ({ name: `O̅${i + 1} ${p}`, net: On[i], bubble: true })),
     });
@@ -96,8 +99,8 @@ export default defineLab({
       sch.wire(Q[i], g.output, [452, y]);
       sch.probe(Q[i], [460, y], { label: `bit ${i}`, color: 'red' });
     });
-    sch.text('74LS04', [390, 240], { class: 'cap', size: 11 });
-    sch.text('pin 16 = +5 V · pin 8 = GND', [212, 256], { class: 'cap', size: 10 });
+    sch.text('74LS04', [390, 240 + grow], { class: 'cap', size: 11 });
+    sch.text('pin 16 = +5 V · pin 8 = GND', [212, 256 + grow], { class: 'cap', size: 10 });
     d.add(sch.autoUpdate());
 
     // ---- front-panel controls ----

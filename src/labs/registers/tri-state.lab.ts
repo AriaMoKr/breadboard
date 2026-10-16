@@ -1,7 +1,7 @@
 import { Circuit, Trace, type Bit, type Level, type Net } from '../../logic/circuit';
 import { Scope, Toggle, note, panel, row } from '../../ui/components';
 import { Disposer, animate, h, s, setClass, setText } from '../../ui/dom';
-import { Schematic, levelClass } from '../../ui/schematic';
+import { Schematic, levelClass, switchPitch } from '../../ui/schematic';
 import { defineLab } from '../types';
 import { LS245_PINS, addLs245, joinOutputs, outputStage } from './_model';
 import { labFrame, levelLegend, runCircuit, truthTable } from './_shared';
@@ -235,14 +235,17 @@ export default defineLab({
     addLs245(c2, { dir: DIR, oe: OE, a: aNet, b: bNet, name: 'U7' });
     c2.settle();
 
-    const sch2 = new Schematic(c2, { width: 470, height: 300 });
+    // the Q switches sit level with the 245's A pins: 190 / 9 apart, wider on touch screens
+    const chipH = 9 * switchPitch(190 / 9);
+    const grow = chipH - 190;
+    const sch2 = new Schematic(c2, { width: 470, height: 300 + grow });
     const chip = sch2.chip(
       { x: 190, y: 50 },
       {
         label: '74LS245',
         sublabel: 'transceiver',
         width: 120,
-        height: 190,
+        height: chipH,
         left: aNet.map((n, i) => ({ name: `${LS245_PINS.A[i]} A${i + 1}`, net: n })).reverse(),
         right: bNet.map((n, i) => ({ name: `B${i + 1} ${LS245_PINS.B[i]}`, net: n })).reverse(),
         top: [{ name: 'DIR 1', net: DIR }],
@@ -255,7 +258,7 @@ export default defineLab({
       sch2.wire(aNet[bit], [70, p.y], p);
       sch2.switch(regIn[bit], [70, p.y], { label: `Q${bit}`, onToggle: settle2 });
     });
-    const other = sch2.chip({ x: 400, y: 50 }, { label: 'other', sublabel: 'module', width: 56, height: 190, left: bNet.map((n) => ({ name: '', net: n })).reverse(), bottom: [{ name: 'EN', net: otherEn }] });
+    const other = sch2.chip({ x: 400, y: 50 }, { label: 'other', sublabel: 'module', width: 56, height: chipH, left: bNet.map((n) => ({ name: '', net: n })).reverse(), bottom: [{ name: 'EN', net: otherEn }] });
     chip.right.forEach((p, k) => {
       const bit = 7 - k;
       sch2.wire(bNet[bit], p, other.left[k]);
@@ -265,10 +268,11 @@ export default defineLab({
     sch2.text('register (173 outputs)', [70, 36], { size: 10, class: 'gate-label', anchor: 'start' });
     sch2.wire(DIR, chip.top[0], [chip.top[0].x, 18], [150, 18]);
     sch2.switch(DIR, [150, 18], { label: 'DIR', onToggle: settle2 });
-    sch2.wire(OE, chip.bottom[0], [chip.bottom[0].x, 280], [150, 280]);
-    sch2.switch(OE, [150, 280], { label: '~OE', onToggle: settle2 });
-    sch2.wire(otherEn, other.bottom[0], [other.bottom[0].x, 280], [400, 280]);
-    sch2.switch(otherEn, [400, 280], { label: 'other EN', onToggle: settle2 });
+    const enY = 280 + grow;
+    sch2.wire(OE, chip.bottom[0], [chip.bottom[0].x, enY], [150, enY]);
+    sch2.switch(OE, [150, enY], { label: '~OE', onToggle: settle2 });
+    sch2.wire(otherEn, other.bottom[0], [other.bottom[0].x, enY], [400, enY]);
+    sch2.switch(otherEn, [400, enY], { label: 'other EN', onToggle: settle2 });
     d.add(sch2.autoUpdate());
 
     const s245 = h('div', { class: 'callout' });

@@ -71,6 +71,9 @@ last `loadSource()`.
 * `box(at, { width, height }, { dashed, fill, label })` — package outlines / gate groups under everything; `layer('back' | 'bus' | 'wires' | 'parts' | 'top')` and `add(el, layer)` for any other custom SVG.
 * `bus(points, { label: [x, y] })` — a thick multi-bit bus line; `handle.set('active' | 'idle' | 'floating' | 'contention' | 'off', '42')`.
 * The function returned by `autoUpdate()` also cancels a frame that is still queued.
+* Stacks of `switch()`es closer than about 36 apart are hard to hit with a finger. Space them (and
+  the chip pins they feed) with `switchPitch(normal)`: `normal` with a mouse, 36 on touch screens.
+  Then size the chip (`height`) and the schematic from it, as `ram-intro` and `eeprom` do.
 
 Reference labs to copy from:
 * `src/labs/latches/sr-latch.lab.ts`: gate level. It has a Circuit, a Schematic, a Trace and Scope timing diagram, a truth table, and slow motion.

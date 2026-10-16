@@ -1,5 +1,14 @@
 import type { Circuit, Level, Net } from '../logic/circuit';
-import { s } from './dom';
+import { media, s } from './dom';
+
+/**
+ * Spacing for a stack of switches and the chip pins they feed: `normal` with a mouse, at least
+ * 36 on touch screens so neighbouring switches are a fingertip apart. Drawings that use it grow
+ * taller there.
+ */
+export function switchPitch(normal = 20): number {
+  return media('(pointer: coarse)')?.matches ? Math.max(normal, 36) : normal;
+}
 
 /**
  * Live SVG schematics bound to a logic `Circuit`. Wires take the colour of

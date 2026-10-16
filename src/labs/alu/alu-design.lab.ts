@@ -1,7 +1,7 @@
 import type { Net } from '../../logic/circuit';
 import { LedBar, Toggle, note, panel, row } from '../../ui/components';
 import { Disposer, h, s, setClass, setText } from '../../ui/dom';
-import { Schematic } from '../../ui/schematic';
+import { Schematic, switchPitch } from '../../ui/schematic';
 import { defineLab } from '../types';
 import { BitRow, labFrame, levelLegend, truthTable } from '../registers/_shared';
 import { LS283_PINS, aluDetail, bitOf, buildAlu8, netsValue, toBinSpaced, toSigned } from './_model';
@@ -28,7 +28,10 @@ export default defineLab({
     const num = netsValue;
 
     // ---- schematic ----
-    const sch = new Schematic(c, { width: 390, height: 612 });
+    // the A and B switches sit level with the 74LS283 pins: 230 / 9 apart, wider on touch screens
+    const chipH = 9 * switchPitch(230 / 9);
+    const grow = chipH - 230; // per chip
+    const sch = new Schematic(c, { width: 390, height: 612 + 2 * grow });
     const SU_X = 96;
     const slice = (y0: number, lo: number, name: string, c0: Net, c4: Net) => {
       const bits = [3, 2, 1, 0].map((k) => lo + k);
@@ -36,7 +39,7 @@ export default defineLab({
         label: '74LS283',
         sublabel: `${name} · bits ${lo + 3}-${lo}`,
         width: 108,
-        height: 230,
+        height: chipH,
         left: [
           ...bits.map((b) => ({ name: `${LS283_PINS.A[b - lo]} A${b - lo + 1}`, net: A[b] })),
           ...bits.map((b) => ({ name: `${LS283_PINS.B[b - lo]} B${b - lo + 1}`, net: BX[b] })),
@@ -74,7 +77,7 @@ export default defineLab({
       return chip;
     };
     const hi = slice(40, 4, 'U20', C4L, COUT);
-    const lo = slice(336, 0, 'U21', SU, C4L);
+    const lo = slice(336 + grow, 0, 'U21', SU, C4L);
     // carry chain U21 C4 → U20 C0
     sch.wire(C4L, lo.top[0], hi.bottom[0]);
     sch.text('carry', [lo.top[0].x + 6, (lo.top[0].y + hi.bottom[0].y) / 2], { size: 10, anchor: 'start', class: 'gate-label' });
@@ -82,7 +85,7 @@ export default defineLab({
     sch.wire(COUT, hi.top[0], [hi.top[0].x, 16], [330, 16]);
     sch.probe(COUT, [338, 16], { label: 'C', color: 'yellow' });
     // SU line: all XOR gates + carry in of U21
-    sch.wire(SU, [SU_X, 22], [SU_X, 596], [lo.bottom[0].x, 596], lo.bottom[0]);
+    sch.wire(SU, [SU_X, 22], [SU_X, 596 + 2 * grow], [lo.bottom[0].x, 596 + 2 * grow], lo.bottom[0]);
     sch.switch(SU, [SU_X, 22], { label: 'SU', onToggle: flip });
     d.add(sch.autoUpdate());
 

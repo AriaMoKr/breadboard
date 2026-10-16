@@ -3,7 +3,7 @@ import { bin, hex } from '../../sim/assembler';
 import { HEX_DIGITS } from '../../sim/display';
 import { Button, DipSwitch, Led, LedBar, Scope, SevenSegment, Toggle, note, panel, row, select } from '../../ui/components';
 import { Disposer, animate, h, setText } from '../../ui/dom';
-import { Schematic } from '../../ui/schematic';
+import { Schematic, switchPitch } from '../../ui/schematic';
 import { badge, ledCell, makeHexDump, scopedStyle, stepList } from '../ram/_ui';
 import { defineLab } from '../types';
 import { Eeprom28C16, HEX_CA, T_WP_MAX_NS, T_WP_MIN_NS, checkWritePulse, rcPulseNs } from './_shared';
@@ -66,11 +66,14 @@ export default defineLab({
     const nWE = c.input('W̅E̅', 1);
     const addrPins = [8, 7, 6, 5, 4, 3, 2, 1, 23, 22, 19];
     const ioPins = [9, 10, 11, 13, 14, 15, 16, 17];
-    const sch = new Schematic(c, { width: 420, height: 330 });
+    const chipH = 12 * switchPitch(); // 11 switched address pins
+    const grow = chipH - 240; // 0 with a mouse; touch screens space the switches out
+    const sch = new Schematic(c, { width: 420, height: 330 + grow });
     const chip = sch.chip([150, 20], {
       label: '28C16',
       sublabel: '2K × 8 EEPROM',
       width: 120,
+      height: chipH,
       left: nA.map((n, i) => ({ name: `${addrPins[i]} A${i}`, net: n })),
       right: nIO.map((n, i) => ({ name: `I/O${i} ${ioPins[i]}`, net: n })),
       bottom: [{ name: 'C̅E̅', net: nCE, bubble: true }, { name: 'O̅E̅', net: nOE, bubble: true }, { name: 'W̅E̅', net: nWE, bubble: true }],
@@ -85,7 +88,7 @@ export default defineLab({
       sch.wire(n, p, [352, p.y]);
       sch.probe(n, [360, p.y], { color: 'red' });
     });
-    sch.text('LEDs (330 Ω)', [360, 290], { size: 10, class: 'cap' });
+    sch.text('LEDs (330 Ω)', [360, 290 + grow], { size: 10, class: 'cap' });
     const labels = ['C̅E̅', 'O̅E̅', 'W̅E̅'];
     chip.bottom.forEach((p, i) => {
       const net = [nCE, nOE, nWE][i];

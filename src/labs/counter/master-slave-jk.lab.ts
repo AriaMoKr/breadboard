@@ -1,7 +1,7 @@
 import { Circuit } from '../../logic/circuit';
 import { Button, Scope, Slider, Toggle, note, panel, readouts, row } from '../../ui/components';
 import { Disposer, h, setText } from '../../ui/dom';
-import { Schematic } from '../../ui/schematic';
+import { Schematic, switchPitch } from '../../ui/schematic';
 import { MetastabilityGuard, callout, netRecorder, stepLoop, truthTable } from '../latches/_shared';
 import { defineLab } from '../types';
 import { JK_ROWS, LS76_PINS, LS76_ROWS, jkRow, ls76, ls76Row, masterSlaveJK } from './_shared';
@@ -135,10 +135,13 @@ export default defineLab({
       else last76 = `J = ${J1.value}, K = ${K1.value}: on the next falling edge of 1CLK the flip-flop will ${['hold', 'reset', 'set', 'toggle'][jkRow(J1.value, K1.value)]}${PRE1.value === 1 && CLR1.value === 1 ? '' : ' (once PRE̅ and CLR̅ are both high again)'}.`;
       update76();
     };
-    const sch76 = new Schematic(c76, { width: 440, height: 236 });
+    // the input switches sit level with the 76's pins: 190 / 9 apart, wider on touch screens
+    const chipH76 = 9 * switchPitch(190 / 9);
+    const grow76 = chipH76 - 190;
+    const sch76 = new Schematic(c76, { width: 440, height: 236 + grow76 });
     const pinNet: Record<number, typeof J1 | undefined> = { 1: CLK1, 2: PRE1, 3: CLR1, 4: J1, 5: VCC76, 13: GND76, 14: Q1n, 15: Q1, 16: K1 };
     const pin = (n: number) => ({ name: `${n} ${LS76_PINS[n]}`, net: pinNet[n], bubble: n === 1 || n === 6 || n === 2 || n === 3 || n === 7 || n === 8 });
-    const chip76 = sch76.chip({ x: 160, y: 24 }, { label: '74LS76', sublabel: 'dual JK', width: 140, height: 190, left: [1, 2, 3, 4, 5, 6, 7, 8].map(pin), right: [16, 15, 14, 13, 12, 11, 10, 9].map(pin) });
+    const chip76 = sch76.chip({ x: 160, y: 24 }, { label: '74LS76', sublabel: 'dual JK', width: 140, height: chipH76, left: [1, 2, 3, 4, 5, 6, 7, 8].map(pin), right: [16, 15, 14, 13, 12, 11, 10, 9].map(pin) });
     const inputs76: [number, typeof J1, string, boolean][] = [[1, CLK1, 'CLK', true], [2, PRE1, 'PRE̅', false], [3, CLR1, 'CLR̅', false], [4, J1, 'J', false]];
     for (const [p, net, label, momentary] of inputs76) {
       const at = chip76.left[p - 1];
@@ -157,7 +160,7 @@ export default defineLab({
     sch76.probe(Q1n, [370, chip76.right[2].y], { label: 'Q̅', color: 'red' });
     sch76.wire(GND76, chip76.right[3], [330, chip76.right[3].y]);
     sch76.text('GND', [334, chip76.right[3].y], { anchor: 'start', size: 10, class: 'gate-label' });
-    sch76.text('flip-flop 2 (pins 6-12) unused here', [230, 230], { size: 10, class: 'gate-label' });
+    sch76.text('flip-flop 2 (pins 6-12) unused here', [230, 230 + grow76], { size: 10, class: 'gate-label' });
     d.add(sch76.autoUpdate());
     const tt76 = truthTable(['PRE̅', 'CLR̅', 'CLK', 'J', 'K', 'Q', ''], LS76_ROWS);
     const status76 = callout();
