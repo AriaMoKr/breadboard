@@ -109,7 +109,7 @@ const SW5 = bb.dip('SW5', 4, SW5_COL, {
     m.computer.dipAddress = ~v & 0x0f;
     m.changed();
   },
-});
+}, 'SW5 address');
 gnd(bb, SW5.pin(1, 'bottom'));
 gnd(bb, SW5.pin(2, 'bottom'));
 gnd(bb, SW5.pin(3, 'top'));
@@ -160,8 +160,9 @@ const sw6: LiveControl = {
     m.computer.programMode = pos === 0;
     m.changed();
   },
+  positions: ['program', 'run'],
 };
-b.add({ id: 'SW6', board: 'mar', label: 'SW6', kind: 'slide', a: `h${MODE}`, common: `h${MODE + 1}`, b: `h${MODE + 2}`, initial: 1 });
+b.add({ id: 'SW6', board: 'mar', label: 'SW6 program/run', kind: 'slide', a: `h${MODE}`, common: `h${MODE + 1}`, b: `h${MODE + 2}`, initial: 1 });
 b.live.controls.SW6 = sw6;
 gnd(bb, `h${MODE + 1}`);
 // PROG -> U33 S, on lane 13 under the address wires (nothing crosses it).

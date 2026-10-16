@@ -131,7 +131,7 @@ const SW3 = top.dip('SW3', 8, SW3_COL, {
     m.computer.dipData = ~v & 0xff;
     m.changed();
   },
-});
+}, 'SW3 data');
 for (let k = 1; k <= 8; k++) {
   const bit = k - 1;
   const mux = bit < 4 ? U27 : U26;

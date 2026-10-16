@@ -22,10 +22,14 @@ video by video.
   five example circuits, and **Share link** puts your circuit in a link (`#/sandbox/c1.…`) that
   opens it in anyone's sandbox. See [docs/BREADBOARD.md](docs/BREADBOARD.md).
 * **VR view** (`vr.html`): the breadboard computer in 3D on a table, run live by the simulator,
-  with a control panel behind it (Run/Stop, Pulse, Step, Reset, speed, program). In a WebXR
-  headset (Quest Browser, or Chrome/Edge with a PC headset) press **Enter VR**, point at the panel
-  and pull the trigger. On a screen, drag to look around and click the panel. It is built with
-  three.js from the same layout as the breadboard view (`src/vr/`), at 1.5x real size.
+  with a control panel behind it (Run/Stop, Pulse, Step, Reset, speed, program). The switches,
+  buttons and pot on the boards work too, as in the breadboard view: the clock's step button,
+  manual/auto and speed pot, the address and data DIP switches, write, program/run, signed and
+  reset. In a WebXR headset (Quest Browser, or Chrome/Edge with a PC headset) press **Enter VR**,
+  point and pull the trigger (twist the controller to turn the pot); the grip buttons pick the
+  computer up, and pulling both grips apart makes it bigger (up to 8x). On a screen, drag to look
+  around, double-click to look closer, and click. It is built with three.js from the same layout
+  as the breadboard view (`src/vr/`), at 1.5x real size.
 * **Chapter labs** (`#/lab/<id>`): each of the 44 videos maps to an interactive lab
   that rebuilds what that video builds. Examples: the 555 timer modes, SR/D latches,
   flip-flops, JK racing, tri-state buses, registers, two's complement, the ALU, RAM,

@@ -164,7 +164,7 @@ export type LiveSeg7 = (c: Computer, m: Machine) => number;
 
 export type LiveControl =
   | { kind: 'button'; press: (m: Machine) => void; release?: (m: Machine) => void }
-  | { kind: 'slide'; get: (m: Machine) => 0 | 1; set: (m: Machine, pos: 0 | 1) => void }
+  | { kind: 'slide'; get: (m: Machine) => 0 | 1; set: (m: Machine, pos: 0 | 1) => void; positions?: [string, string] }
   | { kind: 'dip'; get: (m: Machine) => number; set: (m: Machine, value: number) => void }
   | { kind: 'pot'; get: (m: Machine) => number; set: (m: Machine, t: number) => void };
 
@@ -173,7 +173,8 @@ export interface LiveBindings {
   leds: Record<string, LiveLed>;
   /** 7-seg part id -> segment byte (dp a b c d e f g, like src/sim/display.ts). */
   seg7: Record<string, LiveSeg7>;
-  /** Interactive part id -> what it does. DIP value: bit k-1 = switch k is ON. */
+  /** Interactive part id -> what it does. DIP value: bit k-1 = switch k is ON. A slide's
+   *  `positions` name what positions 0 and 1 select ("manual", "auto"). */
   controls: Record<string, LiveControl>;
 }
 

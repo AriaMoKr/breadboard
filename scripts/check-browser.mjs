@@ -1,7 +1,8 @@
 // Browser checks for what the unit tests can't see (npm run check:browser):
 // every page renders without errors, phones get no sideways scrolling and fingertip-sized
 // controls, the sticky toolbar, parts drawer and tap-to-zoom work, the two computer pages share
-// one machine, sandbox links round-trip, and the breadboard view keeps its frame rate.
+// one machine, sandbox links round-trip, the breadboard view keeps its frame rate, and the VR
+// view builds the computer, runs it and answers the mouse on its boards' switches and buttons.
 // With --dist it checks the built site instead (run `npm run build` first), plus the download
 // link, install support and offline use. Needs Node 22+ and an installed Chrome, Edge or Chromium.
 import { createServer, preview } from 'vite';
@@ -170,6 +171,50 @@ try {
     const errs = errors.slice(before);
     assert(!errs.length, errs.join('\n'));
     return `${r.counts.chips} chips, ${r.counts.leds} LEDs, ${r.counts.meshes} meshes; cycle ${r.a} -> ${r.b}`;
+  });
+
+  await check('VR view: the switches, buttons and pot on the boards work with the mouse', async () => {
+    // real mouse events (Chrome's input pipeline), aimed with the page's breadboardVR.screenPoint
+    const mouse = (type, { x, y }, extra = {}) => page.send('Input.dispatchMouseEvent', { type, x, y, button: 'left', buttons: type === 'mouseReleased' ? 0 : 1, clickCount: 1, ...extra });
+    const click = async (p, clickCount = 1) => {
+      await mouse('mouseMoved', p, { button: 'none', buttons: 0 });
+      await mouse('mousePressed', p, { clickCount });
+      await mouse('mouseReleased', p, { clickCount });
+      await sleep(60);
+    };
+    const at = (part, bit) => page.evaluate(`breadboardVR.screenPoint(${JSON.stringify(part)}${bit === undefined ? '' : `, ${bit}`})`);
+    const state = () => page.evaluate(`(() => { const m = breadboardVR.machine, c = m.computer; return { mode: m.mode, cycles: c.cycles, data: c.dipData, hz: m.hz }; })()`);
+    const s0 = await state();
+    // From the home view: data switches 1 and 8 on the RAM board (each about 3 px wide here).
+    await click(await at('ram/SW3', 0));
+    await click(await at('ram/SW3', 7));
+    const s1 = await state();
+    assert((s0.data ^ s1.data) === 0x81, `SW3 switches 1 and 8 changed the data switches from ${s0.data} to ${s1.data}`);
+    // Double-click the clock board's pot to look closer, then switch to manual and step twice.
+    const pot = await at('clock/RV1');
+    await click(pot);
+    await click(pot, 2);
+    await sleep(600);
+    const near = await at('clock/RV1');
+    assert(Math.hypot(near.x - pot.x, near.y - pot.y) > 20, 'double-clicking the board did not move the view closer');
+    await click(await at('clock/SW2'));
+    const s2 = await state();
+    assert(s0.mode === 'auto' && s2.mode === 'manual', `SW2 left the clock in ${s2.mode} mode`);
+    await click(await at('clock/SW1'));
+    await click(await at('clock/SW1'));
+    const s3 = await state();
+    assert(s3.cycles === s2.cycles + 2, `two presses of SW1 ran ${s3.cycles - s2.cycles} clock cycles`);
+    // Drag the pot down: faster, and the view stays put.
+    await mouse('mouseMoved', near, { button: 'none', buttons: 0 });
+    await mouse('mousePressed', near);
+    for (let dy = 5; dy <= 45; dy += 5) await mouse('mouseMoved', { x: near.x, y: near.y + dy });
+    await mouse('mouseReleased', { x: near.x, y: near.y + 45 });
+    await sleep(300);
+    const s4 = await state();
+    const after = await at('clock/RV1');
+    assert(s4.hz > s3.hz, `dragging RV1 down took the clock from ${s3.hz} to ${s4.hz} Hz`);
+    assert(Math.hypot(after.x - near.x, after.y - near.y) < 1, 'dragging the pot also turned the view');
+    return `SW3 switches, SW2 to manual, SW1 x2 = 2 cycles, RV1 ${s3.hz} -> ${Math.round(s4.hz)} Hz`;
   });
 
   // ---- phone --------------------------------------------------------------------------

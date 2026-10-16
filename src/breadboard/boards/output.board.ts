@@ -193,6 +193,7 @@ bot.slide('SW7', `c${SW}`, `c${SW + 1}`, `c${SW + 2}`, {
   set: (m: Machine, pos: 0 | 1) => {
     m.computer.signedDisplay = pos === 1;
   },
+  positions: ['unsigned', 'signed'],
 }, 'SW7 signed');
 bot.wire(`a${SW + 2}`, bot.railHole('tp', SW + 2), 'red');
 const a10 = U45.pin('A10');

@@ -123,3 +123,49 @@ export class ControlPanel {
     this.refresh();
   }
 }
+
+/** A label floating just above a point, always facing the viewer, drawn over everything. */
+export class Tooltip {
+  readonly sprite: THREE.Sprite;
+  private canvas = document.createElement('canvas');
+  private texture: THREE.CanvasTexture;
+  private text = '';
+
+  /** `height` in metres; the label is as wide as its text. */
+  constructor(height = 0.024) {
+    this.canvas.width = 1024;
+    this.canvas.height = 80;
+    this.texture = new THREE.CanvasTexture(this.canvas);
+    this.texture.colorSpace = THREE.SRGBColorSpace;
+    this.sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.texture, depthTest: false, transparent: true }));
+    this.sprite.center.set(0.5, 0); // anchored at its bottom centre
+    this.sprite.scale.set((height * this.canvas.width) / this.canvas.height, height, 1);
+    this.sprite.renderOrder = 10;
+    this.sprite.visible = false;
+  }
+
+  show(text: string, at: THREE.Vector3) {
+    if (text !== this.text) {
+      this.text = text;
+      const g = this.canvas.getContext('2d')!;
+      const { width: w, height: h } = this.canvas;
+      g.clearRect(0, 0, w, h);
+      g.font = '600 40px system-ui, sans-serif';
+      const tw = Math.min(w - 8, g.measureText(text).width + 40);
+      g.fillStyle = 'rgba(23, 26, 33, 0.92)';
+      roundRect(g, (w - tw) / 2, 4, tw, h - 8, 18);
+      g.fill();
+      g.fillStyle = '#ffffff';
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      g.fillText(text, w / 2, h / 2 + 1, w - 48);
+      this.texture.needsUpdate = true;
+    }
+    this.sprite.position.copy(at);
+    this.sprite.visible = true;
+  }
+
+  hide() {
+    this.sprite.visible = false;
+  }
+}

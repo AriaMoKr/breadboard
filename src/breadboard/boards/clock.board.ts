@@ -107,6 +107,7 @@ bb.slide('SW2', 'i22', 'i23', 'i24', {
   kind: 'slide',
   get: (m: Machine) => (m.mode === 'auto' ? 1 : 0),
   set: (m: Machine, pos: 0 | 1) => (pos ? m.start() : m.setMode('manual')),
+  positions: ['manual', 'auto'],
 }, 'SW2 auto/manual');
 toRail('j23', 'bn'); // SW2 common -> GND
 bb.wire('h24', at(U3, 'TRIG', 'h'), 'green'); // throw -> TRIG

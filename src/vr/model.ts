@@ -9,7 +9,8 @@ import { LED_COLORS, WIRE_COLORS } from '../breadboard/render';
  * The breadboard computer as a three.js model, built from the same Layout as the breadboard
  * view. Lengths are in breadboard pitch units (0.1"); the caller scales the root. Static parts
  * are merged into one mesh per material (few draw calls, for VR headsets); LEDs and display
- * segments are instanced so lighting one is a colour change.
+ * segments are instanced so lighting one is a colour change. Buttons, switches and pots keep
+ * their moving pieces apart, with hit boxes to point at (`hitTargets`).
  */
 
 /** Board thickness and part heights, in pitch units above the board's top surface. */
@@ -24,13 +25,28 @@ export interface ModelOptions {
   label?: (text: string) => THREE.Texture;
 }
 
+/** What a hit box stands for (its `userData`): a part, and for a DIP switch which switch. */
+export interface ControlHit {
+  part: string;
+  /** DIP switches: switch k is bit k-1. */
+  bit?: number;
+}
+
 export interface ComputerModel {
   root: THREE.Group;
   /** Width (x) and depth (z) in pitch units; the model is centred on the origin. */
   size: { w: number; d: number };
   setLed(id: string, on: boolean): void;
   setSeg7(id: string, byte: number): void;
-  counts: { boards: number; chips: number; leds: number; wires: number; seg7: number; meshes: number };
+  /**
+   * Invisible boxes over every button, slide switch and pot, and one per DIP switch: what a
+   * pointer ray can hit (`userData` is a `ControlHit`). The hovered one shows as a glow.
+   */
+  hitTargets: THREE.Mesh[];
+  /** Show a part's state: slide 0 | 1, DIP bits (bit k-1 = switch k ON), pot 0..1, button 1 = pressed. */
+  setControl(id: string, value: number): void;
+  setHover(hit: THREE.Object3D | null): void;
+  counts: { boards: number; chips: number; leds: number; wires: number; seg7: number; meshes: number; controls: number };
 }
 
 const mat = (color: string, opts: THREE.MeshStandardMaterialParameters = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.65, ...opts });
@@ -83,7 +99,36 @@ export function buildComputerModel(layout: Layout, opts: ModelOptions = {}): Com
     pieces.set(key, list);
   };
   const boards = new Map(layout.boards.map((b) => [b.id, b]));
-  const counts = { boards: layout.boards.length, chips: 0, leds: 0, wires: 0, seg7: 0, meshes: 0 };
+  const counts = { boards: layout.boards.length, chips: 0, leds: 0, wires: 0, seg7: 0, meshes: 0, controls: 0 };
+
+  // interactive parts: their moving pieces (caps, knobs, levers, the pot's slot) and hit boxes,
+  // one group per part, all under `controlsGroup`
+  const controlsGroup = new THREE.Group();
+  controlsGroup.name = 'controls';
+  const hitTargets: THREE.Mesh[] = [];
+  const controls = new Map<string, (value: number) => void>();
+  const hitMaterial = new THREE.MeshBasicMaterial({ color: '#8ab8ff', transparent: true, opacity: 0.3, depthWrite: false });
+  const piece = (key: string, material: () => THREE.Material, g: THREE.BufferGeometry) => {
+    if (!materials.has(key)) materials.set(key, material());
+    return new THREE.Mesh(g, materials.get(key));
+  };
+  const control = (p: Part, m: THREE.Matrix4, set: (value: number) => void, ...pieces: THREE.Object3D[]) => {
+    const g = new THREE.Group();
+    g.applyMatrix4(m);
+    g.add(...pieces);
+    controlsGroup.add(g);
+    controls.set(p.id, set);
+    counts.controls++;
+    return g;
+  };
+  /** A hit box from board-local corner (x0, z0) to (x1, z1), from the board up to height y1. */
+  const hitBox = (g: THREE.Group, hit: ControlHit, x0: number, z0: number, x1: number, z1: number, y1: number) => {
+    const mesh = new THREE.Mesh(box(x0, z0, x1, z1, 0, y1), hitMaterial);
+    mesh.visible = false; // raycasting ignores visibility: hit boxes are hit, and only drawn on hover
+    mesh.userData = hit;
+    g.add(mesh);
+    hitTargets.push(mesh);
+  };
 
   // ---- boards: one textured box each ----
   const boardSide = mat('#d9d7ce');
@@ -207,7 +252,10 @@ export function buildComputerModel(layout: Layout, opts: ModelOptions = {}): Com
       case 'button': {
         const c = at(p.a).add(at(p.b)).multiplyScalar(0.5);
         add('button', () => mat('#2b2d33'), box(c.x - 0.7, c.z - 0.7, c.x + 0.7, c.z + 0.7, 0, 0.7), m);
-        add('button-cap', () => mat('#111214'), new THREE.CylinderGeometry(0.42, 0.42, 0.45, 14).translate(c.x, 0.9, c.z), m);
+        const cap = piece('button-cap', () => mat('#111214'), new THREE.CylinderGeometry(0.42, 0.42, 0.45, 14));
+        cap.position.set(c.x, 0.9, c.z);
+        const g = control(p, m, (down) => (cap.position.y = down ? 0.62 : 0.9), cap);
+        hitBox(g, { part: p.id }, c.x - 1, c.z - 1, c.x + 1, c.z + 1, 1.6);
         return;
       }
       case 'slide': {
@@ -215,15 +263,31 @@ export function buildComputerModel(layout: Layout, opts: ModelOptions = {}): Com
         const horizontal = Math.abs(b2.x - a.x) >= Math.abs(b2.z - a.z);
         const hx = horizontal ? Math.abs(b2.x - a.x) / 2 + 0.6 : 0.55, hz = horizontal ? 0.55 : Math.abs(b2.z - a.z) / 2 + 0.6;
         add('slide', () => mat('#33363d'), box(c.x - hx, c.z - hz, c.x + hx, c.z + hz, 0, 0.9), m);
-        add('slide-knob', () => mat('#dcdcdc'), box(c.x - 0.3, c.z - 0.3, c.x + 0.3, c.z + 0.3, 0.9, 1.3), m);
+        // position 1 puts the knob towards b, as in the 2D view
+        const toB = b2.clone().sub(a).normalize();
+        const knob = piece('slide-knob', () => mat('#dcdcdc'), horizontal ? new THREE.BoxGeometry(1, 0.4, 0.6) : new THREE.BoxGeometry(0.6, 0.4, 1));
+        const set = (pos: number) => knob.position.copy(c).addScaledVector(toB, pos ? 0.6 : -0.6).setY(1.1);
+        set(p.initial ?? 0);
+        const g = control(p, m, set, knob);
+        hitBox(g, { part: p.id }, c.x - hx - 0.2, c.z - hz - 0.2, c.x + hx + 0.2, c.z + hz + 0.2, 1.8);
         return;
       }
       case 'dip': {
         const xa = colX(p.col) - 0.5, xb = colX(p.col + p.positions - 1) + 0.5;
         add('dip', () => mat('#c8302a'), box(xa, ROW_Y.e - 0.1, xb, ROW_Y.f + 0.1, 0, 1.0), m);
+        const levers = Array.from({ length: p.positions }, (_, k) => {
+          const lever = piece('dip-lever', () => mat('#f4f4f4'), new THREE.BoxGeometry(0.44, 0.25, 0.9));
+          lever.position.set(colX(p.col + k), 1.125, 0);
+          return lever;
+        });
+        // ON (bit set) is the row-e side, where the 2D view prints "ON"
+        const set = (bits: number) => levers.forEach((l, k) => (l.position.z = (bits >> k) & 1 ? ROW_Y.e + 0.85 : ROW_Y.f - 0.85));
+        set(0);
+        const g = control(p, m, set, ...levers);
+        // only as high as the levers: a ray at one lever from the side must not enter its neighbour's box first
         for (let k = 0; k < p.positions; k++) {
           const x = colX(p.col + k);
-          add('dip-lever', () => mat('#f4f4f4'), box(x - 0.22, ROW_Y.e + 0.4, x + 0.22, ROW_Y.e + 1.3, 1.0, 1.25), m);
+          hitBox(g, { part: p.id, bit: k }, x - 0.5, ROW_Y.e - 0.1, x + 0.5, ROW_Y.f + 0.1, 1.3);
         }
         return;
       }
@@ -232,6 +296,13 @@ export function buildComputerModel(layout: Layout, opts: ModelOptions = {}): Com
         const c = pins.reduce((s, q) => s.add(q), v(0, 0, 0)).multiplyScalar(1 / 3);
         add('pot', () => mat('#2f62c8'), box(c.x - 1.1, c.z - 1.1, c.x + 1.1, c.z + 1.1, 0, 1.0), m);
         add('pot-rotor', () => mat('#f0f0ee'), new THREE.CylinderGeometry(0.8, 0.8, 0.3, 18).translate(c.x, 1.15, c.z), m);
+        // the slot turns from -135° (t = 0) to +135° (t = 1), clockwise seen from above, as in 2D
+        const slot = piece('pot-slot', () => mat('#5a5f69'), new THREE.BoxGeometry(0.14, 0.05, 1.4));
+        slot.position.set(c.x, 1.32, c.z);
+        const set = (t: number) => (slot.rotation.y = -THREE.MathUtils.degToRad(-135 + 270 * Math.max(0, Math.min(1, t))));
+        set(0.5);
+        const g = control(p, m, set, slot);
+        hitBox(g, { part: p.id }, c.x - 1.3, c.z - 1.3, c.x + 1.3, c.z + 1.3, 1.8);
         return;
       }
       default:
@@ -283,14 +354,22 @@ export function buildComputerModel(layout: Layout, opts: ModelOptions = {}): Com
     segIndex.set(s.id, { at: i * 8, value: 0 });
   });
   segMesh.name = 'seg7-segments';
-  inner.add(segMesh);
+  inner.add(segMesh, controlsGroup);
 
   counts.meshes = inner.children.length;
   const SEG_BITS = [0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01, 0x80];
+  let hovered: THREE.Object3D | null = null;
   return {
     root,
     size: { w: bounds.w, d: bounds.h },
     counts,
+    hitTargets,
+    setControl: (id, value) => controls.get(id)?.(value),
+    setHover(hit) {
+      if (hovered) hovered.visible = false;
+      hovered = hit && hitTargets.includes(hit as THREE.Mesh) ? hit : null;
+      if (hovered) hovered.visible = true;
+    },
     setLed(id, on) {
       const i = ledIndex.get(id);
       if (i === undefined || ledOn[i] === on) return;

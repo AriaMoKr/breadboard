@@ -33,6 +33,55 @@ describe('VR model of the breadboard computer', () => {
     expect(Math.abs(centre.z)).toBeLessThan(5);
   });
 
+  it('has a hit box for every button, switch and pot, and one per DIP switch', () => {
+    const interactive = scene.layout.parts.filter((p) => p.kind === 'button' || p.kind === 'slide' || p.kind === 'dip' || p.kind === 'pot');
+    expect(model.counts.controls).toBe(interactive.length);
+    expect(model.hitTargets.length).toBe(interactive.reduce((n, p) => n + (p.kind === 'dip' ? p.positions : 1), 0));
+    for (const id of Object.keys(scene.live.controls)) expect(model.hitTargets.some((t) => t.userData.part === id), id).toBe(true);
+    expect(model.hitTargets.filter((t) => t.userData.part === 'ram/SW3').map((t) => t.userData.bit)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+  });
+
+  it('shows a hit box only while it is pointed at', () => {
+    const [a, b] = model.hitTargets;
+    expect(model.hitTargets.every((t) => !t.visible)).toBe(true);
+    model.setHover(a);
+    expect([a.visible, b.visible]).toEqual([true, false]);
+    model.setHover(b);
+    expect([a.visible, b.visible]).toEqual([false, true]);
+    model.setHover(null);
+    expect(b.visible).toBe(false);
+  });
+
+  it('moves slide knobs, DIP levers, button caps and the pot slot', () => {
+    const moving = (id: string) => model.hitTargets.find((t) => t.userData.part === id)!.parent!.children.filter((c) => !model.hitTargets.includes(c as THREE.Mesh));
+    const [knob] = moving('clock/SW2');
+    model.setControl('clock/SW2', 0);
+    const at0 = knob.position.clone();
+    model.setControl('clock/SW2', 1);
+    expect(knob.position.distanceTo(at0)).toBeCloseTo(1.2);
+
+    const levers = moving('ram/SW3');
+    expect(levers).toHaveLength(8);
+    model.setControl('ram/SW3', 0);
+    const off = levers.map((l) => l.position.z);
+    model.setControl('ram/SW3', 0b1);
+    expect(levers[0].position.z).toBeLessThan(off[0]); // towards row e, the ON side
+    expect(levers[1].position.z).toBe(off[1]);
+
+    const [cap] = moving('clock/SW1');
+    const up = cap.position.y;
+    model.setControl('clock/SW1', 1);
+    expect(cap.position.y).toBeLessThan(up);
+    model.setControl('clock/SW1', 0);
+    expect(cap.position.y).toBe(up);
+
+    const [slot] = moving('clock/RV1');
+    model.setControl('clock/RV1', 0);
+    const turned0 = slot.rotation.y;
+    model.setControl('clock/RV1', 1);
+    expect(turned0 - slot.rotation.y).toBeCloseTo(1.5 * Math.PI); // 270°, clockwise seen from above
+  });
+
   it('lights LEDs and display segments by id', () => {
     const domes = instanced('led-domes');
     const id = Object.keys(scene.live.leds)[0];
