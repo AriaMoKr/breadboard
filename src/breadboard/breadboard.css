@@ -23,9 +23,13 @@
 .bb-wire-end { fill: #c9ccd2; stroke: #6b6f76; stroke-width: 0.04; }
 
 .bb-lead { stroke: #a9adb4; stroke-width: 0.12; stroke-linecap: round; }
-.bb-led-dome { opacity: 0.32; stroke: rgba(0, 0, 0, 0.35); stroke-width: 0.05; transition: opacity 0.04s; }
+/* LEDs and digits change every frame while the computer runs. Their own layers (will-change)
+   and no fade transitions keep Chrome from repainting the whole scene each time: about 25-30 fps
+   before, 65 after (whole computer, headless Chrome). */
+.bb-led, .bb-seg7 { will-change: transform; }
+.bb-led-dome { opacity: 0.32; stroke: rgba(0, 0, 0, 0.35); stroke-width: 0.05; }
 .bb-led.led-white .bb-led-dome { opacity: 0.55; }
-.bb-led-glow { opacity: 0; transition: opacity 0.04s; pointer-events: none; }
+.bb-led-glow { opacity: 0; pointer-events: none; }
 .bb-led-shine { fill: #fff; opacity: 0.55; pointer-events: none; }
 .bb-led.on .bb-led-dome { opacity: 1; }
 .bb-led.on .bb-led-glow { opacity: 0.85; }
@@ -53,7 +57,7 @@
 .bb-pot-slot { stroke: #555; stroke-width: 0.16; stroke-linecap: round; }
 
 .bb-seg7-body { fill: #1c1c1f; stroke: #000; stroke-width: 0.05; }
-.bb-seg { fill: #3a1512; transition: fill 0.03s; }
+.bb-seg { fill: #3a1512; }
 .bb-seg.on { fill: #ff3420; }
 
 .bb-port-stub { stroke: #6d7280; stroke-width: 0.14; }

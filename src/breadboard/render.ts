@@ -465,7 +465,14 @@ export class LayoutView {
     });
     body.appendChild(hit);
     g.appendChild(body);
-    const set = (v: unknown) => knob.setAttribute('x', String(v ? 0 : -len / 2 + 0.2));
+    // Only write on a change: the live view calls this every frame, and rewriting even the same
+    // `x` makes Chrome repaint the whole (10 000-element) scene.
+    let on: boolean | null = null;
+    const set = (v: unknown) => {
+      if (!!v === on) return;
+      on = !!v;
+      knob.setAttribute('x', String(on ? 0 : -len / 2 + 0.2));
+    };
     set(part.initial ?? 0);
     this.handles.set(part.id, { part, el: g, set });
   }
@@ -482,9 +489,11 @@ export class LayoutView {
     const hit = s('circle', { cx, cy, r: 1.3, class: 'bb-hit' });
     hit.appendChild(s('title', null, `${part.label ?? part.id}: ${formatOhms(part.ohms)} potentiometer (drag to turn)`));
     g.appendChild(hit);
-    let t = 0.5;
+    let t = NaN;
     const set = (v: unknown) => {
-      t = Math.max(0, Math.min(1, Number(v)));
+      const nt = Math.max(0, Math.min(1, Number(v)));
+      if (nt === t) return; // called every frame by the live view; write only on a change
+      t = nt;
       slot.setAttribute('transform', `rotate(${-135 + 270 * t} ${cx} ${cy})`);
     };
     let drag: { y: number; t: number } | null = null;
@@ -500,7 +509,7 @@ export class LayoutView {
       this.emit(part.id, { type: 'pot', value: nt });
     });
     hit.addEventListener('pointerup', () => (drag = null));
-    set(t);
+    set(0.5);
     this.handles.set(part.id, { part, el: g, set });
   }
 
