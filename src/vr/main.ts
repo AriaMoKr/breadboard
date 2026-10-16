@@ -1,27 +1,27 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { VRButton } from 'three/addons/webxr/VRButton.js';
-import { MODULE_BOARDS } from '../breadboard/boards';
-import { composeComputer } from '../breadboard/computer-layout';
-import { Machine } from '../sim/machine';
-import { PROGRAMS } from '../sim/programs';
+import { decodeLayout } from '../breadboard/share';
 import { Carry, twist } from './carry';
-import { buildComputerModel, type ControlHit } from './model';
+import { EXAMPLE_IDS, circuitExhibit, computerExhibit, exampleExhibit, exhibitHash, parseExhibitHash, type Exhibit, type ExhibitChoice, type Hold } from './exhibits';
+import { BOARD_T, buildComputerModel, disposeTree, type ComputerModel, type ControlHit } from './model';
 import { ControlPanel, Tooltip } from './panel';
 import { boardTexture, labelTexture } from './textures';
 import './vr.css';
 
 /**
- * VR view: the breadboard computer on a table, run live by the simulator. In a headset
- * (WebXR, "Enter VR") you point with a controller and pull the trigger, at the control panel
- * behind the table or at the switches and buttons on the boards; the grip buttons pick the
- * computer up (both grips: pull apart to make it bigger). On a screen you orbit with the mouse or
- * a finger and click the panel and the boards.
+ * VR view: the breadboard computer on a table, run live by the simulator, or a circuit from the
+ * sandbox (vr.html#c1.… from a share link, or #example/<id>). In a headset (WebXR, "Enter VR")
+ * you point with a controller and pull the trigger, at the control panel behind the table or at
+ * the switches and buttons on the boards; the grip buttons pick the boards up (both grips: pull
+ * apart to make them bigger). On a screen you orbit with the mouse or a finger and click the
+ * panel and the boards. "Next ▸" on the panel goes through the computer and the examples.
  */
 
 const UNIT = 0.00254 * 1.5; // one breadboard pitch (0.1") in metres, at 1.5x real size
 const TABLE_TOP = 0.76;
 const TABLE_Z = -0.72; // the user starts at the origin, facing -z
+const TITLE = document.title;
 
 const host = document.getElementById('vr-root')!;
 const statusEl = document.getElementById('vr-status')!;
@@ -38,6 +38,7 @@ renderer.setSize(innerWidth, innerHeight);
 renderer.xr.enabled = true;
 host.appendChild(renderer.domElement);
 document.body.appendChild(VRButton.createButton(renderer));
+const inVR = () => renderer.xr.isPresenting;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#111318');
@@ -89,139 +90,103 @@ for (const [x, z] of [[-0.5, -0.44], [0.5, -0.44], [-0.5, 0.44], [0.5, 0.44]]) {
 table.position.z = TABLE_Z;
 scene.add(table);
 
-// ---- the computer ----
-const composed = composeComputer([...MODULE_BOARDS.values()]);
-const model = buildComputerModel(composed.layout, { boardTexture: boardTexture(renderer.capabilities.getMaxAnisotropy()), label: labelTexture });
-const ON_TABLE = new THREE.Vector3(0, TABLE_TOP + 2.6 * UNIT, TABLE_Z);
-/** Back on the table at 1.5x, after being picked up in VR. */
-function putBack() {
-  model.root.position.copy(ON_TABLE);
-  model.root.quaternion.identity();
-  model.root.scale.setScalar(UNIT);
-}
-putBack();
-scene.add(model.root);
-
-const machine = new Machine({ microcodeVersion: 'flags' });
-let program = PROGRAMS.findIndex((p) => p.id === 'count-by-3');
-const load = (i: number) => {
-  program = (i + PROGRAMS.length) % PROGRAMS.length;
-  const wasRunning = machine.running && machine.mode === 'auto';
-  machine.loadSource(PROGRAMS[program].source);
-  if (wasRunning) machine.start();
-};
-load(program);
-machine.setHz(4);
-machine.start();
-
-const ledIds = Object.keys(composed.live.leds);
-const segIds = Object.keys(composed.live.seg7);
-const live = composed.live.controls;
-const parts = new Map(composed.layout.parts.map((p) => [p.id, p]));
+// ---- what is on the table: the exhibit, its model, and its control panel ----
+const boardTex = boardTexture(renderer.capabilities.getMaxAnisotropy()); // shared by every model
+let exhibit: Exhibit | null = null;
+let choice: ExhibitChoice = { kind: 'computer' };
+let model: ComputerModel | null = null;
+let panel: ControlPanel | null = null;
+let home = UNIT; // the model's scale on the table
+let carry: Carry | null = null;
+let targets: THREE.Object3D[] = [];
+let notice = '';
 let dirty = true;
-machine.onChange(() => (dirty = true));
 
-const fmtHz = (hz: number) => (hz >= 1000 ? `${+(hz / 1000).toPrecision(3)} kHz` : `${+hz.toPrecision(2)} Hz`);
-const running = () => machine.running && machine.mode === 'auto';
-const inVR = () => renderer.xr.isPresenting;
+/** What "Next ▸" goes through: the computer, the sandbox's examples, and first a shared circuit when the link had one. */
+const order: ExhibitChoice[] = [{ kind: 'computer' }, ...EXAMPLE_IDS.map((id): ExhibitChoice => ({ kind: 'example', id }))];
+const indexOf = (c: ExhibitChoice) => order.findIndex((o) => exhibitHash(o) === exhibitHash(c));
 
-// ---- control panel, standing behind the table like a monitor ----
-const panel = new ControlPanel(
-  [
-    { label: () => (running() ? 'Stop' : 'Run'), run: () => (running() ? machine.stop() : machine.start()), primary: true },
-    { label: () => 'Pulse', run: () => machine.pulse() },
-    { label: () => 'Step', run: () => machine.stepInstruction() },
-    { label: () => 'Reset', run: () => machine.reset() },
-    { label: () => 'Slower', run: () => machine.setHz(Math.max(0.5, machine.hz / 2)) },
-    { label: () => 'Faster', run: () => machine.setHz(Math.min(500_000, machine.hz * 2)) },
-    { label: () => 'Program ▸', run: () => load(program + 1) },
-    { label: () => (inVR() ? 'Put back' : 'Fit view'), run: () => (putBack(), inVR() || homeView()) },
-  ],
-  'Breadboard 8-bit',
-);
-panel.group.position.set(0, TABLE_TOP + 0.3, TABLE_Z - 0.62);
-panel.group.rotation.x = -0.12;
-scene.add(panel.group);
-
-// ---- the switches, buttons and pot on the boards, as in the breadboard view ----
-
-/** What pressing a control does until it is let go: `end(click)` with click = not dragged. */
-interface Hold {
-  end(click: boolean): void;
-  /** Pots: turn by `by` (a whole turn is 1) from where the hold started. */
-  turn?(by: number): void;
+/** Back on the table at its home size, after being picked up in VR. */
+function putBack() {
+  if (!model) return;
+  model.root.position.set(0, TABLE_TOP + BOARD_T * home, TABLE_Z);
+  model.root.quaternion.identity();
+  model.root.scale.setScalar(home);
 }
 
-function begin(hit: ControlHit): Hold | null {
-  const ctl = live[hit.part];
-  const changed = () => machine.changed();
-  switch (ctl?.kind) {
-    case 'button':
-      ctl.press(machine);
-      model.setControl(hit.part, 1);
-      changed();
-      return {
-        end() {
-          ctl.release?.(machine);
-          model.setControl(hit.part, 0);
-          changed();
-        },
-      };
-    case 'slide':
-      return { end: (click) => click && (ctl.set(machine, ctl.get(machine) ? 0 : 1), changed()) };
-    case 'dip':
-      return { end: (click) => click && (ctl.set(machine, ctl.get(machine) ^ (1 << (hit.bit ?? 0))), changed()) };
-    case 'pot': {
-      const t0 = ctl.get(machine);
-      return { end() {}, turn: (by) => (ctl.set(machine, Math.max(0, Math.min(1, t0 + by))), changed()) };
-    }
+async function open(c: ExhibitChoice) {
+  try {
+    if (c.kind === 'circuit') {
+      const layout = await decodeLayout(c.code);
+      if (indexOf(c) < 0) order.unshift(c);
+      setExhibit(circuitExhibit('Shared circuit', layout), c);
+    } else setExhibit(c.kind === 'example' ? exampleExhibit(c.id) : computerExhibit(), c);
+  } catch (e) {
+    setExhibit(computerExhibit(), { kind: 'computer' });
+    notice = `The link has no circuit in it (${(e as Error).message}).`;
   }
-  return null;
 }
 
-function describe(hit: ControlHit): string {
-  const ctl = live[hit.part];
-  const name = parts.get(hit.part)?.label ?? hit.part.split('/').pop()!;
-  switch (ctl?.kind) {
-    case 'slide': {
-      const pos = ctl.get(machine);
-      return `${name}: ${ctl.positions?.[pos] ?? `position ${pos}`}`;
-    }
-    case 'dip': {
-      const k = hit.bit ?? 0;
-      return `${name} switch ${k + 1}: ${(ctl.get(machine) >> k) & 1 ? 'ON' : 'off'}`;
-    }
-    case 'pot': {
-      const value = hit.part === 'clock/RV1' ? fmtHz(machine.hz) : `${Math.round(ctl.get(machine) * 100)}%`;
-      return `${name}: ${value} · ${inVR() ? 'hold the trigger and twist' : 'drag up or down'}`;
-    }
-    case 'button':
-      return `${name} · push`;
+function setExhibit(next: Exhibit, c: ExhibitChoice) {
+  // let go of whatever the old one had in hand, and free its model and panel
+  press?.hold?.end(false);
+  press = null;
+  for (const ray of rays) ray.hold = null;
+  if (model) {
+    scene.remove(model.root);
+    disposeTree(model.root, [boardTex]);
   }
-  return name;
+  if (panel) {
+    scene.remove(panel.group);
+    disposeTree(panel.group);
+  }
+  exhibit = next;
+  choice = c;
+  notice = '';
+  model = buildComputerModel(next.layout, { boardTexture: boardTex, label: labelTexture });
+  // 1.5x real size; small circuits bigger, to cover some of the table (up to 6x)
+  home = Math.min(4 * UNIT, Math.max(UNIT, 0.62 / Math.max(model.size.w, model.size.d)));
+  putBack();
+  scene.add(model.root);
+  carry = new Carry(model.root, 0.5 * home, 8 * home);
+  carry.grip(holding);
+
+  panel = new ControlPanel(
+    [
+      ...next.actions,
+      { label: () => 'Next ▸', run: () => void open(order[(indexOf(choice) + 1) % order.length]) },
+      { label: () => (inVR() ? 'Put back' : 'Fit view'), run: () => (putBack(), inVR() || homeView()) },
+    ],
+    next.title,
+  );
+  panel.group.position.set(0, TABLE_TOP + 0.3, TABLE_Z - 0.62);
+  panel.group.rotation.x = -0.12;
+  scene.add(panel.group);
+  targets = [...panel.targets, ...model.hitTargets];
+  hover(null);
+
+  history.replaceState(null, '', location.pathname + location.search + exhibitHash(c));
+  document.title = c.kind === 'computer' ? TITLE : `${next.title} · ${TITLE}`;
+  document.body.dataset.ready = JSON.stringify({ exhibit: c.kind === 'example' ? `example/${c.id}` : c.kind, ...model.counts });
+  dirty = true;
 }
 
 function sync() {
-  const c = machine.computer;
-  for (const id of ledIds) model.setLed(id, composed.live.leds[id](c, machine));
-  for (const id of segIds) model.setSeg7(id, composed.live.seg7[id](c, machine));
-  for (const [id, ctl] of Object.entries(live)) if (ctl.kind !== 'button') model.setControl(id, ctl.get(machine));
-  const lines = [
-    PROGRAMS[program].title,
-    `${c.halted ? 'halted' : running() ? 'running' : 'stopped'} at ${fmtHz(machine.hz)} · T${c.step} · cycle ${c.cycles} · OUT ${c.out}`,
-  ];
+  if (!exhibit || !model || !panel) return;
+  exhibit.show(model);
+  const lines = exhibit.status();
   panel.setStatus(lines);
   panel.refresh();
-  statusEl.textContent = lines.join(' · ');
+  statusEl.textContent = [notice, ...lines].filter(Boolean).join(' · ');
   showTip();
 }
 
 // ---- pointing: mouse / finger on screen, controller rays in VR ----
 const raycaster = new THREE.Raycaster();
-const targets: THREE.Object3D[] = [...panel.targets, ...model.hitTargets];
 const pick = (): THREE.Intersection | undefined => raycaster.intersectObjects(targets, false)[0];
-const hitOf = (o: THREE.Object3D | null | undefined): ControlHit | null => (o && model.hitTargets.includes(o as THREE.Mesh) ? (o.userData as ControlHit) : null);
-const isPanel = (o: THREE.Object3D | null | undefined) => !!o && panel.targets.includes(o as THREE.Mesh);
+const hitOf = (o: THREE.Object3D | null | undefined): ControlHit | null => (o && model?.hitTargets.includes(o as THREE.Mesh) ? (o.userData as ControlHit) : null);
+const isPanel = (o: THREE.Object3D | null | undefined) => !!o && !!panel?.targets.includes(o as THREE.Mesh);
+const begin = (hit: ControlHit): Hold | null => exhibit?.begin(hit) ?? null;
 
 const tooltip = new Tooltip();
 scene.add(tooltip.sprite);
@@ -229,15 +194,15 @@ let hovered: THREE.Object3D | null = null;
 const box = new THREE.Box3();
 function showTip() {
   const hit = hitOf(hovered);
-  if (!hit) return tooltip.hide();
+  if (!hit || !exhibit) return tooltip.hide();
   box.setFromObject(hovered!);
   const at = box.getCenter(new THREE.Vector3()).setY(box.max.y + 0.004);
-  tooltip.show(describe(hit), at);
+  tooltip.show(exhibit.describe(hit, inVR()), at);
 }
 function hover(o: THREE.Object3D | null) {
   hovered = o;
-  panel.setHover(o);
-  model.setHover(o);
+  panel?.setHover(o);
+  model?.setHover(o);
   showTip();
 }
 
@@ -280,7 +245,7 @@ const finish = (e: PointerEvent, cancelled: boolean) => {
   if (press.hold) press.hold.end(click);
   else if (click) {
     const o = fromPointer(e);
-    if (isPanel(o)) panel.press(o!);
+    if (isPanel(o)) panel!.press(o!);
   }
   press = null;
   controls.enabled = true;
@@ -292,6 +257,7 @@ renderer.domElement.addEventListener('pointercancel', (e) => finish(e, true));
 // switches are small from the home view.
 let fly: { from: [THREE.Vector3, THREE.Vector3]; to: [THREE.Vector3, THREE.Vector3]; t: number } | null = null;
 renderer.domElement.addEventListener('dblclick', (e) => {
+  if (!model) return;
   fromPointer(e);
   const spot = raycaster.intersectObject(model.root, true)[0]?.point;
   if (!spot) return;
@@ -308,9 +274,8 @@ function flyOn(ms: number) {
   if (fly.t === 1) fly = null;
 }
 
-// VR controllers: the trigger points and presses, the grip picks the computer up (both grips:
-// pull apart to make it bigger, from half to 8 times the size on the table).
-const carry = new Carry(model.root, 0.5 * UNIT, 8 * UNIT);
+// VR controllers: the trigger points and presses, the grip picks the boards up (both grips: pull
+// apart to make them bigger, from half to 8 times their size on the table).
 const holding: THREE.XRTargetRaySpace[] = [];
 const rollOf = (ctrl: THREE.Object3D) => new THREE.Euler().setFromQuaternion(ctrl.quaternion, 'YXZ').z;
 const rays: { ctrl: THREE.XRTargetRaySpace; line: THREE.Line; hold: { hold: Hold; roll0: number } | null }[] = [];
@@ -326,7 +291,7 @@ for (const i of [0, 1]) {
     const hit = hitOf(o);
     const hold = hit && begin(hit);
     if (hold) ray.hold = { hold, roll0: rollOf(ctrl) };
-    else if (isPanel(o)) panel.press(o!);
+    else if (isPanel(o)) panel!.press(o!);
   });
   ctrl.addEventListener('selectend', () => {
     ray.hold?.hold.end(true);
@@ -334,12 +299,12 @@ for (const i of [0, 1]) {
   });
   ctrl.addEventListener('squeezestart', () => {
     if (!holding.includes(ctrl)) holding.push(ctrl);
-    carry.grip(holding);
+    carry?.grip(holding);
   });
   ctrl.addEventListener('squeezeend', () => {
     const at = holding.indexOf(ctrl);
     if (at >= 0) holding.splice(at, 1);
-    carry.grip(holding);
+    carry?.grip(holding);
   });
   scene.add(ctrl);
   rays.push(ray);
@@ -355,12 +320,12 @@ function pointControllers() {
     over ??= hit?.object ?? null;
   }
   if (over !== hovered) hover(over);
-  else showTip(); // follow the computer while it is carried
+  else showTip(); // follow the boards while they are carried
 }
 renderer.xr.addEventListener('sessionstart', () => (dirty = true));
 renderer.xr.addEventListener('sessionend', () => {
   holding.length = 0;
-  carry.grip(holding);
+  carry?.grip(holding);
   for (const ray of rays) ray.hold = null;
   putBack(); // the screen view looks at the table
   homeView();
@@ -372,12 +337,13 @@ addEventListener('resize', () => {
   fitLens();
   renderer.setSize(innerWidth, innerHeight);
 });
+addEventListener('hashchange', () => void open(parseExhibitHash(location.hash)));
 let last = performance.now();
 renderer.setAnimationLoop(() => {
   const now = performance.now();
-  machine.frame(now - last);
+  if (exhibit?.frame(now - last)) dirty = true;
   if (inVR()) {
-    carry.follow(holding);
+    carry?.follow(holding);
     pointControllers();
   } else {
     flyOn(now - last);
@@ -390,15 +356,21 @@ renderer.setAnimationLoop(() => {
   }
   renderer.render(scene, camera);
 });
-document.body.dataset.ready = JSON.stringify(model.counts);
+void open(parseExhibitHash(location.hash));
 
-// For the browser check (scripts/check-browser.mjs) and the console: the machine, and where on
-// the screen a control is (the middle of its hit box's top; DIP switches by bit).
+// For the browser check (scripts/check-browser.mjs) and the console: what is on the table, the
+// computer's machine when that is it, and where on the screen a control is (the middle of its hit
+// box's top; DIP switches by bit).
 Object.assign(window, {
   breadboardVR: {
-    machine,
+    get exhibit() {
+      return exhibit;
+    },
+    get machine() {
+      return exhibit && 'machine' in exhibit ? exhibit.machine : undefined;
+    },
     screenPoint(part: string, bit?: number) {
-      const o = model.hitTargets.find((t) => t.userData.part === part && (bit === undefined || t.userData.bit === bit));
+      const o = model?.hitTargets.find((t) => t.userData.part === part && (bit === undefined || t.userData.bit === bit));
       if (!o) return null;
       scene.updateMatrixWorld(); // also before the first frame
       camera.updateMatrixWorld();

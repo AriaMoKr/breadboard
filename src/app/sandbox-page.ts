@@ -407,6 +407,7 @@ export function mountSandboxPage(root: HTMLElement): () => void {
       }
     } }).el,
     new Button({ label: 'Share link', title: 'A link that opens this circuit in anyone’s sandbox', onClick: () => void shareLink() }).el,
+    new Button({ label: '◈ View in VR', shortLabel: '◈ VR', title: 'This circuit in 3D on a table, in a VR headset or on this screen', onClick: () => void viewInVR() }).el,
     runBtn.el,
     speedSlider.el,
   );
@@ -481,6 +482,10 @@ export function mountSandboxPage(root: HTMLElement): () => void {
     } catch {
       prompt('Copy this link:', url);
     }
+  }
+  /** This circuit in the VR view: vr.html with the circuit in its link. The board stays saved here. */
+  async function viewInVR() {
+    location.assign(new URL(`vr.html#${await encodeLayout(layout)}`, location.href).href);
   }
   // Opening a link replaces the board as one change, so Undo brings back the circuit you had.
   const code = location.hash.replace(/^#\/?/, '').split('/')[1];

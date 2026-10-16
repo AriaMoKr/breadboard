@@ -13,8 +13,11 @@ import { LED_COLORS, WIRE_COLORS } from '../breadboard/render';
  * their moving pieces apart, with hit boxes to point at (`hitTargets`).
  */
 
-/** Board thickness and part heights, in pitch units above the board's top surface. */
-const BOARD_T = 2.6;
+/**
+ * Board thickness and part heights, in pitch units above the board's top surface. The root's
+ * origin is on the boards' top, so it sits BOARD_T above the table for them to rest on it.
+ */
+export const BOARD_T = 2.6;
 const WIRE_Y = 0.3;
 const LED_Y = 1.25;
 
@@ -50,6 +53,20 @@ export interface ComputerModel {
 }
 
 const mat = (color: string, opts: THREE.MeshStandardMaterialParameters = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.65, ...opts });
+
+/** Free the GPU memory of everything under `root` (a model or panel no longer shown), except `keep` (shared textures). */
+export function disposeTree(root: THREE.Object3D, keep: THREE.Texture[] = []) {
+  root.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    mesh.geometry?.dispose();
+    for (const m of [mesh.material ?? []].flat()) {
+      const map = (m as THREE.MeshBasicMaterial).map;
+      if (map && !keep.includes(map)) map.dispose();
+      m.dispose();
+    }
+    (o as THREE.InstancedMesh).dispose?.();
+  });
+}
 
 /** Board-local (x, y) to the model's (x, y-up, z) through the board's placement. */
 function boardMatrix(b: BoardSpec): THREE.Matrix4 {

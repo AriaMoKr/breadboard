@@ -20,7 +20,8 @@ video by video.
   in the build, the 28C16, the 555, LEDs, resistors, buttons, switches, DIP switches, 7-segment
   displays). Wire up your own circuits and the chip-level engine simulates them. It comes with
   five example circuits, and **Share link** puts your circuit in a link (`#/sandbox/c1.…`) that
-  opens it in anyone's sandbox. See [docs/BREADBOARD.md](docs/BREADBOARD.md).
+  opens it in anyone's sandbox. **View in VR** shows it in the VR view. See
+  [docs/BREADBOARD.md](docs/BREADBOARD.md).
 * **VR view** (`vr.html`): the breadboard computer in 3D on a table, run live by the simulator,
   with a control panel behind it (Run/Stop, Pulse, Step, Reset, speed, program). The switches,
   buttons and pot on the boards work too, as in the breadboard view: the clock's step button,
@@ -29,7 +30,10 @@ video by video.
   point and pull the trigger (twist the controller to turn the pot); the grip buttons pick the
   computer up, and pulling both grips apart makes it bigger (up to 8x). On a screen, drag to look
   around, double-click to look closer, and click. It is built with three.js from the same layout
-  as the breadboard view (`src/vr/`), at 1.5x real size.
+  as the breadboard view (`src/vr/`), at 1.5x real size. It also shows sandbox circuits:
+  `vr.html#c1.…` (the code from a share link, or the sandbox's **View in VR**) or
+  `vr.html#example/<id>`, run by the sandbox's chip-level engine. **Next ▸** on the panel goes
+  through the computer and the five examples.
 * **Chapter labs** (`#/lab/<id>`): each of the 44 videos maps to an interactive lab
   that rebuilds what that video builds. Examples: the 555 timer modes, SR/D latches,
   flip-flops, JK racing, tri-state buses, registers, two's complement, the ALU, RAM,

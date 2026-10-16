@@ -1,12 +1,15 @@
 # Breadboards
 
-Two features share one breadboard model:
+Three features share one breadboard model:
 
 * **Breadboard view** (`#/breadboard`, `src/app/breadboard-page.ts`): the finished computer drawn
   as Ben's boards, driven live by the control-signal simulator (`src/sim`). LEDs, 7-segment
   digits and front-panel controls are bound to it.
 * **Breadboard sandbox** (`#/sandbox`, `src/app/sandbox-page.ts`): place parts and wires yourself.
   The chip-level engine (`src/breadboard/sim`) simulates what you build.
+* **VR view** (`vr.html`, `src/vr/`): either of them in 3D, built from the same `Layout`. The
+  computer runs on the same live bindings; a sandbox circuit (`vr.html#c1.…`, from the sandbox's
+  **View in VR**, or `#example/<id>`) runs on the chip-level engine.
 
 The module boards of the view are also real chip-level circuits. The engine can simulate a board
 on its own by driving its ports, which is how the boards are verified.
@@ -26,6 +29,8 @@ on its own by driving its ports, which is how the boards are verified.
 | `src/breadboard/sim/types.ts` | Engine interfaces (`ChipModel`, `BoardSimulator`) |
 | `src/breadboard/sim/chips.ts` | `CHIP_MODELS`: logic behaviour of every catalog chip |
 | `src/breadboard/sim/engine.ts` | `BreadboardSim`: layout → `Circuit`, passives, switches, ports |
+| `src/vr/model.ts` | three.js model of a `Layout`: merged static parts, instanced LEDs and segments, moving switch parts and their hit boxes |
+| `src/vr/exhibits.ts` | What the VR table shows: the computer (live bindings) or a sandbox circuit (`BreadboardSim`), and the `#hash` that picks it |
 
 ## Geometry (pitch units, 1 = 0.1")
 
@@ -122,8 +127,9 @@ between-module wire.
 `seg7(id, col, 'cathode', (c) => byte)` gives the segment byte for a digit; see
 `displaySegments` in `src/sim/display.ts`.
 Controls go through `button(id, a, b, { kind: 'button', press: (m) => …, release })`,
-`slide(…, { kind: 'slide', get, set })`, `dip(…, { kind: 'dip', get, set })` and
-`pot(…, { kind: 'pot', get, set })`. They act on the `Machine` (`src/sim/machine.ts`):
+`slide(…, { kind: 'slide', get, set, positions: ['manual', 'auto'] })`,
+`dip(…, { kind: 'dip', get, set })` and `pot(…, { kind: 'pot', get, set })` (the VR view uses
+them too, and names a slide's position with `positions`). They act on the `Machine` (`src/sim/machine.ts`):
 `m.halfPulse()`, `m.start()`, `m.setMode('manual')`, `m.setHz()`, `m.reset()`,
 `m.computer.programMode`, `.dipAddress`, `.dipData`, `.programWrite()`, `.signedDisplay`.
 Ben's DIP switches pull a line to GND, so an ON switch reads 0. Keep that polarity in the live

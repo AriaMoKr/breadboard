@@ -46,7 +46,8 @@ export class ControlPanel {
   private statusText = '';
 
   constructor(actions: PanelAction[], title: string) {
-    const W = 0.6, H = 0.34, cols = 4;
+    const cols = 4, rows = Math.ceil(actions.length / cols);
+    const W = 0.6, H = 0.196 + rows * 0.072; // 0.34 for two rows of buttons
     const back = new CanvasPlane(W, H);
     back.draw((g, w, h) => {
       g.fillStyle = 'rgba(23, 26, 33, 0.94)';
@@ -69,7 +70,7 @@ export class ControlPanel {
     actions.forEach((action, i) => {
       const plane = new CanvasPlane(bw, bh);
       const col = i % cols, row = Math.floor(i / cols);
-      plane.mesh.position.set((col - (cols - 1) / 2) * (bw + gap), -0.02 - row * (bh + gap), 0.004);
+      plane.mesh.position.set((col - (cols - 1) / 2) * (bw + gap), H / 2 - 0.19 - row * (bh + gap), 0.004);
       this.group.add(plane.mesh);
       this.targets.push(plane.mesh);
       this.buttons.push({ action, plane, text: '', hover: false, flash: 0 });

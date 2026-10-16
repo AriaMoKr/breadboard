@@ -217,6 +217,40 @@ try {
     return `SW3 switches, SW2 to manual, SW1 x2 = 2 cycles, RV1 ${s3.hz} -> ${Math.round(s4.hz)} Hz`;
   });
 
+  await check('VR view: a sandbox circuit opens from the sandbox and runs, buttons and all', async () => {
+    const before = errors.length;
+    await page.goto(`${base}#/sandbox`);
+    await page.evaluate(`(async () => {
+      const pick = [...document.querySelectorAll('select')].find((s) => [...s.options].some((o) => o.value === 'sr-latch'));
+      pick.value = 'sr-latch'; pick.dispatchEvent(new Event('change', { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 300));
+      [...document.querySelectorAll('button')].find((b) => b.textContent.includes('View in VR')).click();
+    })()`);
+    await sleep(3000); // vr.html loads
+    const opened = await page.evaluate(`({ url: location.pathname + location.hash.slice(0, 4), ready: JSON.parse(document.body.dataset.ready ?? 'null') })`);
+    assert(opened.url.endsWith('vr.html#c1.') && opened.ready?.exhibit === 'circuit' && opened.ready.chips === 1 && opened.ready.leds === 2, `opened ${opened.url}: ${JSON.stringify(opened.ready)}`);
+    // S (SW1) sets the latch: Q (D1) on
+    const lit = (id) => page.evaluate(`breadboardVR.exhibit.sim().ledLit(${JSON.stringify(id)})`);
+    const q0 = await lit('D1');
+    const s = await page.evaluate(`breadboardVR.screenPoint('SW1')`);
+    for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await page.send('Input.dispatchMouseEvent', { type, x: s.x, y: s.y, button: type === 'mouseMoved' ? 'none' : 'left', buttons: type === 'mousePressed' ? 1 : 0, clickCount: 1 });
+    const q1 = await lit('D1');
+    assert(!q0 && q1, `pressing S took Q from ${q0} to ${q1}`);
+    // another exhibit by its link: the counter example counts by itself
+    const counting = await page.evaluate(`(async () => {
+      location.hash = '#example/counter';
+      await new Promise((r) => setTimeout(r, 800));
+      const leds = () => breadboardVR.exhibit.layout.parts.filter((p) => p.kind === 'led').map((p) => +breadboardVR.exhibit.sim().ledLit(p.id)).join('');
+      const seen = new Set();
+      for (let i = 0; i < 20; i++) { seen.add(leds()); await new Promise((r) => setTimeout(r, 100)); }
+      return { ready: JSON.parse(document.body.dataset.ready), title: document.title, seen: seen.size };
+    })()`);
+    assert(counting.ready.exhibit === 'example/counter' && counting.seen > 2, `counter: ${JSON.stringify(counting)}`);
+    const errs = errors.slice(before);
+    assert(!errs.length, errs.join('\n'));
+    return `SR latch from the sandbox: S lit Q; "${counting.title}" showed ${counting.seen} LED patterns in 2 s`;
+  });
+
   // ---- phone --------------------------------------------------------------------------
   console.log('Phone (375 x 812, touch)');
   await page.send('Emulation.setDeviceMetricsOverride', { width: 375, height: 812, deviceScaleFactor: 2, mobile: true });
