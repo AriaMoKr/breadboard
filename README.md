@@ -59,6 +59,10 @@ it. `npm run check:browser -- --dist` checks the built
 site instead (run `npm run build` first), plus the download link, install and offline use. It
 needs an installed Chrome, Edge or Chromium (or `CHROME_PATH`).
 
+`npm run verify` runs the unit tests, the build and the browser checks on the built site, in that
+order, stopping at the first failure. Run it before committing or pushing (it takes about two
+minutes).
+
 Keyboard on the computer page: **Space** = clock pulse, **I** = step one
 instruction, **R** = run/stop, **Backspace** = reset.
 
