@@ -3,7 +3,8 @@ import { displaySegments, toSigned8 } from '../sim/display';
 import type { Machine } from '../sim/machine';
 import { INSTRUCTION_BY_OPCODE } from '../sim/microcode';
 import { SIGNAL_BITS, SIGNALS, SIGNAL_INFO, formatControlWord, type ModuleId, type Signal } from '../sim/signals';
-import { Button, DipSwitch, Led, LedBar, SevenSegment, Slider, Toggle, panel, row } from './components';
+import { speedSlider } from './clock-speed';
+import { Button, DipSwitch, Led, LedBar, SevenSegment, Toggle, panel, row } from './components';
 import { Disposer, animate, h, setClass, setText } from './dom';
 
 /**
@@ -173,18 +174,13 @@ export class ComputerView {
     }, onRelease: () => {
       m.computer.clk === 1 && m.halfPulse();
     } });
-    const speed = new Slider({
-      // Ben's 555 (1 kΩ + 1 kΩ..1 MΩ pot, 1 µF) spans ~0.7–480 Hz; beyond that is simulator turbo.
-      label: 'Speed', min: 0.5, max: 500_000, value: m.hz, log: true,
-      format: (v) => (v >= 1000 ? `${(v / 1000).toPrecision(3)} kHz` : `${v.toPrecision(v < 10 ? 2 : 3)} Hz`),
-      onInput: (v) => m.setHz(v),
-    });
+    const speed = speedSlider(m);
     this.on(() => {
       clk.set(m.computer.clk === 1);
       hlt.set(m.computer.halted);
       mode.set(m.mode === 'auto' && m.running);
       pulse.setDisabled(m.mode === 'auto' && m.running);
-      if (Math.abs(speed.value - m.hz) > 1e-9) speed.set(m.hz);
+      speed.sync();
     });
     return panel('Clock', { accent: 'blue', chips: '555 ×3, 74LS04, 74LS08, 74LS32' },
       row(h('span', { class: 'led-cell' }, clk.el, h('span', { class: 'led-caption' }, 'CLK')), h('span', { class: 'led-cell' }, hlt.el, h('span', { class: 'led-caption' }, 'HLT')), mode.el, pulse.el),

@@ -4,6 +4,7 @@ import { layoutBounds, type LiveControl } from '../breadboard/layout';
 import { LayoutView, type PartEvent } from '../breadboard/render';
 import { PanZoom } from '../breadboard/viewer';
 import { Machine } from '../sim/machine';
+import { speedSlider } from '../ui/clock-speed';
 import { Button, Toggle, select } from '../ui/components';
 import { Disposer, animate, h, s, setText } from '../ui/dom';
 import { ProgramPanel } from '../ui/program-panel';
@@ -88,6 +89,10 @@ export function mountBreadboardPage(root: HTMLElement, opts: { machine?: Machine
   const pulse = new Button({ label: 'Clock pulse', onClick: () => machine.pulse() });
   const step = new Button({ label: 'Step instruction', onClick: () => machine.stepInstruction() });
   const reset = new Button({ label: 'Reset', kind: 'danger', onClick: () => machine.reset() });
+  // Same clock as the pot RV1 on the clock board: each follows the other.
+  const speed = speedSlider(machine);
+  speed.el.title = 'Clock speed in auto mode. RV1 on the clock board turns with it; Ben’s 555 reaches about 0.7–480 Hz, faster is simulator turbo.';
+  d.add(machine.onChange(speed.sync));
   const status = h('span', { class: 'mono dim status' });
   const moduleIds = [...scene.modules.keys()];
   const zoomPick = select(
@@ -112,7 +117,7 @@ export function mountBreadboardPage(root: HTMLElement, opts: { machine?: Machine
   d.add(() => prog.dispose());
 
   root.append(
-    h('div', { class: 'toolbar' }, run.el, pulse.el, step.el, reset.el, zoomPick, status),
+    h('div', { class: 'toolbar' }, run.el, pulse.el, step.el, reset.el, speed.el, zoomPick, status),
     linkToggles,
     pz.el,
     h('details', { class: 'bb-program' }, h('summary', null, 'Program & RAM'), prog.el),
