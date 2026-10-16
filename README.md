@@ -19,7 +19,8 @@ video by video.
 * **Breadboard sandbox** (`#/sandbox`): an empty breadboard with Ben's parts bin (every 74LS chip
   in the build, the 28C16, the 555, LEDs, resistors, buttons, switches, DIP switches, 7-segment
   displays). Wire up your own circuits and the chip-level engine simulates them. It comes with
-  five example circuits. See [docs/BREADBOARD.md](docs/BREADBOARD.md).
+  five example circuits, and **Share link** puts your circuit in a link (`#/sandbox/c1.…`) that
+  opens it in anyone's sandbox. See [docs/BREADBOARD.md](docs/BREADBOARD.md).
 * **Chapter labs** (`#/lab/<id>`): each of the 44 videos maps to an interactive lab
   that rebuilds what that video builds. Examples: the 555 timer modes, SR/D latches,
   flip-flops, JK racing, tri-state buses, registers, two's complement, the ALU, RAM,

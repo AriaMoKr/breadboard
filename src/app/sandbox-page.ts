@@ -2,6 +2,7 @@ import { CHIPS, CHIP_IDS, prettyPin } from '../breadboard/catalog';
 import { holeXY, parseHole, toScene } from '../breadboard/geometry';
 import { layoutBounds, partPins, validateLayout, type Layout, type LedColor, type Part, type PartSpec, type WireColor } from '../breadboard/layout';
 import { LayoutView, LED_COLORS, WIRE_COLORS, formatOhms, type PartEvent } from '../breadboard/render';
+import { decodeLayout, encodeLayout } from '../breadboard/share';
 import type { BoardSimulator, SimProblem } from '../breadboard/sim/types';
 import { PanZoom } from '../breadboard/viewer';
 import type { Level } from '../logic/circuit';
@@ -405,6 +406,7 @@ export function mountSandboxPage(root: HTMLElement): () => void {
         setStatus(`Import failed: ${(e as Error).message}`);
       }
     } }).el,
+    new Button({ label: 'Share link', title: 'A link that opens this circuit in anyone’s sandbox', onClick: () => void shareLink() }).el,
     runBtn.el,
     speedSlider.el,
   );
@@ -458,6 +460,40 @@ export function mountSandboxPage(root: HTMLElement): () => void {
   renderParts();
   renderProblems();
   setStatus(hintFor(tool));
+
+  // ---- circuit links (#/sandbox/c1.…) ----------------------------------------------
+  let disposed = false;
+  d.add(() => (disposed = true));
+  /** Share a link to this circuit: the share sheet on phones, else the clipboard. */
+  async function shareLink() {
+    const url = `${location.origin}${location.pathname}#/sandbox/${await encodeLayout(layout)}`;
+    if (navigator.share && media('(pointer: coarse)')?.matches) {
+      try {
+        await navigator.share({ title: 'Breadboard circuit', url });
+        return;
+      } catch (e) {
+        if ((e as Error).name === 'AbortError') return; // closed the share sheet
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setStatus(`Link copied to the clipboard (${url.length} characters). It opens this circuit in anyone’s sandbox.`);
+    } catch {
+      prompt('Copy this link:', url);
+    }
+  }
+  // Opening a link replaces the board as one change, so Undo brings back the circuit you had.
+  const code = location.hash.replace(/^#\/?/, '').split('/')[1];
+  if (code) {
+    window.history.replaceState(null, '', '#/sandbox'); // so a reload doesn't load it again over your edits
+    void decodeLayout(code).then((shared) => {
+      if (disposed) return;
+      switchState.clear();
+      commit(shared);
+      setStatus('Loaded the circuit from the link. Undo brings back the one you had.');
+      pz.fit();
+    }, () => !disposed && setStatus('That link does not hold a circuit.'));
+  }
 
   // ---- lazy engine + examples ---------------------------------------------------
   const engineLoader = engineModules['../breadboard/sim/engine.ts'];
