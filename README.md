@@ -36,7 +36,8 @@ video by video.
   through the computer and the five examples.
   In VR the speed pot changes the speed evenly, tenfold per ~100° of twist (Ben's linear pot
   crowds 7–480 Hz into its first tenth). `vr.html?debug` logs to the console what the
-  controllers do, to read from a headset over adb (`chrome://inspect`).
+  controllers do and, once a second, how evenly the frames come, to read from a headset over
+  adb (`chrome://inspect`).
 * **Chapter labs** (`#/lab/<id>`): each of the 44 videos maps to an interactive lab
   that rebuilds what that video builds. Examples: the 555 timer modes, SR/D latches,
   flip-flops, JK racing, tri-state buses, registers, two's complement, the ALU, RAM,

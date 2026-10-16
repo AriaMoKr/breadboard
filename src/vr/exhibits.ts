@@ -124,7 +124,9 @@ export function computerExhibit(): Exhibit & { machine: Machine } {
     },
     status() {
       const c = machine.computer;
-      return [PROGRAMS[program].title, `${c.halted ? 'halted' : running() ? 'running' : 'stopped'} at ${fmtHz(machine.hz)} · T${c.step} · cycle ${c.cycles} · OUT ${c.out}`];
+      // fixed-width fields (the panel's font is monospace), so the line holds still as they change
+      const state = c.halted ? 'halted' : running() ? 'running' : 'stopped';
+      return [PROGRAMS[program].title, `${state} at ${fmtHz(machine.hz).padStart(7)} · T${c.step} · OUT ${String(c.out).padStart(3)} · cycle ${c.cycles}`];
     },
     begin(hit) {
       const ctl = live[hit.part];
@@ -165,7 +167,7 @@ export function computerExhibit(): Exhibit & { machine: Machine } {
           return dipText(name, hit.bit ?? 0, ctl.get(machine));
         case 'pot': {
           const value = hit.part === 'clock/RV1' ? fmtHz(machine.hz) : `${Math.round(ctl.get(machine) * 100)}%`;
-          return `${name}: ${value} · ${inVR ? 'hold the trigger and twist' : 'drag up or down'}`;
+          return `${name} · ${inVR ? 'hold the trigger and twist' : 'drag up or down'} · ${value}`; // the value last: as it changes, nothing else moves
         }
         case 'button':
           return `${name} · push`;

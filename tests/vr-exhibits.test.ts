@@ -106,7 +106,19 @@ describe('the computer in VR', () => {
     click(e, { part: 'mar/SW6' });
     expect(e.machine.computer.programMode).toBe(true);
     expect(e.describe({ part: 'mar/SW6' }, false)).toBe('SW6 program/run: program');
-    expect(e.describe({ part: 'clock/RV1' }, true)).toMatch(/^RV1 speed: .* Hz · hold the trigger and twist$/);
+    expect(e.describe({ part: 'clock/RV1' }, true)).toMatch(/^RV1 speed · hold the trigger and twist · .* Hz$/);
+  });
+
+  it('keeps the status line still while the speed and output change (fixed-width fields)', () => {
+    const e = computerExhibit();
+    const fields = () => e.status()[1].split(' · ').slice(0, 3).map((f) => f.length);
+    const first = fields();
+    for (const hz of [0.72, 13, 480, 500_000]) {
+      e.machine.setHz(hz);
+      e.machine.computer.out = hz === 480 ? 173 : 7;
+      expect(fields()).toEqual(first);
+    }
+    expect(e.status()[1]).toMatch(/^running at 500 kHz · T\d · OUT {3}7 · cycle \d+$/);
   });
 
   it('spreads the speed evenly over RV1, a decade per ~100° of twist', () => {

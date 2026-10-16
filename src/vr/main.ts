@@ -186,11 +186,22 @@ function setExhibit(next: Exhibit, c: ExhibitChoice) {
 function sync() {
   if (!exhibit || !model || !panel) return;
   exhibit.show(model);
+  statusDue = true;
+  panel.refresh();
+  showTip();
+}
+
+// The status changes every frame while the clock runs fast; its text is redrawn at most ten times a
+// second (on the panel each redraw is a texture to upload, and nobody reads a count that fast).
+let statusDue = false;
+let statusAt = -Infinity;
+function syncStatus(now: number) {
+  if (!statusDue || now - statusAt < 100 || !exhibit || !panel) return;
+  statusDue = false;
+  statusAt = now;
   const lines = exhibit.status();
   panel.setStatus(lines);
-  panel.refresh();
   statusEl.textContent = [notice, ...lines].filter(Boolean).join(' · ');
-  showTip();
 }
 
 // ---- pointing: mouse / finger on screen, controller rays in VR ----
@@ -209,7 +220,7 @@ function showTip() {
   if (!hit || !exhibit) return tooltip.hide();
   box.setFromObject(hovered!);
   const at = box.getCenter(new THREE.Vector3()).setY(box.max.y + 0.004);
-  tooltip.show(exhibit.describe(hit, inVR()), at);
+  tooltip.show(exhibit.describe(hit, inVR()), at, hovered);
 }
 function hover(o: THREE.Object3D | null) {
   hovered = o;
@@ -360,6 +371,33 @@ function debugTwist(ctrl: THREE.Object3D, held: Held) {
   const deg = (r: number) => Math.round(THREE.MathUtils.radToDeg(r));
   debugLog('twist', { turned: +held.twist.turned.toFixed(3), pitch: deg(e.x), yaw: deg(e.y), roll: deg(e.z), shows: exhibit?.describe(held.object.userData as ControlHit, true) });
 }
+// Once a second in VR: how evenly the frames came (slow: more than 1.5 frames apart), our CPU
+// time per frame (the simulation, pointing, handing the frame to WebGL), and how many times the
+// label and the panel's status were redrawn (each a texture upload).
+const perf = { at: 0, frames: 0, slow: 0, worst: 0, cpu: 0, cpuMax: 0, labels: 0, statuses: 0 };
+function debugPerf(start: number, gap: number) {
+  if (!DEBUG || !inVR()) return void (perf.at = 0);
+  const now = performance.now();
+  if (!perf.at) return void Object.assign(perf, { at: now, frames: 0, slow: 0, worst: 0, cpu: 0, cpuMax: 0, labels: tooltip.draws, statuses: panel?.statusDraws ?? 0 });
+  const frameMs = 1000 / ((renderer.xr.getSession() as (XRSession & { frameRate?: number }) | null)?.frameRate ?? 72);
+  perf.frames++;
+  if (gap > 1.5 * frameMs) perf.slow++;
+  perf.worst = Math.max(perf.worst, gap);
+  perf.cpu += now - start;
+  perf.cpuMax = Math.max(perf.cpuMax, now - start);
+  if (now - perf.at < 1000) return;
+  debugLog('perf', {
+    fps: Math.round((perf.frames * 1000) / (now - perf.at)),
+    slow: perf.slow,
+    worstMs: +perf.worst.toFixed(1),
+    cpuMs: +(perf.cpu / perf.frames).toFixed(1),
+    cpuMaxMs: +perf.cpuMax.toFixed(1),
+    labelDraws: tooltip.draws - perf.labels,
+    statusDraws: Math.max(0, (panel?.statusDraws ?? 0) - perf.statuses),
+    twisting: rays.some((r) => r.hold),
+  });
+  perf.at = 0; // the next second
+}
 renderer.xr.addEventListener('sessionend', () => {
   debugLog('session', { vr: false });
   holding.length = 0;
@@ -367,14 +405,17 @@ renderer.xr.addEventListener('sessionend', () => {
   for (const ray of rays) ray.hold = null;
   putBack(); // the screen view looks at the table
   homeView();
+  setTimeout(fitScreen); // once three.js has given the canvas back
   dirty = true;
 });
 
 // ---- loop ----
-addEventListener('resize', () => {
+function fitScreen() {
+  if (renderer.xr.isPresenting) return; // the headset sets the size; done again when VR ends
   fitLens();
   renderer.setSize(innerWidth, innerHeight);
-});
+}
+addEventListener('resize', fitScreen);
 addEventListener('hashchange', () => void open(parseExhibitHash(location.hash)));
 let last = performance.now();
 renderer.setAnimationLoop(() => {
@@ -387,12 +428,15 @@ renderer.setAnimationLoop(() => {
     flyOn(now - last);
     controls.update();
   }
+  const gap = now - last;
   last = now;
   if (dirty) {
     dirty = false;
     sync();
   }
+  syncStatus(now);
   renderer.render(scene, camera);
+  debugPerf(now, gap);
 });
 void open(parseExhibitHash(location.hash));
 

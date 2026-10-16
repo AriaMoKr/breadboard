@@ -46,6 +46,10 @@ export class ControlPanel {
   private buttons: { action: PanelAction; plane: CanvasPlane; text: string; hover: boolean; flash: number }[] = [];
   private status: CanvasPlane;
   private statusText = '';
+  /** The longest status line so far, in characters: what the status font is sized for. */
+  private statusChars = 0;
+  /** Status redraws (each a texture upload), for the debug log. */
+  statusDraws = 0;
 
   /** `note`: small print in the bottom right corner (which version this is). */
   constructor(actions: PanelAction[], title: string, note = '') {
@@ -113,10 +117,17 @@ export class ControlPanel {
     const text = lines.join('\n');
     if (text === this.statusText) return;
     this.statusText = text;
+    this.statusDraws++;
+    // One font size for the longest line so far (smaller only when a longer one comes), not each
+    // line squeezed to fit: that stretched and shrank the line every time a number changed length.
+    this.statusChars = Math.max(this.statusChars, ...lines.map((l) => l.length));
     this.status.draw((g, w) => {
-      g.font = '500 26px ui-monospace, Consolas, monospace';
+      const font = (px: number) => `500 ${px}px ui-monospace, Consolas, monospace`;
+      g.font = font(26);
+      const fits = Math.floor((26 * (w - 16)) / (g.measureText('0').width * this.statusChars));
+      g.font = font(Math.max(18, Math.min(26, fits)));
       g.fillStyle = '#b8bfcc';
-      lines.forEach((line, i) => g.fillText(line, 8, 30 + i * 34, w - 16));
+      lines.forEach((line, i) => g.fillText(line, 8, 30 + i * 34, w - 16)); // squeezes only a line longer than 18 px fits
     });
   }
 
@@ -145,8 +156,12 @@ export class Tooltip {
   private canvas = document.createElement('canvas');
   private texture: THREE.CanvasTexture;
   private text = '';
+  private key: unknown = null;
+  private boxW = 0;
+  /** Redraws (each a texture upload), for the debug log. */
+  draws = 0;
 
-  /** `height` in metres; the label is as wide as its text. */
+  /** `height` in metres; the box fits the text (see `show`). */
   constructor(height = 0.024) {
     this.canvas.width = 1024;
     this.canvas.height = 80;
@@ -159,21 +174,28 @@ export class Tooltip {
     this.sprite.visible = false;
   }
 
-  show(text: string, at: THREE.Vector3) {
-    if (text !== this.text) {
-      this.text = text;
+  /**
+   * `key`: what it labels. While that stays the same the box only grows, and the text starts at
+   * its left edge, so a value changing as a knob turns doesn't make the label twitch.
+   */
+  show(text: string, at: THREE.Vector3, key: unknown = text) {
+    if (text !== this.text || key !== this.key) {
       const g = this.canvas.getContext('2d')!;
       const { width: w, height: h } = this.canvas;
       g.clearRect(0, 0, w, h);
       g.font = '600 40px system-ui, sans-serif';
-      const tw = Math.min(w - 8, g.measureText(text).width + 40);
+      const need = Math.min(w - 8, g.measureText(text).width + 40);
+      this.boxW = key === this.key ? Math.max(this.boxW, need) : need;
+      this.text = text;
+      this.key = key;
+      this.draws++;
+      const x = (w - this.boxW) / 2;
       g.fillStyle = 'rgba(23, 26, 33, 0.92)';
-      roundRect(g, (w - tw) / 2, 4, tw, h - 8, 18);
+      roundRect(g, x, 4, this.boxW, h - 8, 18);
       g.fill();
       g.fillStyle = '#ffffff';
-      g.textAlign = 'center';
       g.textBaseline = 'middle';
-      g.fillText(text, w / 2, h / 2 + 1, w - 48);
+      g.fillText(text, x + 20, h / 2 + 1, w - 48);
       this.texture.needsUpdate = true;
     }
     this.sprite.position.copy(at);
