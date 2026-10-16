@@ -104,6 +104,7 @@
 .bb-program summary { cursor: pointer; font-weight: 600; }
 @media (pointer: coarse) {
   .sb-tool { min-height: 34px; padding: 4px 10px; }
+  .bb-program summary { padding: 8px 0; }
 }
 @media (max-width: 860px) {
   .sb-layout { grid-template-columns: minmax(0, 1fr); }

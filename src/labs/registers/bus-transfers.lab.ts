@@ -60,6 +60,7 @@ const CSS = `
 .bt-svg .bt-pill.on rect { fill: var(--led-blue); stroke: var(--led-blue); }
 .bt-svg .bt-pill.on text { fill: #fff; }
 .bt-svg .bt-pill:focus-visible rect { stroke: var(--accent); stroke-width: 2.5; }
+.bt-svg .bt-pill rect.hit, .bt-svg .bt-pill.on rect.hit, .bt-svg .bt-pill:focus-visible rect.hit { fill: transparent; stroke: none; }
 .bt-svg .bt-stub { stroke: var(--grid); stroke-width: 8; stroke-linecap: butt; }
 .bt-svg .bt-stub.drive { stroke: var(--wire-1); }
 .bt-svg .bt-stub.load { stroke: var(--ok); }
@@ -121,9 +122,10 @@ export default defineLab({
     /** Top of each input switch (its row), for placing the knob. */
     const swTop = new Map<SVGElement, number>();
 
-    const pill = (x: number, y: number, label: string, onClick: () => void) => {
+    const pill = (x: number, y: number, label: string, width: number, onClick: () => void) => {
       const g = s('g', { class: 'bt-pill', tabindex: 0, role: 'button', 'aria-pressed': 'false', 'aria-label': label });
-      g.append(s('rect', { x, y, width: 56, height: 22, rx: 11 }), s('text', { x: x + 28, y: y + 15.5, 'text-anchor': 'middle' }, label));
+      // the hit area reaches 5 above and below the 22-high pill, for fingertips
+      g.append(s('rect', { x, y: y - 5, width, height: 32, class: 'hit' }), s('rect', { x, y, width, height: 22, rx: 11 }), s('text', { x: x + width / 2, y: y + 15.5, 'text-anchor': 'middle' }, label));
       g.addEventListener('click', onClick);
       g.addEventListener('keydown', (e) => {
         const k = (e as KeyboardEvent).key;
@@ -190,14 +192,12 @@ export default defineLab({
       sigs.forEach((sg, i) => {
         const px = sigs.length === 1 ? x + 9 : x + 9 + i * 68;
         const width = sg.label.length > 4 ? 76 : 56;
-        const g = pill(px, py, sg.label, () => {
+        const g = pill(px, py, sg.label, width, () => {
           if (anim) return;
           const set = sg.kind === 'in' ? ins : outs;
           if (set.has(m.id)) set.delete(m.id); else set.add(m.id);
           render();
         });
-        (g.firstChild as SVGRectElement).setAttribute('width', String(width));
-        (g.lastChild as SVGTextElement).setAttribute('x', String(px + width / 2));
         g.appendChild(s('title', null, sg.kind === 'in' ? `${sg.label}: load from the bus on the next clock edge` : `${sg.label}: drive this module's value onto the bus`));
         gTop.appendChild(g);
         pills.push({ kind: sg.kind, g });

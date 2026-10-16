@@ -5,7 +5,7 @@ import { INSTRUCTION_BY_OPCODE, UCODE_TEMPLATE_FLAGS } from '../../sim/microcode
 import { FI, formatControlWord } from '../../sim/signals';
 import { Button, DipSwitch, Led, LedBar, Scope, Toggle, note, panel, row } from '../../ui/components';
 import { Disposer, animate, h, setText } from '../../ui/dom';
-import { Schematic } from '../../ui/schematic';
+import { Schematic, switchPitch } from '../../ui/schematic';
 import { MicrostepTrace, chipContrastCss, machineToolbar, scopedStyle } from '../control/_shared';
 import { defineLab } from '../types';
 import { buildFlagsCircuit } from './_circuits';
@@ -108,7 +108,8 @@ export default defineLab({
     sch.wire(f.fi, [220, 340], inv.inputs[0]);
     sch.wire(f.fin, inv.output, [398, 340], [398, reg.left[2].y], reg.left[2]);
     sch.wire(f.clk, [300, 280], [370, 280], [370, reg.left[3].y], reg.left[3]);
-    sch.wire(f.clr, [300, 250], [380, 250], [380, reg.left[4].y], reg.left[4]);
+    const clrY = 280 - switchPitch(30); // CLR above CLK, wider apart on touch screens
+    sch.wire(f.clr, [300, clrY], [380, clrY], [380, reg.left[4].y], reg.left[4]);
     sch.wire(f.cf, reg.right[0], [560, reg.right[0].y]);
     sch.wire(f.zf, reg.right[1], [560, reg.right[1].y]);
     sch.probe(f.cf, [570, reg.right[0].y], { label: 'C', color: 'green' });
@@ -122,7 +123,7 @@ export default defineLab({
     };
     sch.switch(f.fi, [220, 340], { label: 'FI', onToggle: toggleAndNote });
     sch.switch(f.clk, [300, 280], { label: 'CLK', momentary: true, onToggle: toggleAndNote });
-    sch.switch(f.clr, [300, 250], { label: 'CLR', momentary: true, onToggle: toggleAndNote });
+    sch.switch(f.clr, [300, clrY], { label: 'CLR', momentary: true, onToggle: toggleAndNote });
     d.add(sch.autoUpdate());
 
     // ---- EEPROM rewiring ----

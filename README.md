@@ -41,6 +41,13 @@ Then open http://localhost:5173. Other scripts: `npm test` (vitest), `npm run ty
 `npm run build` (static site in `dist/`, see [Deploying](#deploying)), `npm run icons` (renders
 the app icons from `public/icons/icon.svg`).
 
+`npm run check:browser` checks in headless Chrome what the unit tests can't see. It checks
+that every page renders without errors, that phones get no sideways scrolling and controls of
+at least 24 px, the sticky toolbar, parts drawer and tap-to-zoom, the shared computer, sandbox
+links, and the breadboard view's frame rate. `npm run check:browser -- --dist` checks the built
+site instead (run `npm run build` first), plus the download link, install and offline use. It
+needs Node 22+ and an installed Chrome, Edge or Chromium (or `CHROME_PATH`).
+
 Keyboard on the computer page: **Space** = clock pulse, **I** = step one
 instruction, **R** = run/stop, **Backspace** = reset.
 

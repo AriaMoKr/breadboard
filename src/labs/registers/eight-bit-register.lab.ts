@@ -1,7 +1,7 @@
 import type { Bit, Net } from '../../logic/circuit';
 import { Button, DipSwitch, LedBar, Toggle, note, panel, readouts, row } from '../../ui/components';
 import { Disposer, h, setClass, setText } from '../../ui/dom';
-import { Schematic } from '../../ui/schematic';
+import { Schematic, switchPitch } from '../../ui/schematic';
 import { defineLab } from '../types';
 import { LS173_PINS, LS245_PINS, buildARegister } from './_model';
 import { bin8, labFrame, levelLegend } from './_shared';
@@ -29,7 +29,8 @@ export default defineLab({
     const flip = (n: Net) => { c.toggle(n); c.settle(); };
 
     // ---- schematic ----
-    const sch = new Schematic(c, { width: 560, height: 520 });
+    const ctlPitch = switchPitch(30); // the control switches at the bottom right, wider apart on touch screens
+    const sch = new Schematic(c, { width: 560, height: 520 + 3 * (ctlPitch - 30) });
     const p173 = (bits: number[]) => [
       ...bits.map((b, k) => ({ name: `${LS173_PINS[`${4 - k}D` as '4D']} ${4 - k}D`, net: bus[b] })),
       { name: `${LS173_PINS.G1} G1`, net: nAI, bubble: true },
@@ -87,7 +88,7 @@ export default defineLab({
     // control switches (each drives the net with that label)
     const ctl: [Net, string, boolean][] = [[nAI, '~AI', false], [nAO, '~AO', false], [CLK, 'CLK', true], [CLR, 'CLR', true]];
     ctl.forEach(([net, label, momentary], i) => {
-      const y = 404 + i * 30;
+      const y = 404 + i * ctlPitch;
       sch.wire(net, [450, y], [480, y]);
       sch.text(label, [484, y], { size: 10, anchor: 'start' });
       sch.switch(net, [450, y], { label, momentary, onToggle: flip });
