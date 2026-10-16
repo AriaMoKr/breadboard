@@ -3,7 +3,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { VRButton } from 'three/addons/webxr/VRButton.js';
 import { decodeLayout } from '../breadboard/share';
 import { buildLabel } from '../build-info';
-import { Carry, twist } from './carry';
+import { Carry, Twist } from './carry';
 import { EXAMPLE_IDS, circuitExhibit, computerExhibit, exampleExhibit, exhibitHash, parseExhibitHash, type Exhibit, type ExhibitChoice, type Hold } from './exhibits';
 import { BOARD_T, buildComputerModel, disposeTree, type ComputerModel, type ControlHit } from './model';
 import { ControlPanel, Tooltip } from './panel';
@@ -289,20 +289,23 @@ function flyOn(ms: number) {
 // VR controllers: the trigger points and presses, the grip picks the boards up (both grips: pull
 // apart to make them bigger, from half to 8 times their size on the table).
 const holding: THREE.XRTargetRaySpace[] = [];
-const rollOf = (ctrl: THREE.Object3D) => new THREE.Euler().setFromQuaternion(ctrl.quaternion, 'YXZ').z;
-const rays: { ctrl: THREE.XRTargetRaySpace; line: THREE.Line; hold: { hold: Hold; roll0: number } | null }[] = [];
+/** A control held with the trigger: what it does, the hit box (it stays the hovered one), and the wrist's twist for pots. */
+type Held = { hold: Hold; object: THREE.Object3D; twist: Twist };
+const rays: { ctrl: THREE.XRTargetRaySpace; line: THREE.Line; hold: Held | null }[] = [];
 for (const i of [0, 1]) {
   const ctrl = renderer.xr.getController(i);
   const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, -1)]), new THREE.LineBasicMaterial({ color: '#8ab8ff' }));
   line.scale.z = 3;
   ctrl.add(line);
-  const ray = { ctrl, line, hold: null as { hold: Hold; roll0: number } | null };
+  const ray = { ctrl, line, hold: null as Held | null };
   ctrl.addEventListener('selectstart', () => {
     raycaster.setFromXRController(ctrl);
-    const o = pick()?.object;
+    const found = pick();
+    const o = found?.object;
     const hit = hitOf(o);
     const hold = hit && begin(hit);
-    if (hold) ray.hold = { hold, roll0: rollOf(ctrl) };
+    debugLog('trigger', { hand: i, on: hit ? `${hit.part}${hit.bit === undefined ? '' : `#${hit.bit}`}` : isPanel(o) ? 'panel' : 'nothing', m: found && +found.distance.toFixed(3) });
+    if (hold) ray.hold = { hold, object: o!, twist: new Twist(ctrl.quaternion) };
     else if (isPanel(o)) panel!.press(o!);
   });
   ctrl.addEventListener('selectend', () => {
@@ -312,11 +315,13 @@ for (const i of [0, 1]) {
   ctrl.addEventListener('squeezestart', () => {
     if (!holding.includes(ctrl)) holding.push(ctrl);
     carry?.grip(holding);
+    debugLog('grip', { hand: i, hands: holding.length });
   });
   ctrl.addEventListener('squeezeend', () => {
     const at = holding.indexOf(ctrl);
     if (at >= 0) holding.splice(at, 1);
     carry?.grip(holding);
+    debugLog('grip', { hand: i, hands: holding.length, scale: model && +(model.root.scale.x / home).toFixed(2) });
   });
   scene.add(ctrl);
   rays.push(ray);
@@ -325,17 +330,38 @@ function pointControllers() {
   let over: THREE.Object3D | null = null;
   for (const ray of rays) {
     const { ctrl, line, hold } = ray;
-    if (hold?.hold.turn) hold.hold.turn(twist(hold.roll0, rollOf(ctrl))); // a pot turns with the wrist
+    if (hold?.hold.turn) {
+      // a pot turns with the wrist
+      hold.hold.turn(hold.twist.update(ctrl.quaternion));
+      debugTwist(ctrl, hold);
+    }
     raycaster.setFromXRController(ctrl);
     const hit = pick();
     line.scale.z = hit ? hit.distance : 3;
-    over ??= hit?.object ?? null;
+    over ??= hold?.object ?? hit?.object ?? null; // a held control keeps its label, wherever the ray swings
   }
   if (over !== hovered) hover(over);
   else showTip(); // follow the boards while they are carried
 }
-renderer.xr.addEventListener('sessionstart', () => (dirty = true));
+renderer.xr.addEventListener('sessionstart', () => {
+  dirty = true;
+  debugLog('session', { vr: true });
+});
+
+// With ?debug in the URL, what the controllers do goes to the console as "[vr] …" lines: to see
+// it from a headset, connect over adb (chrome://inspect, or the DevTools protocol).
+const DEBUG = new URLSearchParams(location.search).has('debug');
+const debugLog = (what: string, data: object) => DEBUG && console.info(`[vr] ${what} ${JSON.stringify(data)}`);
+let debugAt = 0;
+function debugTwist(ctrl: THREE.Object3D, held: Held) {
+  if (!DEBUG || performance.now() - debugAt < 100) return;
+  debugAt = performance.now();
+  const e = new THREE.Euler().setFromQuaternion(ctrl.quaternion, 'YXZ');
+  const deg = (r: number) => Math.round(THREE.MathUtils.radToDeg(r));
+  debugLog('twist', { turned: +held.twist.turned.toFixed(3), pitch: deg(e.x), yaw: deg(e.y), roll: deg(e.z), shows: exhibit?.describe(held.object.userData as ControlHit, true) });
+}
 renderer.xr.addEventListener('sessionend', () => {
+  debugLog('session', { vr: false });
   holding.length = 0;
   carry?.grip(holding);
   for (const ray of rays) ray.hold = null;

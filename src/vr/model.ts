@@ -319,7 +319,7 @@ export function buildComputerModel(layout: Layout, opts: ModelOptions = {}): Com
         const set = (t: number) => (slot.rotation.y = -THREE.MathUtils.degToRad(-135 + 270 * Math.max(0, Math.min(1, t))));
         set(0.5);
         const g = control(p, m, set, slot);
-        hitBox(g, { part: p.id }, c.x - 1.3, c.z - 1.3, c.x + 1.3, c.z + 1.3, 1.8);
+        hitBox(g, { part: p.id }, c.x - 2, c.z - 2, c.x + 2, c.z + 2, 1.8); // bigger than the pot: easier to hit with a ray
         return;
       }
       default:

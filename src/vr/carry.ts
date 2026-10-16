@@ -47,14 +47,39 @@ export class Carry {
 }
 
 /**
- * Turning a knob by twisting the controller: how far (a whole turn of the knob is 1) for a roll
- * from `roll0` to `roll` (radians, about the controller's pointing axis, as from an Euler 'YXZ'
- * z). Half a turn of the wrist turns the knob end to end; clockwise (as seen along the ray, the
- * roll goes down) turns it up.
+ * Turning a knob by twisting the controller, as if holding the knob: the twist about the
+ * controller's own pointing axis (its -z, the ray) since the trigger was pulled, whatever way it
+ * points, and however the ray swings meanwhile (Euler angles lose it pointing straight down, at a
+ * knob on a table). `update` takes the controller's world rotation and gives how far the knob has
+ * turned, where its full 270° travel is 1, clockwise (as seen along the ray) up. The knob follows
+ * the hand 1:1, so a longer turn takes a second grip, as on a real one; a wrist can't turn past
+ * the ±180° where the angle would wrap.
  */
-export function twist(roll0: number, roll: number): number {
-  const d = roll - roll0;
-  return -Math.atan2(Math.sin(d), Math.cos(d)) / Math.PI;
+export class Twist {
+  private from = new THREE.Quaternion();
+  turned = 0;
+
+  constructor(from: THREE.Quaternion) {
+    this.from.copy(from);
+  }
+
+  update(now: THREE.Quaternion): number {
+    return (this.turned = -twistAngle(this.from, now) / KNOB_TRAVEL);
+  }
+}
+
+/** A potentiometer's travel: 270°. */
+const KNOB_TRAVEL = 1.5 * Math.PI;
+
+/**
+ * The part of the rotation from `from` to `to` that is about the rotated object's own z axis, in
+ * radians (-π, π]: counterclockwise as seen from its +z side, so for a controller as seen from
+ * behind it, along its ray (swing-twist decomposition of the relative rotation).
+ */
+export function twistAngle(from: THREE.Quaternion, to: THREE.Quaternion): number {
+  const r = from.clone().invert().multiply(to); // the rotation in the object's own frame
+  const a = 2 * Math.atan2(r.z, r.w);
+  return Math.atan2(Math.sin(a), Math.cos(a));
 }
 
 const UP = new THREE.Vector3(0, 1, 0);

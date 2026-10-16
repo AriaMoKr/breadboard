@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { Carry, twist } from '../src/vr/carry';
+import { Carry, Twist, twistAngle } from '../src/vr/carry';
 
 /** A controller at a position, pointing along -z and turned `yaw` about the vertical. */
 const hand = (x: number, y: number, z: number, yaw = 0) => {
@@ -78,12 +78,40 @@ describe('carrying the computer in VR', () => {
 });
 
 describe('turning a pot by twisting the controller', () => {
-  it('turns it up for a clockwise twist (the roll goes down), end to end in half a turn', () => {
-    expect(twist(0, -Math.PI / 2)).toBeCloseTo(0.5);
-    expect(twist(0, Math.PI / 4)).toBeCloseTo(-0.25);
+  const X = new THREE.Vector3(1, 0, 0), Y = new THREE.Vector3(0, 1, 0), Z = new THREE.Vector3(0, 0, 1);
+  const turn = (axis: THREE.Vector3, deg: number) => new THREE.Quaternion().setFromAxisAngle(axis, THREE.MathUtils.degToRad(deg));
+  /** A controller turned `yaw` and pitched `pitch` (negative: pointing down), twisted `roll` about its ray. */
+  const aim = (yaw: number, pitch: number, roll = 0) => turn(Y, yaw).multiply(turn(X, pitch)).multiply(turn(Z, roll));
+
+  /** Twist from 0 to `roll` in small steps, as frames do, and see how far the knob turned. */
+  const knob = (yaw: number, pitch: number, roll: number) => {
+    const t = new Twist(aim(yaw, pitch));
+    for (let k = 1; k <= 30; k++) t.update(aim(yaw, pitch, (roll * k) / 30));
+    return t.turned;
+  };
+
+  it('turns the knob with the hand, 1:1 over its 270° travel, clockwise up', () => {
+    expect(knob(0, 0, -135)).toBeCloseTo(0.5); // clockwise, seen along the ray
+    expect(knob(0, 0, 90)).toBeCloseTo(-1 / 3);
   });
 
-  it('does not jump where the roll angle wraps round from +180° to -180°', () => {
-    expect(twist(3.0, -3.0)).toBeCloseTo(-(2 * Math.PI - 6) / Math.PI);
+  it('measures the twist about the ray even pointing straight down at a knob on the table', () => {
+    // Euler angles lose it there: pointing straight down, a twist reads as yaw, not roll
+    const e = new THREE.Euler().setFromQuaternion(aim(30, -90, -45), 'YXZ');
+    expect(e.z).toBeCloseTo(0);
+    for (const pitch of [0, -45, -70, -89, -90]) expect(knob(30, pitch, -45), `pitch ${pitch}°`).toBeCloseTo(1 / 6);
+  });
+
+  it('ends where it started when the ray swings around and comes back', () => {
+    const t = new Twist(aim(0, -60));
+    t.update(aim(25, -40));
+    t.update(aim(-10, -75, 5));
+    expect(t.update(aim(0, -60))).toBeCloseTo(0);
+    expect(t.update(aim(0, -60, -27))).toBeCloseTo(0.1);
+  });
+
+  it('gives the twist part of a rotation, in (-180°, 180°]', () => {
+    expect(THREE.MathUtils.radToDeg(twistAngle(aim(10, -30), aim(10, -30, 170)))).toBeCloseTo(170);
+    expect(THREE.MathUtils.radToDeg(twistAngle(aim(10, -30), aim(10, -30, 190)))).toBeCloseTo(-170);
   });
 });
