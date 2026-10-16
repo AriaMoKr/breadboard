@@ -88,7 +88,10 @@ export class PanZoom {
     }, { capture: true });
     this.el.addEventListener('pointermove', (e) => {
       const slop = e.pointerType === 'touch' ? 10 : 4; // fingers wobble more than a mouse
-      if (this.downAt && Math.hypot(e.clientX - this.downAt.x, e.clientY - this.downAt.y) > slop) this.moved = true;
+      if (!this.moved && this.downAt && Math.hypot(e.clientX - this.downAt.x, e.clientY - this.downAt.y) > slop) {
+        this.moved = true;
+        if (this.pointers.has(e.pointerId)) this.capture(e.pointerId); // a pan now: follow it off the board too
+      }
       if (!this.pointers.has(e.pointerId)) return;
       this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (this.pinch && this.pointers.size === 2) {
@@ -138,11 +141,22 @@ export class PanZoom {
       this.pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), view: { ...this.view }, cx: c.x, cy: c.y };
       this.drag = null;
       this.zoomTap = false;
+      for (const id of this.pointers.keys()) this.capture(id);
     } else {
       this.drag = { x: e.clientX, y: e.clientY, view: { ...this.view }, id: e.pointerId };
       this.el.classList.add('dragging');
     }
-    this.el.setPointerCapture?.(e.pointerId);
+    // A single pointer is captured only once it moves (pointermove): a captured pointer's click
+    // goes to the viewport instead of the hole or part under it, and the sandbox places parts
+    // and deletes them on that click.
+  }
+
+  private capture(id: number) {
+    try {
+      this.el.setPointerCapture?.(id);
+    } catch {
+      /* the pointer is already gone */
+    }
   }
 
   /** True if the pointer gesture that just ended was a drag/pan rather than a click. */

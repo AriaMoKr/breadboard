@@ -121,6 +121,62 @@ try {
     return `${r.made} parts in a ${r.length}-character link`;
   });
 
+  // Real mouse events (Chrome's input pipeline) for what a dispatched event can't show: which
+  // element the click goes to, after a drag or a pointer capture.
+  const mouse = (type, { x, y }, extra = {}) => page.send('Input.dispatchMouseEvent', { type, x, y, button: 'left', buttons: type === 'mouseReleased' ? 0 : 1, clickCount: 1, ...extra });
+  const click = async (p, clickCount = 1) => {
+    await mouse('mouseMoved', p, { button: 'none', buttons: 0 });
+    await mouse('mousePressed', p, { clickCount });
+    await mouse('mouseReleased', p, { clickCount });
+    await sleep(60);
+  };
+
+  await check('sandbox: a click on a hole places the part in hand, a drag pans instead', async () => {
+    await page.goto(`${base}#/sandbox`);
+    await page.evaluate(`localStorage.removeItem('breadboard-sandbox-v1'); location.reload()`); // an empty board
+    await sleep(1500);
+    const parts = () => page.evaluate(`JSON.parse(localStorage.getItem('breadboard-sandbox-v1') || '{"parts":[]}').parts.map((p) => p.kind).join(' ')`);
+    const centre = (selector) => page.evaluate(`(() => {
+      const el = document.querySelector(${JSON.stringify(selector)});
+      el.scrollIntoView({ block: 'nearest' });
+      const r = el.getBoundingClientRect();
+      return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+    })()`);
+    const tool = async (title) => click(await centre(`.sb-tool[title^="${title}"]`));
+    // a hole on the screen (geometry.ts: column c at x = c + 0.5, row a at y = 3.5, f at 10.5)
+    const hole = (row, col) => page.evaluate(`(() => {
+      const svg = document.querySelector('.bb-svg'), p = svg.createSVGPoint();
+      p.x = ${col + 0.5}; p.y = ${{ a: 3.5, f: 10.5 }[row]};
+      const s = p.matrixTransform(svg.getScreenCTM());
+      return { x: s.x, y: s.y };
+    })()`);
+    await tool('74LS00');
+    await click(await hole('f', 10));
+    const chip = await parts();
+    assert(chip === 'chip', `a click on f10 with the 74LS00 in hand placed: "${chip}"`);
+    await tool('red wire');
+    await click(await hole('a', 3));
+    await click(await hole('a', 8));
+    const wire = await parts();
+    assert(wire === 'chip wire', `two clicks with a wire in hand placed: "${wire}"`);
+    // a drag from a hole pans the board and places nothing
+    const from = await hole('a', 20);
+    await mouse('mouseMoved', from, { button: 'none', buttons: 0 });
+    await mouse('mousePressed', from);
+    for (let dx = 10; dx <= 80; dx += 10) await mouse('mouseMoved', { x: from.x + dx, y: from.y });
+    await mouse('mouseReleased', { x: from.x + 80, y: from.y });
+    await sleep(60);
+    const moved = (await hole('a', 20)).x - from.x;
+    const dragged = await parts();
+    assert(Math.abs(moved - 80) < 2, `an 80 px drag moved the board ${moved.toFixed(1)} px`);
+    assert(dragged === 'chip wire', `the drag placed something: "${dragged}"`);
+    await tool('Remove parts');
+    await click(await centre('.bb-svg [data-part^="U"]'));
+    const left = await parts();
+    assert(left === 'wire', `a click on the chip with Delete left: "${left}"`);
+    return 'a 74LS00 and a wire by clicks, an 80 px pan, the chip deleted';
+  });
+
   await check('breadboard view keeps its frame rate while running', async () => {
     const measure = async () => {
       await page.goto(`${base}#/breadboard`); // a fresh page: the 40 pages above leave garbage behind
@@ -174,14 +230,7 @@ try {
   });
 
   await check('VR view: the switches, buttons and pot on the boards work with the mouse', async () => {
-    // real mouse events (Chrome's input pipeline), aimed with the page's breadboardVR.screenPoint
-    const mouse = (type, { x, y }, extra = {}) => page.send('Input.dispatchMouseEvent', { type, x, y, button: 'left', buttons: type === 'mouseReleased' ? 0 : 1, clickCount: 1, ...extra });
-    const click = async (p, clickCount = 1) => {
-      await mouse('mouseMoved', p, { button: 'none', buttons: 0 });
-      await mouse('mousePressed', p, { clickCount });
-      await mouse('mouseReleased', p, { clickCount });
-      await sleep(60);
-    };
+    // real mouse events, aimed with the page's breadboardVR.screenPoint
     const at = (part, bit) => page.evaluate(`breadboardVR.screenPoint(${JSON.stringify(part)}${bit === undefined ? '' : `, ${bit}`})`);
     const state = () => page.evaluate(`(() => { const m = breadboardVR.machine, c = m.computer; return { mode: m.mode, cycles: c.cycles, data: c.dipData, hz: m.hz }; })()`);
     const s0 = await state();
@@ -301,6 +350,43 @@ try {
     assert(!r.open, 'drawer is open');
     assert(r.board < 520, `board starts ${r.board} px down`);
     return `board starts ${r.board} px down`;
+  });
+
+  await check('phones: in the sandbox a tap zooms in, the next tap on a hole places the part', async () => {
+    await page.evaluate(`localStorage.removeItem('breadboard-sandbox-v1'); location.hash = '#/sandbox'; location.reload()`);
+    await sleep(1500);
+    // real taps (Chrome's input pipeline: touch, pointer and click events)
+    const tap = async (p) => {
+      await page.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: p.x, y: p.y }] });
+      await page.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      await sleep(500);
+    };
+    const centre = (selector) => page.evaluate(`(() => {
+      const el = document.querySelector(${JSON.stringify(selector)});
+      el.scrollIntoView({ block: 'center' });
+      const r = el.getBoundingClientRect();
+      return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+    })()`);
+    const f10 = () => page.evaluate(`(() => {
+      const svg = document.querySelector('.bb-svg'), p = svg.createSVGPoint();
+      p.x = 10.5; p.y = 10.5; // geometry.ts
+      const s = p.matrixTransform(svg.getScreenCTM());
+      return { x: s.x, y: s.y, pxPerHole: svg.getScreenCTM().a };
+    })()`);
+    await tap(await centre('.sb-drawer summary'));
+    await tap(await centre('.sb-tool[title^="74LS00"]'));
+    await centre('.bb-viewport');
+    const far = await f10();
+    await tap(far);
+    const near = await f10();
+    const parts = () => page.evaluate(`JSON.parse(localStorage.getItem('breadboard-sandbox-v1') || '{"parts":[]}').parts.map((p) => p.kind).join(' ')`);
+    const zoomed = await parts();
+    assert(near.pxPerHole >= 20 && far.pxPerHole < 20, `the first tap zoomed ${far.pxPerHole.toFixed(1)} -> ${near.pxPerHole.toFixed(1)} px per hole`);
+    assert(zoomed === '', `the zooming tap placed: "${zoomed}"`);
+    await tap(near);
+    const placed = await parts();
+    assert(placed === 'chip', `a tap on f10 with the 74LS00 in hand placed: "${placed}"`);
+    return `${far.pxPerHole.toFixed(1)} -> ${near.pxPerHole.toFixed(1)} px per hole, then a 74LS00 on f10`;
   });
 
   await check('phones: a tap on the zoomed-out breadboard zooms in instead of flipping a switch', async () => {
