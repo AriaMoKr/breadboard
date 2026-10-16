@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Ben Eater's 8-bit breadboard computer in VR: the boards on a table, run live by the simulator." />
+    <title>VR view · Breadboard 8-bit</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='6' fill='%23ff3b3b'/%3E%3C/svg%3E" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <meta name="theme-color" content="#111318" />
+  </head>
+  <body>
+    <header class="vr-bar">
+      <a href="./">← Breadboard 8-bit</a>
+      <h1>VR view</h1>
+      <span class="vr-hint">Drag to look around · scroll or pinch to zoom · click the panel behind the table. In a headset: Enter VR, point and pull the trigger.</span>
+    </header>
+    <div id="vr-root"></div>
+    <p class="vr-status" id="vr-status" aria-live="polite"></p>
+    <script type="module" src="/src/vr/main.ts"></script>
+  </body>
+</html>

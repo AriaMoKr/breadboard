@@ -43,8 +43,9 @@ self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
   if (req.mode === 'navigate') {
-    // the page itself: fresh when online (a new build shows up at once), the cached copy offline
-    e.respondWith(fetch(req).catch(() => caches.match('./')));
+    // a page: fresh when online (a new build shows up at once), the cached copy offline
+    // (vr.html is cached by its name, the app by './')
+    e.respondWith(fetch(req).catch(async () => (await caches.match(req, { ignoreSearch: true })) ?? caches.match('./')));
     return;
   }
   e.respondWith(caches.match(req).then((hit) => hit ?? fetch(req)));

@@ -21,6 +21,11 @@ video by video.
   displays). Wire up your own circuits and the chip-level engine simulates them. It comes with
   five example circuits, and **Share link** puts your circuit in a link (`#/sandbox/c1.…`) that
   opens it in anyone's sandbox. See [docs/BREADBOARD.md](docs/BREADBOARD.md).
+* **VR view** (`vr.html`): the breadboard computer in 3D on a table, run live by the simulator,
+  with a control panel behind it (Run/Stop, Pulse, Step, Reset, speed, program). In a WebXR
+  headset (Quest Browser, or Chrome/Edge with a PC headset) press **Enter VR**, point at the panel
+  and pull the trigger. On a screen, drag to look around and click the panel. It is built with
+  three.js from the same layout as the breadboard view (`src/vr/`), at 1.5x real size.
 * **Chapter labs** (`#/lab/<id>`): each of the 44 videos maps to an interactive lab
   that rebuilds what that video builds. Examples: the 555 timer modes, SR/D latches,
   flip-flops, JK racing, tri-state buses, registers, two's complement, the ALU, RAM,
@@ -44,7 +49,8 @@ the app icons from `public/icons/icon.svg`).
 `npm run check:browser` checks in headless Chrome what the unit tests can't see. It checks
 that every page renders without errors, that phones get no sideways scrolling and controls of
 at least 24 px, the sticky toolbar, parts drawer and tap-to-zoom, the shared computer, sandbox
-links, and the breadboard view's frame rate. `npm run check:browser -- --dist` checks the built
+links, the breadboard view's frame rate, and that the VR view builds the computer in 3D and runs
+it. `npm run check:browser -- --dist` checks the built
 site instead (run `npm run build` first), plus the download link, install and offline use. It
 needs Node 22+ and an installed Chrome, Edge or Chromium (or `CHROME_PATH`).
 
@@ -54,7 +60,8 @@ instruction, **R** = run/stop, **Backspace** = reset.
 ## Deploying
 
 `npm run build` writes a static site to `dist/`:
-* `index.html`, one JS and one CSS file;
+* `index.html` and `vr.html`, each with one JS and one CSS file. These are two builds, so the
+  app doesn't carry three.js;
 * the app manifest, icons and `sw.js` (a service worker, made by `scripts/sw-dist.mjs`);
 * `breadboard-8bit.zip`, the same site as a download (made by `scripts/zip-dist.mjs`).
 
@@ -63,10 +70,12 @@ host needs no rewrite rules. The sidebar offers the zip ("Download for offline u
 sits next to `index.html`, so not on the dev server or in a copy.
 
 Served over HTTPS, the site is an installable app: "Install" in desktop Chrome or Edge, or "Add
-to Home Screen" on a phone. After the first visit it works offline. The service worker keeps
-the page fresh while online, so a new build shows up on the next visit.
+to Home Screen" on a phone. After the first visit it works offline, the VR view too. The service
+worker keeps the pages fresh while online, so a new build shows up on the next visit. WebXR (the
+VR view's "Enter VR") also needs HTTPS.
 
-The app is built as a single JS file on purpose, so a plain mirror gets all of it:
+Each page is built as a single JS file on purpose, so a plain mirror gets all of it (a link in
+`index.html`'s `<noscript>` leads wget to `vr.html`):
 
 ```bash
 wget --mirror --no-parent --page-requisites https://example.com/breadboard/

@@ -71,6 +71,7 @@ export class App {
       h('a', { class: 'nav-computer', href: '#/', dataset: { route: 'computer' } }, '▣ The finished computer'),
       h('a', { class: 'nav-computer', href: '#/breadboard', dataset: { route: 'breadboard' } }, '⌗ Breadboard view'),
       h('a', { class: 'nav-computer', href: '#/sandbox', dataset: { route: 'sandbox' } }, '✎ Breadboard sandbox'),
+      h('a', { class: 'nav-computer', href: 'vr.html', dataset: { route: 'vr' }, title: 'The breadboard computer in 3D: VR headsets, or mouse and touch' }, '◈ VR view'),
       h('ol', { class: 'nav-chapters' }, items),
     );
   }
@@ -95,7 +96,7 @@ export class App {
       '⤓ Download for offline use',
       h('span', { class: 'nav-download-size' }, bytes > 0 ? `zip · ${Math.round(bytes / 1024)} kB` : 'zip'),
     );
-    this.nav.querySelector('[data-route="sandbox"]')?.after(link);
+    this.nav.querySelector('[data-route="vr"]')?.after(link);
   }
 
   private highlightNav(route: Route) {

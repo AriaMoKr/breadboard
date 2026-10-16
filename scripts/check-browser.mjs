@@ -145,6 +145,26 @@ try {
     return `${r.running} fps running at 500 kHz, ${r.idle} idle`;
   });
 
+  const vrPage = async () => {
+    const r = await page.evaluate(`(async () => {
+      const cycle = () => Number((document.getElementById('vr-status').textContent.match(/cycle (\\d+)/) ?? [])[1] ?? -1);
+      const a = cycle();
+      await new Promise((r) => setTimeout(r, 1500));
+      return { counts: JSON.parse(document.body.dataset.ready ?? 'null'), a, b: cycle(), title: document.title };
+    })()`);
+    assert(r.counts?.chips === 49 && r.counts.leds > 80, `model: ${JSON.stringify(r.counts)}`);
+    assert(r.b > r.a, `the clock did not run (cycle ${r.a} -> ${r.b})`);
+    return r;
+  };
+  await check('VR view: the computer is built in 3D and runs', async () => {
+    const before = errors.length;
+    await page.goto(`${base}vr.html`, 3000);
+    const r = await vrPage();
+    const errs = errors.slice(before);
+    assert(!errs.length, errs.join('\n'));
+    return `${r.counts.chips} chips, ${r.counts.leds} LEDs, ${r.counts.meshes} meshes; cycle ${r.a} -> ${r.b}`;
+  });
+
   // ---- phone --------------------------------------------------------------------------
   console.log('Phone (375 x 812, touch)');
   await page.send('Emulation.setDeviceMetricsOverride', { width: 375, height: 812, deviceScaleFactor: 2, mobile: true });
@@ -243,7 +263,9 @@ try {
         await page.goto(`${base}#/breadboard`, 2000);
         const r = await page.evaluate(`({ title: document.title, chips: document.querySelectorAll('.bb-chip').length })`);
         assert(r.chips > 40, `offline: "${r.title}", ${r.chips} chips drawn`);
-        return `"${r.title}" with ${r.chips} chips, offline`;
+        await page.goto(`${base}vr.html`, 3000);
+        const vr = await vrPage();
+        return `"${r.title}" with ${r.chips} chips, and "${vr.title}", offline`;
       } finally {
         await page.send('Network.emulateNetworkConditions', { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
       }
