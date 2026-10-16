@@ -24,6 +24,8 @@ export interface ProgramPanelOptions {
   version?: MicrocodeVersionId;
   /** Program id or source to load initially. */
   initial?: string;
+  /** If the machine already holds a program (`machine.lastSource`), show it instead of loading `initial`. */
+  keepLoaded?: boolean;
   /** Hide the source editor (memory view only). */
   memoryOnly?: boolean;
 }
@@ -120,7 +122,7 @@ export class ProgramPanel {
     this.d.add(m.onChange(update));
 
     this.el = h('div', { class: 'program-panel' }, editor, h('div', { class: 'memory-wrap' }, h('h4', null, 'RAM ', h('span', { class: 'dim small' }, '▶ PC  ● MAR — click bits to edit')), table));
-    if (!opts.memoryOnly) {
+    if (!opts.memoryOnly && !(opts.keepLoaded && m.lastSource !== null)) {
       if (opts.initial && !PROGRAMS.some((p) => p.id === opts.initial)) this.setSource(opts.initial);
       else if (first) this.selectProgram(first.id);
     }

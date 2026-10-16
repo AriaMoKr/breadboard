@@ -12,6 +12,8 @@ export interface ComputerWorkbenchOptions {
   microcodeVersion?: MicrocodeVersionId;
   /** Program id from src/sim/programs.ts or assembly source to preload. */
   program?: string;
+  /** Keep the program `machine` already holds instead of loading `program` (pages sharing one machine). */
+  keepProgram?: boolean;
   modules?: ModuleId[];
   highlight?: ModuleId[];
   manualControl?: boolean;
@@ -85,7 +87,7 @@ export function mountComputerWorkbench(root: HTMLElement, opts: ComputerWorkbenc
   let programPanel: ProgramPanel | null = null;
   let microcodePanel: MicrocodePanel | null = null;
   if (tabs.includes('program')) {
-    const p = (programPanel = new ProgramPanel(machine, { initial: opts.program, memoryOnly: manual }));
+    const p = (programPanel = new ProgramPanel(machine, { initial: opts.program, memoryOnly: manual, keepLoaded: opts.keepProgram }));
     d.add(() => p.dispose());
     tabPanels.program = p.el;
   }

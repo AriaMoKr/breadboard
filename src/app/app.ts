@@ -1,4 +1,5 @@
 import type { Lab } from '../labs/types';
+import { Machine } from '../sim/machine';
 import { h } from '../ui/dom';
 import { CHAPTERS, LAB_IDS, PLAYLIST_URL, VIDEO_BY_INDEX, embedUrl, videoUrl, videosForLab, type Video } from './chapters';
 import { mountComputerWorkbench } from './computer-page';
@@ -30,6 +31,11 @@ export class App {
   private shell: HTMLElement;
   /** Incremented on every render, so a lab that finishes loading after the route changed is dropped. */
   private renderToken = 0;
+  /**
+   * One computer for the finished-computer page and the breadboard view, so the program,
+   * its state, the clock mode and the speed carry over between them. Labs have their own.
+   */
+  private sharedMachine: Machine | null = null;
 
   constructor(private root: HTMLElement) {
     this.nav = this.buildNav();
@@ -129,7 +135,7 @@ export class App {
     );
     const host = h('div');
     this.main.append(intro, host);
-    const wb = mountComputerWorkbench(host, { versionPicker: true, program: 'multiply' });
+    const wb = mountComputerWorkbench(host, { versionPicker: true, program: 'multiply', machine: this.machine(), keepProgram: true });
     this.cleanup = wb.dispose;
   }
 
@@ -144,7 +150,7 @@ export class App {
         'p',
         { class: 'lede' },
         breadboard
-          ? 'The finished computer laid out on breadboards the way Ben built it. Every chip, LED and wire is placed in its hole, and the running simulation lights the LEDs. Click the clock button, mode switches and DIP switches on the boards themselves, or use the toolbar.'
+          ? 'The finished computer laid out on breadboards the way Ben built it. Every chip, LED and wire is placed in its hole, and the running simulation lights the LEDs. Click the clock button, mode switches and DIP switches on the boards themselves, or use the toolbar. It is the same computer as on the finished-computer page: its program, state and clock speed carry over.'
           : 'An empty breadboard with Ben’s parts bin. Place 74LS chips, LEDs, switches and resistors, wire them up, and the chip-level simulator runs what you built. Start from an example or from scratch.',
       ),
     );
@@ -153,7 +159,11 @@ export class App {
     const mod = breadboard ? await import('./breadboard-page') : await import('./sandbox-page');
     if (token !== this.renderToken) return;
     body.replaceChildren();
-    this.cleanup = 'mountBreadboardPage' in mod ? mod.mountBreadboardPage(body) : mod.mountSandboxPage(body);
+    this.cleanup = 'mountBreadboardPage' in mod ? mod.mountBreadboardPage(body, { machine: this.machine() }) : mod.mountSandboxPage(body);
+  }
+
+  private machine(): Machine {
+    return (this.sharedMachine ??= new Machine({ microcodeVersion: 'flags' }));
   }
 
   private async renderLab(id: string, videoIndex: number | undefined, token: number) {

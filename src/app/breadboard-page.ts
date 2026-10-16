@@ -117,7 +117,7 @@ export function mountBreadboardPage(root: HTMLElement, opts: { machine?: Machine
   };
   d.add(machine.onChange(updateStatus));
 
-  const prog = new ProgramPanel(machine, { initial: 'add' });
+  const prog = new ProgramPanel(machine, { initial: 'add', keepLoaded: true });
   d.add(() => prog.dispose());
 
   root.append(

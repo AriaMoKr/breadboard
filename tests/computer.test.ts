@@ -1087,4 +1087,26 @@ describe('shared UI pieces (fake DOM)', () => {
     frames(2);
     expect(raf.size).toBe(0);
   });
+
+  it('workbench: keepProgram shows what a shared machine already holds instead of reloading', () => {
+    const m = new Machine({ microcodeVersion: 'flags' });
+    const mount = (program: string, keepProgram: boolean) => {
+      const host = new FElement('div');
+      const wb = mountComputerWorkbench(asEl(host) as unknown as HTMLElement, { machine: m, program, keepProgram, keyboard: false });
+      return { wb, picker: asEl(host.querySelector('.asm-editor select')) };
+    };
+    const a = mount('multiply', true); // nothing loaded yet: loads multiply
+    expect(a.picker.value).toBe('multiply');
+    m.stepInstruction();
+    m.stepInstruction();
+    const cycles = m.computer.cycles;
+    expect(cycles).toBeGreaterThan(0);
+    a.wb.dispose();
+    const b = mount('add', true); // e.g. the breadboard view: keeps multiply mid-run
+    expect([b.picker.value, m.computer.cycles]).toEqual(['multiply', cycles]);
+    b.wb.dispose();
+    const c = mount('add', false); // without keepProgram it loads (and resets) as before
+    expect([c.picker.value, m.computer.cycles]).toEqual(['add', 0]);
+    c.wb.dispose();
+  });
 });
