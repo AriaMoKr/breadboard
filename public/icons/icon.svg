@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- App icon: a breadboard with a chip, a jumper wire and a lit red LED. Source of the PNGs (npm run icons). -->
+  <defs>
+    <pattern id="holes" width="20" height="20" patternUnits="userSpaceOnUse" x="82" y="140">
+      <rect x="6" y="6" width="8" height="8" rx="1.5" fill="#77746a" />
+    </pattern>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="#111318" />
+  <rect x="72" y="128" width="368" height="256" rx="20" fill="#ecebe4" />
+  <rect x="82" y="140" width="340" height="100" fill="url(#holes)" />
+  <rect x="82" y="272" width="340" height="100" fill="url(#holes)" />
+  <rect x="72" y="248" width="368" height="16" fill="#d3d0c4" />
+  <g fill="#c9ccd2">
+    <rect x="168" y="212" width="8" height="12" /><rect x="208" y="212" width="8" height="12" /><rect x="248" y="212" width="8" height="12" /><rect x="288" y="212" width="8" height="12" /><rect x="328" y="212" width="8" height="12" />
+    <rect x="168" y="288" width="8" height="12" /><rect x="208" y="288" width="8" height="12" /><rect x="248" y="288" width="8" height="12" /><rect x="288" y="288" width="8" height="12" /><rect x="328" y="288" width="8" height="12" />
+  </g>
+  <rect x="152" y="220" width="200" height="72" rx="6" fill="#24262c" />
+  <circle cx="170" cy="275" r="6" fill="#3a3d45" />
+  <path d="M112 352 C 112 300, 92 200, 132 150" fill="none" stroke="#2563d4" stroke-width="9" stroke-linecap="round" />
+  <path d="M372 342 C 372 320, 412 300, 412 230" fill="none" stroke="#e8c516" stroke-width="9" stroke-linecap="round" />
+  <circle cx="392" cy="176" r="46" fill="#ff3b3b" opacity="0.28" />
+  <circle cx="392" cy="176" r="21" fill="#ff3b3b" />
+  <circle cx="385" cy="169" r="6" fill="#ffffff" opacity="0.6" />
+</svg>

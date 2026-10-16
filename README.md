@@ -38,18 +38,26 @@ npm run dev
 ```
 
 Then open http://localhost:5173. Other scripts: `npm test` (vitest), `npm run typecheck`,
-`npm run build` (static site in `dist/`, see [Deploying](#deploying)).
+`npm run build` (static site in `dist/`, see [Deploying](#deploying)), `npm run icons` (renders
+the app icons from `public/icons/icon.svg`).
 
 Keyboard on the computer page: **Space** = clock pulse, **I** = step one
 instruction, **R** = run/stop, **Backspace** = reset.
 
 ## Deploying
 
-`npm run build` writes a static site to `dist/`: `index.html`, one JS and one CSS file, and
-`breadboard-8bit.zip`, the same site as a download (made by `scripts/zip-dist.mjs`). Copy `dist/`
-to any static host, at the root or in a sub-folder. Pages use `#/…` URLs, so the host needs no
-rewrite rules. The sidebar offers the zip ("Download for offline use") wherever it sits next to
-`index.html`, so not on the dev server or in a copy.
+`npm run build` writes a static site to `dist/`:
+* `index.html`, one JS and one CSS file;
+* the app manifest, icons and `sw.js` (a service worker, made by `scripts/sw-dist.mjs`);
+* `breadboard-8bit.zip`, the same site as a download (made by `scripts/zip-dist.mjs`).
+
+Copy `dist/` to any static host, at the root or in a sub-folder. Pages use `#/…` URLs, so the
+host needs no rewrite rules. The sidebar offers the zip ("Download for offline use") wherever it
+sits next to `index.html`, so not on the dev server or in a copy.
+
+Served over HTTPS, the site is an installable app: "Install" in desktop Chrome or Edge, or "Add
+to Home Screen" on a phone. After the first visit it works offline. The service worker keeps
+the page fresh while online, so a new build shows up on the next visit.
 
 The app is built as a single JS file on purpose, so a plain mirror gets all of it:
 
