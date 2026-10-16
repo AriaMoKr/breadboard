@@ -4,6 +4,8 @@ export interface PanelAction {
   label: () => string;
   run: () => void;
   primary?: boolean;
+  /** Greyed out, and does nothing, while this says so. */
+  disabled?: () => boolean;
 }
 
 const PX_PER_M = 1000; // canvas pixels per metre of panel
@@ -47,8 +49,9 @@ export class ControlPanel {
 
   /** `note`: small print in the bottom right corner (which version this is). */
   constructor(actions: PanelAction[], title: string, note = '') {
-    const cols = 4, rows = Math.ceil(actions.length / cols);
-    const W = 0.6, H = 0.196 + rows * 0.072; // 0.34 for two rows of buttons
+    // two rows of four buttons, or of five (wider, not taller: the screen's home view shows it whole)
+    const cols = actions.length > 8 ? 5 : 4, rows = Math.ceil(actions.length / cols);
+    const W = 0.032 + cols * 0.142, H = 0.196 + rows * 0.072; // 0.6 x 0.34 for 2 x 4
     const back = new CanvasPlane(W, H);
     back.draw((g, w, h) => {
       g.fillStyle = 'rgba(23, 26, 33, 0.94)';
@@ -89,14 +92,15 @@ export class ControlPanel {
     for (const b of this.buttons) {
       const text = b.action.label();
       const lit = now < b.flash;
-      const key = `${text}|${b.hover}|${lit}`;
+      const off = b.action.disabled?.() ?? false;
+      const key = `${text}|${b.hover}|${lit}|${off}`;
       if (!force && key === b.text) continue;
       b.text = key;
       b.plane.draw((g, w, h) => {
-        g.fillStyle = lit ? '#60a5fa' : b.action.primary ? (b.hover ? '#3f7fe0' : '#2f6fdd') : b.hover ? '#3b4456' : '#2a303c';
+        g.fillStyle = off ? '#1f232b' : lit ? '#60a5fa' : b.action.primary ? (b.hover ? '#3f7fe0' : '#2f6fdd') : b.hover ? '#3b4456' : '#2a303c';
         roundRect(g, 2, 2, w - 4, h - 4, 14);
         g.fill();
-        g.fillStyle = '#ffffff';
+        g.fillStyle = off ? '#5b6270' : '#ffffff';
         g.font = `600 ${Math.round(h * 0.42)}px system-ui, sans-serif`;
         g.textAlign = 'center';
         g.textBaseline = 'middle';
@@ -123,7 +127,7 @@ export class ControlPanel {
 
   press(target: THREE.Object3D) {
     const b = this.buttons.find((x) => x.plane.mesh === target);
-    if (!b) return;
+    if (!b || b.action.disabled?.()) return;
     b.flash = performance.now() + 150;
     b.action.run();
     this.refresh();

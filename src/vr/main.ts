@@ -38,8 +38,14 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.xr.enabled = true;
 host.appendChild(renderer.domElement);
-document.body.appendChild(VRButton.createButton(renderer));
+const vrButton = VRButton.createButton(renderer); // "Enter VR" on the page; the panel's VR button clicks it too
+document.body.appendChild(vrButton);
 const inVR = () => renderer.xr.isPresenting;
+let vrSupported = false;
+void navigator.xr?.isSessionSupported('immersive-vr').then((ok) => {
+  vrSupported = ok;
+  dirty = true;
+}, () => {});
 document.querySelector('.vr-bar')?.append(Object.assign(document.createElement('span'), { className: 'vr-build', title: 'The commit this was built from, and its date', textContent: buildLabel() }));
 
 const scene = new THREE.Scene();
@@ -158,6 +164,9 @@ function setExhibit(next: Exhibit, c: ExhibitChoice) {
       ...next.actions,
       { label: () => 'Next ▸', run: () => void open(order[(indexOf(choice) + 1) % order.length]) },
       { label: () => (inVR() ? 'Put back' : 'Fit view'), run: () => (putBack(), inVR() || homeView()) },
+      // In a headset, the way out without the system menu. A click on it counts as the user's
+      // gesture that a browser wants before it starts VR, so on a screen it enters VR.
+      { label: () => (inVR() ? 'Exit VR' : 'Enter VR'), run: () => vrButton.click(), disabled: () => !inVR() && !vrSupported },
     ],
     next.title,
     buildLabel(),
