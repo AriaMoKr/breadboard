@@ -1,7 +1,10 @@
 // Runs after `vite build`: packs dist/ into dist/<package name>.zip, so the whole
 // site can be downloaded in one file (curl -LO https://…/breadboard-8bit.zip).
 // Plain Node, no dependencies: deflated entries plus a central directory.
-import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+// Reproducible: the same site makes the same zip, byte for byte, so rsync -c and caches see no
+// change after a rebuild. Every entry gets one date (see `stamp`) instead of its file's time.
+import { execFileSync } from 'node:child_process';
+import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { deflateRawSync } from 'node:zlib';
@@ -47,19 +50,37 @@ function crc32(buf) {
   return (c ^ 0xffffffff) >>> 0;
 }
 
-/** MS-DOS time and date fields (local time, 2 s resolution). */
-const dosTime = (d) => (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1);
-const dosDate = (d) => ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
+/**
+ * The date of every entry: SOURCE_DATE_EPOCH when set (the reproducible-builds convention), else
+ * the last commit's time, else 1980-01-01 (the earliest date a zip can hold).
+ */
+function stamp() {
+  const DOS_EPOCH = Date.UTC(1980, 0, 1);
+  let seconds = Number(process.env.SOURCE_DATE_EPOCH || NaN);
+  if (!Number.isFinite(seconds)) {
+    try {
+      seconds = Number(execFileSync('git', ['log', '-1', '--format=%ct'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() || NaN);
+    } catch {
+      /* no git, or not a checkout */
+    }
+  }
+  return new Date(Number.isFinite(seconds) ? Math.max(DOS_EPOCH, seconds * 1000) : DOS_EPOCH);
+}
 
+/** MS-DOS time and date fields (2 s resolution), in UTC so every time zone makes the same zip. */
+const dosTime = (d) => (d.getUTCHours() << 11) | (d.getUTCMinutes() << 5) | (d.getUTCSeconds() >> 1);
+const dosDate = (d) => ((d.getUTCFullYear() - 1980) << 9) | ((d.getUTCMonth() + 1) << 5) | d.getUTCDate();
+
+const mtime = stamp();
 const entries = [
-  ...filesIn(dist).map((f) => ({ path: f, data: readFileSync(join(dist, f)), mtime: statSync(join(dist, f)).mtime })),
-  { path: 'README.txt', data: Buffer.from(README), mtime: new Date() },
+  ...filesIn(dist).map((f) => ({ path: f, data: readFileSync(join(dist, f)) })),
+  { path: 'README.txt', data: Buffer.from(README) },
 ].sort((a, b) => (a.path < b.path ? -1 : 1));
 
 const parts = [];
 const central = [];
 let offset = 0;
-for (const { path, data, mtime } of entries) {
+for (const { path, data } of entries) {
   const packed = deflateRawSync(data, { level: 9 });
   const fileName = Buffer.from(`${name}/${path}`); // one top-level folder, so unzipping stays tidy
   // Fields the local header and the central directory entry share, from "version needed" on.
@@ -99,4 +120,4 @@ end.writeUInt32LE(offset, 16); // where the central directory starts
 
 const zip = Buffer.concat([...parts, directory, end]);
 writeFileSync(join(dist, zipName), zip);
-console.log(`dist/${zipName}  ${entries.length} files, ${(zip.length / 1024).toFixed(1)} kB`);
+console.log(`dist/${zipName}  ${entries.length} files, ${(zip.length / 1024).toFixed(1)} kB, dated ${mtime.toISOString().slice(0, 16).replace('T', ' ')} UTC`);

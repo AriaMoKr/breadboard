@@ -80,10 +80,17 @@ instruction, **R** = run/stop, **Backspace** = reset.
 * `index.html` and `vr.html`, each with one JS and one CSS file. These are two builds, so the
   app doesn't carry three.js;
 * the app manifest, icons and `sw.js` (a service worker, made by `scripts/sw-dist.mjs`);
-* `breadboard-8bit.zip`, the same site as a download (made by `scripts/zip-dist.mjs`).
+* `breadboard-8bit.zip`, the same site as a download (made by `scripts/zip-dist.mjs`). It is
+  reproducible: its files are dated with the last commit (or `SOURCE_DATE_EPOCH`), so the same
+  site always makes the same zip.
 
 Copy `dist/` to any static host, at the root or in a sub-folder. Pages use `#/…` URLs, so the
-host needs no rewrite rules. The sidebar offers the zip ("Download for offline use") wherever it
+host needs no rewrite rules. A build rewrites every file, so with rsync compare by content
+(`-c`), and leave out folder times (`-O`); then only what changed is listed and sent:
+
+```bash
+rsync -avcO --delete dist/ user@host:path/to/breadboard/
+``` The sidebar offers the zip ("Download for offline use") wherever it
 sits next to `index.html`, so not on the dev server or in a copy.
 
 Served over HTTPS, the site is an installable app: "Install" in desktop Chrome or Edge, or "Add
