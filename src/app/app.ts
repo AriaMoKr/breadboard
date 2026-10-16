@@ -20,6 +20,9 @@ function parseRoute(hash: string): Route {
 
 const labHref = (id: string, video?: number) => `#/lab/${id}${video ? `/${video}` : ''}`;
 
+/** The whole site as one zip, written next to index.html by scripts/zip-dist.mjs. */
+const SITE_ZIP = 'breadboard-8bit.zip';
+
 export class App {
   private main: HTMLElement;
   private nav: HTMLElement;
@@ -30,6 +33,7 @@ export class App {
 
   constructor(private root: HTMLElement) {
     this.nav = this.buildNav();
+    void this.offerDownload();
     this.main = h('main', { class: 'content', id: 'content', tabindex: -1 });
     const menuBtn = h('button', { class: 'btn btn-ghost menu-btn', type: 'button', 'aria-label': 'Toggle chapter list', onClick: () => this.shell.classList.toggle('nav-open') }, '☰');
     const header = h(
@@ -63,6 +67,29 @@ export class App {
       h('a', { class: 'nav-computer', href: '#/sandbox', dataset: { route: 'sandbox' } }, '✎ Breadboard sandbox'),
       h('ol', { class: 'nav-chapters' }, items),
     );
+  }
+
+  /**
+   * Adds "Download for offline use" under the main links once the zip turns out to exist, so the
+   * dev server, a wget mirror or an unzipped copy shows no dead link. A 200 alone isn't enough:
+   * the dev server and some hosts answer a missing file with index.html.
+   */
+  private async offerDownload() {
+    let res: Response;
+    try {
+      res = await fetch(SITE_ZIP, { method: 'HEAD' });
+    } catch {
+      return; // offline or blocked
+    }
+    if (!res.ok || (res.headers.get('content-type') ?? '').includes('text/html')) return;
+    const bytes = Number(res.headers.get('content-length'));
+    const link = h(
+      'a',
+      { class: 'nav-download', href: SITE_ZIP, download: SITE_ZIP, title: 'The whole site as a zip. Serve the unzipped folder over HTTP to run it (see README.txt inside).' },
+      '⤓ Download for offline use',
+      h('span', { class: 'nav-download-size' }, bytes > 0 ? `zip · ${Math.round(bytes / 1024)} kB` : 'zip'),
+    );
+    this.nav.querySelector('[data-route="sandbox"]')?.after(link);
   }
 
   private highlightNav(route: Route) {

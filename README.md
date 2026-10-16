@@ -47,7 +47,8 @@ instruction, **R** = run/stop, **Backspace** = reset.
 `npm run build` writes a static site to `dist/`: `index.html`, one JS and one CSS file, and
 `breadboard-8bit.zip`, the same site as a download (made by `scripts/zip-dist.mjs`). Copy `dist/`
 to any static host, at the root or in a sub-folder. Pages use `#/…` URLs, so the host needs no
-rewrite rules.
+rewrite rules. The sidebar offers the zip ("Download for offline use") wherever it sits next to
+`index.html`, so not on the dev server or in a copy.
 
 The app is built as a single JS file on purpose, so a plain mirror gets all of it:
 

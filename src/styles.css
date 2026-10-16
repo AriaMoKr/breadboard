@@ -93,6 +93,9 @@ code, pre { font-family: var(--mono); }
   border-right: 1px solid var(--border); padding: 14px 10px 40px; background: var(--bg-2);
 }
 .nav-computer { display: block; padding: 8px 10px; border-radius: 8px; color: var(--fg); text-decoration: none; font-weight: 600; margin-bottom: 8px; }
+.nav-download { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 6px 10px; border-radius: 8px; color: var(--fg-dim); text-decoration: none; font-size: 0.84rem; margin-bottom: 8px; }
+.nav-download:hover { background: var(--panel); color: var(--fg); }
+.nav-download-size { font-family: var(--mono); font-size: 0.72rem; color: var(--fg-faint); }
 .nav-chapters, .nav-videos { list-style: none; margin: 0; padding: 0; }
 .nav-chapter { margin-top: 12px; }
 .nav-chapter-title { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--fg-faint); padding: 0 10px 4px; font-weight: 600; }
