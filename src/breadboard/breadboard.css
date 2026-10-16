@@ -89,7 +89,7 @@
 .sb-tools { display: flex; flex-wrap: wrap; gap: 4px; }
 .sb-tool { font: inherit; font-size: 0.75rem; font-family: var(--mono); padding: 3px 7px; border-radius: 6px; border: 1px solid var(--border); background: var(--panel-2); color: var(--fg); cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
 .sb-tool i { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 1px solid rgba(0, 0, 0, 0.4); }
-.sb-tool.active { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 25%, var(--panel-2)); }
+.sb-tool.active, .sb-tool[aria-pressed='true'] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 25%, var(--panel-2)); }
 .sb-drawer > summary { display: none; }
 .sb-main { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .sb-status { font-size: 0.8rem; color: var(--fg-dim); min-height: 1.3em; }

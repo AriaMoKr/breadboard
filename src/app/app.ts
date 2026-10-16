@@ -130,7 +130,7 @@ export class App {
       'div',
       { class: 'page-head' },
       h('h1', null, 'The finished computer'),
-      h('p', { class: 'lede' }, 'Ben Eater’s 8-bit breadboard computer as it stands at the end of the playlist: 16 bytes of RAM, A and B registers, an adder/subtractor ALU with carry and zero flags, a microcoded control unit and a decimal display. Load an example, then press Run, or pulse the clock by hand (Space) and watch every control signal and bus transfer.'),
+      h('p', { class: 'lede' }, 'Ben Eater’s 8-bit breadboard computer as it stands at the end of the playlist: 16 bytes of RAM, A and B registers, an adder/subtractor ALU with carry and zero flags, a microcoded control unit and a decimal display. Load an example, then press Run, or pulse the clock by hand', h('span', { class: 'key-hint' }, ' (Space)'), ' and watch every control signal and bus transfer.'),
       h('p', { class: 'note' }, 'New here? Start with ', h('a', { href: labHref('overview', 1) }, 'video 1'), ' and follow the chapters on the left: each one has a lab that rebuilds what that video builds. Or see the same computer ', h('a', { href: '#/breadboard' }, 'laid out on breadboards'), ', or build your own circuits in the ', h('a', { href: '#/sandbox' }, 'sandbox'), '.'),
     );
     const host = h('div');

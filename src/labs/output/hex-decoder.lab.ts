@@ -3,7 +3,7 @@ import { bin, hex } from '../../sim/assembler';
 import { HEX_DIGITS } from '../../sim/display';
 import { Button, DipSwitch, SevenSegment, Toggle, note, panel, row } from '../../ui/components';
 import { Disposer, h, setClass, setText } from '../../ui/dom';
-import { Schematic } from '../../ui/schematic';
+import { Schematic, switchPitch } from '../../ui/schematic';
 import { badge, makeTable, scopedStyle } from '../ram/_ui';
 import { defineLab } from '../types';
 import {
@@ -219,8 +219,9 @@ function buildLogic(terms: Implicant[], seg: Seg, pol: Polarity, onToggle: (v: n
 
   const T = (v: number) => 110 + 46 * v;
   const C = (v: number) => T(v) + 31;
-  const yIn = (v: number) => 22 + 26 * v;
-  const top = 128;
+  const pitch = switchPitch(26); // input switches, wider apart on touch screens
+  const yIn = (v: number) => 22 + pitch * v;
+  const top = yIn(3) + 28; // terms start below the last input's inverter
   const spacing = terms.map((t) => Math.max(34, literals(t).length * 12 + 12) * k);
   const yTerm: number[] = [];
   let y = top;

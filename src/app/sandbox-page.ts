@@ -337,18 +337,28 @@ export function mountSandboxPage(root: HTMLElement): () => void {
     t.kind === 'select' ? 'Select: click buttons, switches and DIP switches to operate them.'
     : t.kind === 'delete' ? 'Delete: click a part or wire to remove it.'
     : t.kind === 'probe' ? 'Probe: hover any hole to see its logic level.'
-    : t.kind === 'chip' ? `Click the hole for pin 1 (row f, notch on the left). Press R to rotate 180°. ${CHIPS[t.chip].title}.`
+    : t.kind === 'chip' && rotated ? `Click the hole for pin 1 (row e, chip turned round: notch on the right). ↻ 180° or R turns it back. ${CHIPS[t.chip].title}.`
+    : t.kind === 'chip' ? `Click the hole for pin 1 (row f, notch on the left). ↻ 180° or R turns it round. ${CHIPS[t.chip].title}.`
     : t.kind === 'dip' || t.kind === 'seg7' ? 'Click the hole for pin 1.'
     : t.kind === 'slide' ? 'Click the leftmost of three holes in a row.'
     : 'Click the first hole, then the second.';
 
-  const group = (title: string, ...items: HTMLElement[]) => h('div', { class: 'sb-group' }, h('div', { class: 'sb-group-title' }, title), h('div', { class: 'sb-tools' }, items));
+  // Chips can be turned round with the R key or this button (touch screens have no keyboard).
+  const rotateBtn = h('button', { type: 'button', class: 'sb-tool', title: 'Place chips turned 180° (pin 1 top right). Key: R', 'aria-pressed': 'false' }, '↻ 180°');
+  const setRotated = (r: boolean) => {
+    rotated = r;
+    rotateBtn.setAttribute('aria-pressed', String(r));
+    setStatus(tool.kind === 'chip' ? hintFor(tool) : `Chips are placed ${r ? 'turned 180° (pin 1 top right)' : 'notch left (pin 1 bottom left)'}.`);
+  };
+  rotateBtn.addEventListener('click', () => setRotated(!rotated));
+
+  const group =(title: string, ...items: HTMLElement[]) => h('div', { class: 'sb-group' }, h('div', { class: 'sb-group-title' }, title), h('div', { class: 'sb-tools' }, items));
   const palette = h(
     'div',
     { class: 'sb-palette' },
     group('Tools', toolBtn('Use', { kind: 'select' }, 'Operate switches and buttons'), toolBtn('Probe', { kind: 'probe' }, 'Hover holes to read levels'), toolBtn('Delete', { kind: 'delete' }, 'Remove parts')),
     group('Wires', ...(['red', 'black', 'blue', 'yellow', 'green', 'white', 'orange', 'purple'] as WireColor[]).map((c) => toolBtn('', { kind: 'wire', color: c }, `${c} wire`, WIRE_COLORS[c]))),
-    group('Chips', ...CHIP_IDS.map((c) => toolBtn(c.replace('74LS', ''), { kind: 'chip', chip: c }, `${c}: ${CHIPS[c].title}`))),
+    group('Chips', rotateBtn, ...CHIP_IDS.map((c) => toolBtn(c.replace('74LS', ''), { kind: 'chip', chip: c }, `${c}: ${CHIPS[c].title}`))),
     group(
       'Parts',
       ...(['red', 'green', 'yellow', 'blue'] as LedColor[]).map((c) => toolBtn('LED', { kind: 'led', color: c }, `${c} LED (anode first)`, LED_COLORS[c])),
@@ -431,8 +441,7 @@ export function mountSandboxPage(root: HTMLElement): () => void {
       e.preventDefault();
       undo();
     } else if (e.key === 'r' || e.key === 'R') {
-      rotated = !rotated;
-      setStatus(`Chips are placed ${rotated ? 'rotated 180° (pin 1 top-right)' : 'notch left (pin 1 bottom-left)'}.`);
+      setRotated(!rotated);
     } else if (e.key === 'Escape') {
       pending = null;
       drawGhost(null);

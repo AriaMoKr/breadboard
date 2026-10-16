@@ -432,6 +432,7 @@ table.microcode td.uc-cell[tabindex]:hover { outline: 1px solid var(--accent); }
 /* Touch screens: a fingertip needs bigger targets than a mouse pointer (aim for 32 px or more). */
 @media (pointer: coarse) {
   .btn, select { min-height: 38px; }
+  .key-hint { display: none; } /* keyboard shortcuts in the text: no keyboard here */
   .topbar .btn { min-height: 0; }
   .toggle { min-height: 34px; }
   .toggle-track { width: 42px; height: 24px; border-radius: 12px; }
