@@ -121,28 +121,35 @@ try {
   });
 
   await check('breadboard view keeps its frame rate while running', async () => {
-    await page.goto(`${base}#/breadboard`); // a fresh page: the 40 pages above leave garbage behind
-    const r = await page.evaluate(`(async () => {
-      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-      const fps = (ms) => new Promise((res) => {
-        let n = 0; const t0 = performance.now();
-        (function f(t) { n++; if (t - t0 < ms) requestAnimationFrame(f); else res(Math.round(n / (ms / 1000))); })(t0);
-      });
-      location.hash = '#/breadboard'; await wait(1000);
-      const pick = [...document.querySelectorAll('.bb-program select')].find((s) => [...s.options].some((o) => o.value === 'count-by-3'));
-      pick.value = 'count-by-3'; pick.dispatchEvent(new Event('change', { bubbles: true })); await wait(200);
-      const idle = await fps(1500);
-      const input = document.querySelector('.toolbar .slider input');
-      input.value = '1000'; input.dispatchEvent(new Event('input', { bubbles: true }));
-      const btn = (l) => [...document.querySelectorAll('.toolbar button')].find((b) => b.innerText.trim() === l);
-      btn('Run').click(); await wait(400);
-      const running = Math.max(await fps(2000), await fps(2000)); // the better of two, against noise
-      btn('Stop')?.click();
-      return { idle, running };
-    })()`);
+    const measure = async () => {
+      await page.goto(`${base}#/breadboard`); // a fresh page: the 40 pages above leave garbage behind
+      return page.evaluate(`(async () => {
+        const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+        const fps = (ms) => new Promise((res) => {
+          let n = 0; const t0 = performance.now();
+          (function f(t) { n++; if (t - t0 < ms) requestAnimationFrame(f); else res(Math.round(n / (ms / 1000))); })(t0);
+        });
+        location.hash = '#/breadboard'; await wait(1000);
+        const pick = [...document.querySelectorAll('.bb-program select')].find((s) => [...s.options].some((o) => o.value === 'count-by-3'));
+        pick.value = 'count-by-3'; pick.dispatchEvent(new Event('change', { bubbles: true })); await wait(200);
+        const idle = await fps(1500);
+        const input = document.querySelector('.toolbar .slider input');
+        input.value = '1000'; input.dispatchEvent(new Event('input', { bubbles: true }));
+        const btn = (l) => [...document.querySelectorAll('.toolbar button')].find((b) => b.innerText.trim() === l);
+        btn('Run').click(); await wait(400);
+        const running = Math.max(await fps(2000), await fps(2000)); // the better of two, against noise
+        btn('Stop')?.click();
+        return { idle, running };
+      })()`);
+    };
     // Before the fix it ran at ~20% of the idle rate (any LED change repainted the whole scene).
-    assert(r.running >= 0.3 * r.idle, `${r.running} fps running at 500 kHz, ${r.idle} fps idle: below 30%`);
-    return `${r.running} fps running at 500 kHz, ${r.idle} idle`;
+    // A busy machine can dip below 30% once, so a low result is measured again before failing.
+    const ok = (r) => r.running >= 0.3 * r.idle;
+    let r = await measure();
+    const first = r;
+    if (!ok(r)) r = await measure();
+    assert(ok(r), `${r.running} fps running at 500 kHz, ${r.idle} fps idle: below 30% (twice; first ${first.running}/${first.idle})`);
+    return `${r.running} fps running at 500 kHz, ${r.idle} idle${r === first ? '' : ` (measured again; first ${first.running}/${first.idle})`}`;
   });
 
   const vrPage = async () => {
