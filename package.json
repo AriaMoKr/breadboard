@@ -4,6 +4,9 @@
   "version": "0.1.0",
   "description": "Browser simulator that follows Ben Eater's 'Building an 8-bit breadboard computer!' playlist",
   "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build && vite build --mode vr && node scripts/sw-dist.mjs && node scripts/zip-dist.mjs",
@@ -17,8 +20,8 @@
   "devDependencies": {
     "@types/three": "^0.186.0",
     "typescript": "^5.9.3",
-    "vite": "^6.4.4",
-    "vitest": "^3.2.7"
+    "vite": "^7.3.7",
+    "vitest": "^5.0.5"
   },
   "dependencies": {
     "three": "^0.186.1"
