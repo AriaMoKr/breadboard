@@ -532,6 +532,44 @@ try {
     return `${far.pxPerHole.toFixed(1)} -> ${near.pxPerHole.toFixed(1)} px per hole, then a 74LS00 on f10`;
   });
 
+  await check('phones: Move takes a wire end by taps and a chip by a finger drag, without panning', async () => {
+    const board = { boards: [{ id: 'bb1', place: { x: 0, y: 0 }, title: 'Sandbox' }], parts: [{ id: 'U1', board: 'bb1', kind: 'chip', chip: '74LS00', col: 10 }, { id: 'W1', board: 'bb1', kind: 'wire', color: 'red', a: 'a3', b: 'a12' }] };
+    await page.evaluate(`localStorage.setItem('breadboard-sandbox-v1', ${JSON.stringify(JSON.stringify(board))}); location.hash = '#/sandbox'; location.reload()`);
+    await sleep(1500);
+    const touch = (type, p) => page.send('Input.dispatchTouchEvent', { type, touchPoints: p ? [{ x: p.x, y: p.y }] : [] });
+    const tap = async (p) => {
+      await touch('touchStart', p);
+      await touch('touchEnd');
+      await sleep(500);
+    };
+    const middle = (selector) => page.evaluate(`(() => {
+      const el = document.querySelector(${JSON.stringify(selector)});
+      el.scrollIntoView({ block: 'center' });
+      const r = el.getBoundingClientRect();
+      return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+    })()`);
+    const get = async (id) => (await saved()).find((p) => p.id === id);
+    await tap(await middle('.sb-drawer summary'));
+    await tap(await middle('.sb-tool[title^="Move parts"]'));
+    await middle('.bb-viewport');
+    await tap(await hole('a', 12)); // zoomed out: this one zooms in
+    await tap(await hole('a', 12)); // the wire's end
+    await tap(await hole('a', 15));
+    const wire = await get('W1');
+    assert(wire.a === 'a3' && wire.b === 'a15', `taps on the end at a12, then on a15, made the wire ${wire.a}-${wire.b}`);
+    const from = await middle('.bb-svg [data-part="U1"]');
+    const a10 = await hole('a', 10), a13 = await hole('a', 13);
+    await touch('touchStart', from);
+    for (let i = 1; i <= 8; i++) await touch('touchMove', { x: from.x + ((a13.x - a10.x) * i) / 8, y: from.y });
+    await touch('touchEnd');
+    await sleep(300);
+    const chip = await get('U1');
+    const a10after = await hole('a', 10);
+    assert(chip.col === 13, `a finger drag of three columns put the chip at column ${chip.col}`);
+    assert(Math.abs(a10after.x - a10.x) < 1 && Math.abs(a10after.y - a10.y) < 1, 'the drag panned the board');
+    return 'the end at a12 put on a15 by taps, the chip dragged from column 10 to 13, the board still';
+  });
+
   await check('phones: a tap on the zoomed-out breadboard zooms in instead of flipping a switch', async () => {
     const r = await page.evaluate(`(async () => {
       const wait = (ms) => new Promise((r) => setTimeout(r, ms));

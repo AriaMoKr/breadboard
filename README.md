@@ -69,9 +69,10 @@ MinGW-built Node in MSYS2's UCRT64 shell, so Vite 8 doesn't start there.
 
 `npm run check:browser` checks in headless Chrome what the unit tests can't see. It checks
 that every page renders without errors, that phones get no sideways scrolling and controls of
-at least 24 px, the sticky toolbar, parts drawer and tap-to-zoom, the shared computer, placing
-parts in the sandbox with real clicks and taps, sandbox links, the breadboard view's frame rate,
-and that the VR view builds the computer in 3D and runs it. `npm run check:browser -- --dist`
+at least 24 px, the sticky toolbar, parts drawer and tap-to-zoom, the shared computer, placing,
+moving, deleting and stepping in the sandbox with real clicks, taps and drags, sandbox links, the
+breadboard view's frame rate, and that the VR view builds the computer in 3D and runs it.
+`npm run check:browser -- --dist`
 checks the built site instead (run `npm run build` first), plus the download link, install and
 offline use, and `-- --url <address>` checks a deployed copy the same way (such as
 `https://example.com/breadboard/` after a deploy). It needs an installed Chrome, Edge or
