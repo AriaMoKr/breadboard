@@ -183,9 +183,9 @@ export const MORE_GROUPS: MoreGroup[] = [
     text: 'Ben’s introduction, from 2015, for anyone unsure how transistors and logic gates work; eater.net/8bit points to these before the SR latch. The 4-bit adder video, from the same time, builds an adder like the ALU’s from XOR, AND and OR gates.',
     source: { href: 'https://eater.net/8bit', label: 'eater.net/8bit' },
     videos: [
-      m('33vbFFFn04k', 'How semiconductors work', '15:51', '2015-03-18'),
-      m('DXvAlwMAxiA', 'How a transistor works', '11:23', '2015-03-19'),
-      m('sTu3LwpF6XI', 'Making logic gates from transistors', '13:02', '2015-03-22'),
+      m('33vbFFFn04k', 'How semiconductors work', '15:51', '2015-03-18', 'transistor-gates'),
+      m('DXvAlwMAxiA', 'How a transistor works', '11:23', '2015-03-19', 'transistor-gates'),
+      m('sTu3LwpF6XI', 'Making logic gates from transistors', '13:02', '2015-03-22', 'transistor-gates'),
       m('wvJc9CZcvBc', 'Learn how computers add numbers and build a 4 bit adder circuit', '13:39', '2015-03-01'),
     ],
   },
@@ -207,7 +207,7 @@ export const MORE_GROUPS: MoreGroup[] = [
 
 export const MORE_VIDEOS: MoreVideo[] = MORE_GROUPS.flatMap((g) => g.videos);
 
-/** Labs for Ben's other videos (the digital clock), in order. */
+/** Labs for Ben's other videos (transistors and gates, the digital clock), in order. */
 export const MORE_LAB_IDS: string[] = [...new Set(MORE_VIDEOS.flatMap((v) => (v.lab ? [v.lab] : [])))];
 
 /** Every lab: the playlist's, then those for Ben's other videos. */

@@ -685,7 +685,7 @@ describe('integration: chapter map', () => {
     expect(new Set(MORE_GROUPS.map((g) => g.id)).size).toBe(MORE_GROUPS.length);
   });
   it('every lab id in chapters.ts has a *.lab.ts that registers it, and vice versa', () => {
-    expect(MORE_LAB_IDS).toEqual(['mains-60hz', 'square-wave', 'divide-by-60', 'minutes-seconds', 'setting-time']);
+    expect(MORE_LAB_IDS).toEqual(['transistor-gates', 'mains-60hz', 'square-wave', 'divide-by-60', 'minutes-seconds', 'setting-time']);
     expect(MORE_LAB_IDS.filter((id) => LAB_IDS.includes(id))).toEqual([]);
     const missing = ALL_LAB_IDS.filter((id) => !LABS.has(id));
     expect(missing, `labs without a *.lab.ts: ${missing.join(', ')}`).toEqual([]);

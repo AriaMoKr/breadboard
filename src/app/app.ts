@@ -94,7 +94,7 @@ export class App {
           'div',
           { class: 'nav-chapter' },
           h('div', { class: 'nav-chapter-title' }, g.title),
-          h('ol', { class: 'nav-videos' }, g.videos.filter((v) => v.lab).map((v) => h('li', null, h('a', { href: labHref(v.lab!), dataset: { lab: v.lab! } }, h('span', { class: 'nav-num' }, String(g.videos.indexOf(v) + 1)), h('span', { class: 'nav-title' }, shortTitle(v.title)), h('span', { class: 'nav-dur' }, v.duration))))),
+          h('ol', { class: 'nav-videos' }, g.videos.filter((v) => v.lab).map((v) => h('li', null, h('a', { href: labHref(v.lab!), dataset: { lab: v.lab! } }, h('span', { class: 'nav-num' }, g.numbered ? String(g.videos.indexOf(v) + 1) : '·'), h('span', { class: 'nav-title' }, shortTitle(v.title)), h('span', { class: 'nav-dur' }, v.duration))))),
         ),
       ),
       h(
@@ -222,8 +222,9 @@ export class App {
   }
 
   private async renderLab(id: string, videoIndex: number | undefined, token: number) {
-    // prev/next within the playlist, or within the series of Ben's other videos
-    const order = LAB_IDS.includes(id) ? LAB_IDS : MORE_LAB_IDS;
+    // prev/next within the playlist, or within the group of Ben's other videos the lab belongs to
+    const group = moreVideosForLab(id)[0]?.group;
+    const order = LAB_IDS.includes(id) || !group ? LAB_IDS : MORE_LAB_IDS.filter((l) => group.videos.some((v) => v.lab === l));
     const idx = order.indexOf(id);
     const prev = idx > 0 ? order[idx - 1] : null;
     const next = idx >= 0 && idx < order.length - 1 ? order[idx + 1] : null;

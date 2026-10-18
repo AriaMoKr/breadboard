@@ -47,6 +47,10 @@ video by video.
   flip-flops, JK racing, tri-state buses, registers, two's complement, the ALU, RAM,
   counters, 7-segment and EEPROM decoders, the Arduino EEPROM programmer, the
   multiplexed decimal display, the control logic, microcode, flags and conditional jumps.
+* **From semiconductors to logic gates** (`#/lab/transistor-gates`): a lab for Ben's three 2015 background
+  videos. It shows charge carriers in doped silicon, and a PN junction you can bias forward or in
+  reverse. It shows an NPN transistor with its thin base turning on, and his buffer, inverter, AND,
+  OR and five-transistor XOR built from transistors, each with its current path and truth table.
 * **Digital clock labs** (`#/lab/mains-60hz` …): a lab for each part of Ben's breadboard clock
   series published so far. They cover:
   * the 5 V supply and squaring the 60 Hz from the mains with an LM339 and hysteresis;
@@ -167,7 +171,8 @@ Then open http://localhost:8000/.
 Research notes with sources, used for fidelity:
 [docs/research/computer-spec.md](docs/research/computer-spec.md) (exact behaviour of the
 final machine), [docs/research/videos.md](docs/research/videos.md) (per-video content) and
-[docs/research/clock.md](docs/research/clock.md) (the digital clock series).
+[docs/research/clock.md](docs/research/clock.md) (the digital clock series) and
+[docs/research/background.md](docs/research/background.md) (the transistor and gates videos).
 
 ## Credits
 
