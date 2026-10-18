@@ -95,17 +95,25 @@ export class MicrocodePanel {
     const m = this.machine;
     const current = m.template[op]?.[step] ?? 0;
     const input = h('input', { class: 'uc-input mono', value: current ? formatControlWord(current) : '' });
-    td.replaceChildren(input);
+    // The editor floats over the cell, which keeps its (hidden) text, so the table doesn't change
+    // size: a press on another cell closes this editor, and a column narrowing under the pointer
+    // would send the release, and so the click, to the cell next to it.
+    td.classList.add('editing');
+    td.append(input);
     input.focus();
     input.select();
     let done = false;
+    const close = () => {
+      done = true;
+      input.remove();
+      td.classList.remove('editing');
+    };
     const commit = (apply: boolean) => {
       if (done) return;
       if (apply) {
         try {
           const w = parseControlWord(input.value);
-          done = true;
-          td.replaceChildren();
+          close();
           m.editMicrocode(op, step, w);
         } catch (err) {
           input.classList.add('has-error');
@@ -113,8 +121,7 @@ export class MicrocodePanel {
           return;
         }
       } else {
-        done = true;
-        td.replaceChildren();
+        close();
         m.changed();
       }
     };
