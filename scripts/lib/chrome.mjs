@@ -1,6 +1,6 @@
 // Headless Chrome over the DevTools protocol, for the scripts that need a real browser
-// (check-browser.mjs, make-icons.mjs). Needs Node 22+ (built-in WebSocket) and an installed
-// Chrome, Edge or Chromium; set CHROME_PATH to choose one.
+// (check-browser.mjs, check-input.mjs, make-icons.mjs). Needs Node 22+ (built-in WebSocket) and
+// an installed Chrome, Edge or Chromium; set CHROME_PATH to choose one.
 import { spawn } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';

@@ -73,6 +73,15 @@ offline use, and `-- --url <address>` checks a deployed copy the same way (such 
 `https://example.com/breadboard/` after a deploy). It needs an installed Chrome, Edge or
 Chromium (or `CHROME_PATH`).
 
+`npm run check:input` takes a few minutes, so `verify` leaves it out: run it after changing
+controls or layout. On every page, on a desktop with a mouse and on a phone with touch, it
+clicks or taps controls the way a person does. Chrome then decides where each click goes, which
+an event sent straight to the control skips. It checks that each control's own handler runs, so
+nothing on top, no pointer captured elsewhere and no layout change between press and release
+takes the click. It also checks that no control moves back and forth while the computer runs,
+where a tap would land on whatever moved under the finger. `-- --page <text>` checks only the
+pages whose route contains it, and `-- --url <address>` checks a deployed copy.
+
 `npm run verify` runs the unit tests, the build and the browser checks on the built site, in that
 order, stopping at the first failure. Run it before committing or pushing (it takes about two
 minutes).
