@@ -228,7 +228,8 @@ function showTip() {
   if (!hit || !exhibit) return tooltip.hide();
   box.setFromObject(hovered!);
   const at = box.getCenter(new THREE.Vector3()).setY(box.max.y + 0.004);
-  tooltip.show(exhibit.describe(hit, inVR()), at, hovered);
+  const ex = exhibit;
+  tooltip.show(ex.describe(hit, inVR()), at, hovered, () => ex.labels?.(hit, inVR()) ?? []);
 }
 function hover(o: THREE.Object3D | null) {
   hovered = o;

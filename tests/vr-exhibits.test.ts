@@ -109,6 +109,19 @@ describe('the computer in VR', () => {
     expect(e.describe({ part: 'clock/RV1' }, true)).toMatch(/^RV1 speed · hold the trigger and twist · .* Hz$/);
   });
 
+  it('names the labels a pot can show, so the one over it is as wide as the widest from the start', () => {
+    const e = computerExhibit();
+    const labels = e.labels!({ part: 'clock/RV1' }, true);
+    expect(labels).toContain('RV1 speed · hold the trigger and twist · 480 Hz');
+    expect(labels).toContain('RV1 speed · hold the trigger and twist · 0.72 Hz');
+    const longest = Math.max(...labels.map((l) => l.length));
+    for (let t = 0; t <= 1; t += 0.01) {
+      speedDial.set(e.machine, t);
+      expect(e.describe({ part: 'clock/RV1' }, true).length).toBeLessThanOrEqual(longest);
+    }
+    expect(e.labels!({ part: 'clock/SW2' }, true)).toEqual([]); // only a pot's label changes while it's held
+  });
+
   it('keeps the status line still while the speed and output change (fixed-width fields)', () => {
     const e = computerExhibit();
     const fields = () => e.status()[1].split(' · ').slice(0, 3).map((f) => f.length);

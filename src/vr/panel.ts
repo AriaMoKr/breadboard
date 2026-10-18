@@ -176,16 +176,17 @@ export class Tooltip {
 
   /**
    * `key`: what it labels. While that stays the same the box only grows, and the text starts at
-   * its left edge, so a value changing as a knob turns doesn't make the label twitch.
+   * its left edge, so a value changing as a knob turns doesn't make the label twitch. `others`:
+   * what else it may say for that key, so the box starts as wide as the widest.
    */
-  show(text: string, at: THREE.Vector3, key: unknown = text) {
+  show(text: string, at: THREE.Vector3, key: unknown = text, others?: () => string[]) {
     if (text !== this.text || key !== this.key) {
       const g = this.canvas.getContext('2d')!;
       const { width: w, height: h } = this.canvas;
       g.clearRect(0, 0, w, h);
       g.font = '600 40px system-ui, sans-serif';
-      const need = Math.min(w - 8, g.measureText(text).width + 40);
-      this.boxW = key === this.key ? Math.max(this.boxW, need) : need;
+      const need = (t: string) => Math.min(w - 8, g.measureText(t).width + 40);
+      this.boxW = key === this.key ? Math.max(this.boxW, need(text)) : Math.max(need(text), ...(others?.() ?? []).map(need));
       this.text = text;
       this.key = key;
       this.draws++;

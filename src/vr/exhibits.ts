@@ -30,6 +30,11 @@ export interface Exhibit {
   begin(hit: ControlHit): Hold | null;
   /** What a control is and how it is set, for the label over it. */
   describe(hit: ControlHit, inVR: boolean): string;
+  /**
+   * The labels `describe` can give a control as it is set (a pot's values), so the label over it
+   * starts as wide as the widest instead of growing as the knob turns.
+   */
+  labels?(hit: ControlHit, inVR: boolean): string[];
 }
 
 /** What pressing a control does until it is let go: `end(click)` with click = not dragged. */
@@ -71,14 +76,17 @@ export const exhibitHash = (c: ExhibitChoice) => (c.kind === 'circuit' ? `#${c.c
 const HZ_FAST = hzFromPot(0);
 const HZ_SLOW = hzFromPot(1);
 export const speedDial = {
+  /** The speed at `t` of the knob's travel. */
+  hz: (t: number) => HZ_FAST * (HZ_SLOW / HZ_FAST) ** t,
   get: (m: Machine) => Math.max(0, Math.min(1, Math.log(HZ_FAST / m.hz) / Math.log(HZ_FAST / HZ_SLOW))),
-  set: (m: Machine, t: number) => m.setHz(HZ_FAST * (HZ_SLOW / HZ_FAST) ** t),
+  set: (m: Machine, t: number) => m.setHz(speedDial.hz(t)),
 };
 
 export function computerExhibit(): Exhibit & { machine: Machine } {
   const composed = composeComputer([...MODULE_BOARDS.values()]);
   const live = composed.live.controls;
   const parts = new Map(composed.layout.parts.map((p) => [p.id, p]));
+  const nameOf = (hit: ControlHit) => parts.get(hit.part)?.label ?? hit.part.split('/').pop()!;
   const ledIds = Object.keys(composed.live.leds);
   const segIds = Object.keys(composed.live.seg7);
   const machine = new Machine({ microcodeVersion: 'flags' });
@@ -157,7 +165,7 @@ export function computerExhibit(): Exhibit & { machine: Machine } {
     },
     describe(hit, inVR) {
       const ctl = live[hit.part];
-      const name = parts.get(hit.part)?.label ?? hit.part.split('/').pop()!;
+      const name = nameOf(hit);
       switch (ctl?.kind) {
         case 'slide': {
           const pos = ctl.get(machine);
@@ -165,17 +173,24 @@ export function computerExhibit(): Exhibit & { machine: Machine } {
         }
         case 'dip':
           return dipText(name, hit.bit ?? 0, ctl.get(machine));
-        case 'pot': {
-          const value = hit.part === 'clock/RV1' ? fmtHz(machine.hz) : `${Math.round(ctl.get(machine) * 100)}%`;
-          return `${name} · ${inVR ? 'hold the trigger and twist' : 'drag up or down'} · ${value}`; // the value last: as it changes, nothing else moves
-        }
+        case 'pot':
+          return potText(name, inVR, hit.part === 'clock/RV1' ? fmtHz(machine.hz) : potValue(hit, ctl.get(machine)));
         case 'button':
           return `${name} · push`;
       }
       return name;
     },
+    labels(hit, inVR) {
+      if (live[hit.part]?.kind !== 'pot') return [];
+      return Array.from({ length: 21 }, (_, i) => potText(nameOf(hit), inVR, potValue(hit, i / 20)));
+    },
   };
 }
+
+// the value last: as it changes, nothing else moves
+const potText = (name: string, inVR: boolean, value: string) => `${name} · ${inVR ? 'hold the trigger and twist' : 'drag up or down'} · ${value}`;
+/** A pot's value as its label shows it, at `t` of its travel. */
+const potValue = (hit: ControlHit, t: number) => (hit.part === 'clock/RV1' ? fmtHz(speedDial.hz(t)) : `${Math.round(t * 100)}%`);
 
 const dipText = (name: string, bit: number, value: number) => `${name} switch ${bit + 1}: ${(value >> bit) & 1 ? 'ON' : 'off'}`;
 
