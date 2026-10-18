@@ -188,3 +188,7 @@ Ben Eater designed the computer, its microcode and the display code. See
 [eater.net/8bit](https://eater.net/8bit) and
 [beneater/eeprom-programmer](https://github.com/beneater/eeprom-programmer) (MIT).
 This project is an independent, unofficial learning companion; watch the videos!
+
+## License
+
+[MIT](LICENSE).

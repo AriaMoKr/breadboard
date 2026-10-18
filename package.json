@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "description": "Browser simulator that follows Ben Eater's 'Building an 8-bit breadboard computer!' playlist",
+  "license": "MIT",
   "type": "module",
   "engines": {
     "node": ">=22.12"
