@@ -466,6 +466,17 @@ export class BreadboardSim implements BoardSimulator {
     this.b.circuit.run(Math.max(0, Math.floor(n)));
   }
 
+  stepToChange(max = 100_000): { steps: number; changed: number } {
+    const c = this.b.circuit;
+    let steps = 0;
+    while (steps < max && !c.idle) {
+      steps++;
+      const changed = c.step();
+      if (changed) return { steps, changed };
+    }
+    return { steps, changed: 0 };
+  }
+
   /** Same as `step(n)`. */
   run(n: number): void {
     this.step(n);

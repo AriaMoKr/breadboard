@@ -791,6 +791,33 @@ describe('BreadboardSim: ports and time', () => {
     expect(sim.portLevel('OUT')).toBe(0);
   });
 
+  it('steps to the next change: a gate delay at a time as it spreads, none once it has settled', () => {
+    const sim = new BreadboardSim(buildSrLatch());
+    sim.settle(100);
+    expect(sim.stepToChange()).toEqual({ steps: 0, changed: 0 }); // nothing is coming
+    const q = sim.ledLit('D1');
+    sim.press(q ? 'SW2' : 'SW1'); // the button that flips the latch
+    const steps: number[] = [];
+    for (let r = sim.stepToChange(); r.changed; r = sim.stepToChange()) steps.push(r.steps);
+    expect(steps.length).toBeGreaterThan(1); // the gates one after the other
+    expect(Math.max(...steps)).toBe(1);
+    expect(sim.ledLit('D1')).toBe(!q);
+    // a 555 is always about to change: a step goes as far as its next edge
+    const counter = new BreadboardSim(buildCounter());
+    counter.settle(1000);
+    let out = counter.pinLevel('U1', 'OUT'), waited = 0;
+    while (counter.pinLevel('U1', 'OUT') === out) {
+      const r = counter.stepToChange();
+      expect(r.changed).toBeGreaterThan(0);
+      waited += r.steps;
+    }
+    expect(waited).toBeLessThanOrEqual(COUNTER_HALF_PERIOD);
+    out = counter.pinLevel('U1', 'OUT');
+    const t0 = counter.time;
+    while (counter.pinLevel('U1', 'OUT') === out) counter.stepToChange();
+    expect(counter.time - t0).toBe(COUNTER_HALF_PERIOD);
+  });
+
   it('settle() gives up on a free-running 555 and setParams changes its speed', () => {
     const sim = new BreadboardSim(buildCounter());
     expect(sim.settle(1000)).toEqual({ stable: false, steps: 1000 });

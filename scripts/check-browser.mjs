@@ -226,6 +226,42 @@ try {
     return 'a slide and a DIP switch flipped, kept through a new wire, flipped back';
   });
 
+  await check('sandbox: Step pauses the circuit and moves it on to the next change', async () => {
+    await emptySandbox();
+    await page.evaluate(`(() => {
+      const pick = [...document.querySelectorAll('select')].find((s) => [...s.options].some((o) => o.value === 'counter'));
+      pick.value = 'counter'; pick.dispatchEvent(new Event('change', { bubbles: true }));
+    })()`);
+    await sleep(500);
+    const state = () => page.evaluate(`({
+      t: Number(document.querySelector('.toolbar span[title^="Time in the simulation"]').textContent.replace(/[^0-9]/g, '')),
+      leds: [...document.querySelectorAll('.bb-svg [data-part^="D"]')].map((g) => +g.classList.contains('on')).join(''),
+      run: [...document.querySelectorAll('.toolbar button')].find((b) => /^(Pause|Run)$/.test(b.innerText.trim())).innerText.trim(),
+      status: document.querySelector('.sb-status').textContent,
+    })`);
+    const stepButton = await page.evaluate(`(() => {
+      const r = [...document.querySelectorAll('.toolbar button')].find((b) => b.innerText.trim() === 'Step').getBoundingClientRect();
+      return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+    })()`);
+    await click(stepButton);
+    const first = await state();
+    assert(first.run === 'Run', `Step left it running (the button says ${first.run})`);
+    assert(/^Step: \d+ nets? changed/.test(first.status), `after Step: "${first.status}"`);
+    await sleep(300);
+    const still = await state();
+    assert(still.t === first.t, `paused, the time went on: ${first.t} -> ${still.t}`);
+    // the S key steps too; the 555's next edge is at most a half period away, the LEDs follow
+    let steps = 0, now = still;
+    while (now.leds === first.leds && steps < 400) {
+      await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 's', code: 'KeyS', text: 's' });
+      await page.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 's', code: 'KeyS' });
+      steps++;
+      now = await state();
+    }
+    assert(now.leds !== first.leds, `${steps} steps from t = ${first.t} to ${now.t} changed no LED (${now.leds})`);
+    return `t = ${first.t} after Step, held while paused; ${steps} steps (S key) to t = ${now.t}, LEDs ${first.leds} -> ${now.leds}`;
+  });
+
   await check('breadboard view keeps its frame rate while running', async () => {
     const measure = async () => {
       await page.goto(`${base}#/breadboard`); // a fresh page: the 40 pages above leave garbage behind

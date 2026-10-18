@@ -309,9 +309,10 @@ export class Circuit {
     return this.times.length === 0;
   }
 
-  /** Advance exactly one time unit, applying any events scheduled for it. */
-  step(): void {
+  /** Advance exactly one time unit, applying any events scheduled for it. Returns how many nets changed level. */
+  step(): number {
     this.time += 1;
+    let changed = 0;
     if (this.times.length && this.times[0] <= this.time) {
       const t = this.times.shift()!;
       const events = this.queue.get(t)!;
@@ -325,8 +326,10 @@ export class Circuit {
       const really: Net[] = [];
       for (const n of changedNets) if (this.updateNet(n)) really.push(n);
       if (really.length) this.evaluateReaders(really);
+      changed = really.length;
     }
     this.emit();
+    return changed;
   }
 
   /** Advance `n` time units. */

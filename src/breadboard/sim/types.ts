@@ -68,6 +68,13 @@ export interface BoardSimulator {
   seg7(partId: string): number;
   /** Advance `n` gate delays. */
   step(n?: number): void;
+  /**
+   * Advance to the next gate delay in which a net changes level, at most `max` gate delays: how
+   * far it went and how many nets changed (0 when nothing was going to change).
+   */
+  stepToChange(max?: number): { steps: number; changed: number };
+  /** Simulation time in gate delays. */
+  readonly time: number;
   /** Run until nothing changes (or `max` gate delays). */
   settle(max?: number): { stable: boolean; steps: number };
   problems(): SimProblem[];

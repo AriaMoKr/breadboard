@@ -142,12 +142,14 @@ export function mountSandboxPage(root: HTMLElement): () => void {
     renderProblems();
   };
 
+  const timeEl = h('span', { class: 'mono dim small sb-time', title: 'Time in the simulation, in gate delays' });
   const updateOutputs = () => {
     if (!sim) return;
     for (const p of layout.parts) {
       if (p.kind === 'led') view.setLed(p.id, sim.ledLit(p.id));
       else if (p.kind === 'seg7') view.setSeg7(p.id, sim.seg7(p.id));
     }
+    setText(timeEl, `t = ${sim.time.toLocaleString('en-US')}`);
   };
 
   const switchState = new Map<string, number>(); // slide position / DIP value (per part)
@@ -170,7 +172,9 @@ export function mountSandboxPage(root: HTMLElement): () => void {
       sim.setDip(id, v);
       view.setDip(id, v);
     }
-    sim.settle(2000);
+    // running, the circuit settles at once; paused, Step shows the change spread
+    if (running) sim.settle(2000);
+    else setStatus('Paused: Step shows what that changes, a gate delay at a time.');
     updateOutputs();
   };
 
@@ -392,7 +396,27 @@ export function mountSandboxPage(root: HTMLElement): () => void {
   if (narrow) d.listen(narrow, 'change', () => (drawer.open = !narrow.matches));
 
   // ---- toolbar ----------------------------------------------------------------
-  const runBtn = new Button({ label: 'Pause', labels: ['Pause', 'Run'], onClick: () => { running = !running; runBtn.setLabel(running ? 'Pause' : 'Run'); } });
+  const setRunning = (on: boolean) => {
+    running = on;
+    runBtn.setLabel(on ? 'Pause' : 'Run');
+  };
+  const runBtn = new Button({ label: 'Pause', labels: ['Pause', 'Run'], onClick: () => setRunning(!running) });
+  /**
+   * Pause, then on to the next change: a gate delay at a time while one spreads through the
+   * gates, or as far as the 555's next edge when nothing else is coming.
+   */
+  const step = () => {
+    if (!sim) return;
+    setRunning(false);
+    const { steps, changed } = sim.stepToChange();
+    updateOutputs();
+    setStatus(
+      changed
+        ? `Step: ${changed} net${changed === 1 ? '' : 's'} changed, ${steps === 1 ? '1 gate delay' : `${steps.toLocaleString('en-US')} gate delays`} on.`
+        : 'Step: nothing more is going to change. Press a button or flip a switch, then Step again.',
+    );
+  };
+  const stepBtn = new Button({ label: 'Step', title: 'Pause, then on to the next change: a gate delay at a time while one spreads (key S)', onClick: step });
   const speedSlider = new Slider({ label: 'Speed', min: 1, max: 5000, value: speed, log: true, format: (v) => `${Math.round(v)} gate delays/frame`, onInput: (v) => (speed = Math.round(v)) });
   const exampleHost = h('span');
   const toolbar = h(
@@ -422,8 +446,7 @@ export function mountSandboxPage(root: HTMLElement): () => void {
     } }).el,
     new Button({ label: 'Share link', title: 'A link that opens this circuit in anyone’s sandbox', onClick: () => void shareLink() }).el,
     new Button({ label: '◈ View in VR', shortLabel: '◈ VR', title: 'This circuit in 3D on a table, in a VR headset or on this screen', onClick: () => void viewInVR() }).el,
-    runBtn.el,
-    speedSlider.el,
+    h('span', { class: 'sb-run' }, runBtn.el, stepBtn.el, timeEl, speedSlider.el),
   );
 
   // ---- problems & parts list -------------------------------------------------------
@@ -459,6 +482,8 @@ export function mountSandboxPage(root: HTMLElement): () => void {
       undo();
     } else if (e.key === 'r' || e.key === 'R') {
       setRotated(!rotated);
+    } else if ((e.key === 's' || e.key === 'S') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      step();
     } else if (e.key === 'Escape') {
       pending = null;
       drawGhost(null);
