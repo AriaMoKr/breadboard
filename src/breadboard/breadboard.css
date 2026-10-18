@@ -83,8 +83,7 @@
 .bb-viewport .bb-hint { position: absolute; left: 10px; bottom: 10px; font-size: 0.75rem; color: var(--fg-faint); z-index: 2; pointer-events: none; }
 
 /* ---- sandbox ---- */
-.sb-run { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; } /* Run, Step, time and speed wrap as one */
-.sb-time { min-width: 13ch; } /* "t = 9,999,999": the slider after it stays put as it counts */
+.sb-run { display: inline-flex; gap: 8px; } /* Run and Step stay on one line */
 .sb-layout { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 12px; margin-top: 10px; align-items: start; }
 .sb-palette { display: flex; flex-direction: column; gap: 10px; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px; max-height: 64vh; overflow-y: auto; }
 .sb-group-title { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--fg-faint); margin-bottom: 4px; font-weight: 600; }

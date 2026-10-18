@@ -147,14 +147,12 @@ export function mountSandboxPage(root: HTMLElement): () => void {
     renderProblems();
   };
 
-  const timeEl = h('span', { class: 'mono dim small sb-time', title: 'Time in the simulation, in gate delays' });
   const updateOutputs = () => {
     if (!sim) return;
     for (const p of layout.parts) {
       if (p.kind === 'led') view.setLed(p.id, sim.ledLit(p.id));
       else if (p.kind === 'seg7') view.setSeg7(p.id, sim.seg7(p.id));
     }
-    setText(timeEl, `t = ${sim.time.toLocaleString('en-US')}`);
   };
 
   const switchState = new Map<string, number>(); // slide position / DIP value (per part)
@@ -543,7 +541,7 @@ export function mountSandboxPage(root: HTMLElement): () => void {
     updateOutputs();
     setStatus(
       changed
-        ? `Step: ${changed} net${changed === 1 ? '' : 's'} changed, ${steps === 1 ? '1 gate delay' : `${steps.toLocaleString('en-US')} gate delays`} on.`
+        ? `Step: ${changed} net${changed === 1 ? '' : 's'} changed, ${steps === 1 ? '1 gate delay' : `${steps.toLocaleString('en-US')} gate delays`} on · t = ${sim.time.toLocaleString('en-US')}`
         : 'Step: nothing more is going to change. Press a button or flip a switch, then Step again.',
     );
   };
@@ -577,7 +575,8 @@ export function mountSandboxPage(root: HTMLElement): () => void {
     } }).el,
     new Button({ label: 'Share link', title: 'A link that opens this circuit in anyone’s sandbox', onClick: () => void shareLink() }).el,
     new Button({ label: '◈ View in VR', shortLabel: '◈ VR', title: 'This circuit in 3D on a table, in a VR headset or on this screen', onClick: () => void viewInVR() }).el,
-    h('span', { class: 'sb-run' }, runBtn.el, stepBtn.el, timeEl, speedSlider.el),
+    h('span', { class: 'sb-run' }, runBtn.el, stepBtn.el), // on one line together
+    speedSlider.el,
   );
 
   // ---- problems & parts list -------------------------------------------------------

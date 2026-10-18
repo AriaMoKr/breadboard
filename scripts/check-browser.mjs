@@ -292,7 +292,7 @@ try {
     })()`);
     await sleep(500);
     const state = () => page.evaluate(`({
-      t: Number(document.querySelector('.toolbar span[title^="Time in the simulation"]').textContent.replace(/[^0-9]/g, '')),
+      t: Number(/t = ([0-9,]+)/.exec(document.querySelector('.sb-status').textContent)?.[1].replace(/,/g, '') ?? NaN),
       leds: [...document.querySelectorAll('.bb-svg [data-part^="D"]')].map((g) => +g.classList.contains('on')).join(''),
       run: [...document.querySelectorAll('.toolbar button')].find((b) => /^(Pause|Run)$/.test(b.innerText.trim())).innerText.trim(),
       status: document.querySelector('.sb-status').textContent,
@@ -304,10 +304,10 @@ try {
     await click(stepButton);
     const first = await state();
     assert(first.run === 'Run', `Step left it running (the button says ${first.run})`);
-    assert(/^Step: \d+ nets? changed/.test(first.status), `after Step: "${first.status}"`);
-    await sleep(300);
+    assert(/^Step: \d+ nets? changed, .* on · t = [0-9,]+$/.test(first.status), `after Step: "${first.status}"`);
+    await sleep(500); // running, the counter's LEDs change several times in that
     const still = await state();
-    assert(still.t === first.t, `paused, the time went on: ${first.t} -> ${still.t}`);
+    assert(still.leds === first.leds, `paused, the LEDs went on: ${first.leds} -> ${still.leds}`);
     // the S key steps too; the 555's next edge is at most a half period away, the LEDs follow
     let steps = 0, now = still;
     while (now.leds === first.leds && steps < 400) {
