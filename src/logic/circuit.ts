@@ -68,6 +68,8 @@ export interface ComponentSpec {
   inputs: Net[];
   outputs: Net[];
   delay?: number;
+  /** Read raw net levels: a floating input arrives as 'Z' instead of as `floatingInput`. */
+  raw?: boolean;
   /**
    * Compute output levels from (resolved, gate-view) input levels. Return an
    * array to drive every output after `delay`, or void if you scheduled
@@ -366,7 +368,7 @@ export class Circuit {
   }
 
   private readInputs(comp: Component): Level[] {
-    return comp.inputs.map((n) => this.read(n));
+    return comp.spec.raw ? comp.inputs.map((n) => n.value) : comp.inputs.map((n) => this.read(n));
   }
 
   private evaluateReaders(nets: Net[]) {

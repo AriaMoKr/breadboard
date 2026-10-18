@@ -18,7 +18,7 @@ video by video.
   `tests/boards-output-control.test.ts`).
 * **Breadboard sandbox** (`#/sandbox`): an empty breadboard with Ben's parts bin (every 74LS chip
   in the build, the 28C16, the 555, LEDs, resistors, buttons, switches, DIP switches, 7-segment
-  displays). Wire up your own circuits and the chip-level engine simulates them. **Move** picks a
+  displays, and the 74LS85, 74LS90, 74LS92 and CD4511 from his digital clock). Wire up your own circuits and the chip-level engine simulates them. **Move** picks a
   part or a wire up and puts it elsewhere (click, then click a hole, or drag it), or just one end of
   a wire or a two-legged part when picked up by that end. **Step** (key S)
   pauses it and moves it on to the next change: a gate delay at a time while a change spreads

@@ -24,8 +24,9 @@ import type { ChipModel, ChipParams } from './types';
  * - 3-state outputs return 'Z'. Bidirectional pins (74LS245 A/B, 28C16 IO)
  *   are listed both as inputs and as outputs.
  * - Delays are in gate delays: gates 1, flip-flops / decoders / muxes /
- *   transceivers / 283 / 273 2, 161 / 173 / 189 3, 28C16 5 (an EEPROM is much
- *   slower than TTL; 5 keeps the full computer fast), 555 1.
+ *   transceivers / 283 / 273 / 85 / 90 / 92 2, 161 / 173 / 189 / CD4511 3,
+ *   28C16 5 (an EEPROM is much slower than TTL; 5 keeps the full computer
+ *   fast), 555 1.
  */
 
 // ---------------------------------------------------------------------------
@@ -116,7 +117,7 @@ const MAX_WORLDS = 4096;
  * it reads (a decision tree, so unread unknowns cost nothing) and merge the
  * results. With no unknowns this is a single call.
  */
-function explore(cur: readonly Level[], prev: readonly Level[], store: BitStore, fn: (u: UnitPins) => Level[]): { out: Level[]; writes: Map<number, Level> } {
+function explore(cur: readonly Level[], prev: readonly Level[], store: BitStore, fn: (u: UnitPins) => Level[], floatNoEdge = false): { out: Level[]; writes: Map<number, Level> } {
   const n = cur.length;
   const keys: number[] = [];
   const vals: Bit[] = [];
@@ -128,6 +129,7 @@ function explore(cur: readonly Level[], prev: readonly Level[], store: BitStore,
   };
   let leaf = new Map<number, Level>();
   const edge = (k: number): number => {
+    if (floatNoEdge && prev[k] === 'Z') return 0;
     const c = u.i(k);
     const pl = ttl(prev[k]);
     // Unknown before and after: the net did not change as far as we know.
@@ -186,6 +188,14 @@ interface UnitDef {
   bits?: number;
   /** Custom memory instead of `bits`. */
   store?: (params: ChipParams) => BitStore;
+  /**
+   * An input that was floating is no edge when it is first driven (the chip then reads raw
+   * levels, see ChipModel.raw). For the ripple counters (74LS90 / 74LS92), whose Q0 clocks
+   * ~CP1: at power-up Q0's net floats, reading 1, until the chip drives it low, which would
+   * otherwise count a step before the first clock. (A real chip's outputs come up low with its
+   * flip-flops.)
+   */
+  floatNoEdge?: boolean;
   fn(u: UnitPins): Level[];
 }
 
@@ -209,6 +219,7 @@ function unitChip(id: string, delay: number, units: UnitDef[]): ChipModel {
     inputs,
     outputs,
     delay,
+    raw: units.some((u) => u.floatNoEdge) || undefined,
     evaluate(levels, ctx, params) {
       const stores = (ctx.state.units ??= units.map((u) => (u.store ? u.store(params) : new ArrayStore(u.bits ?? 0)))) as BitStore[];
       const out = new Array<Level>(outputs.length);
@@ -216,7 +227,7 @@ function unitChip(id: string, delay: number, units: UnitDef[]): ChipModel {
         const idx = unitIns[ui];
         const cur = idx.map((k) => levels[k]);
         const prev = idx.map((k) => ctx.prevInputs[k] ?? levels[k]);
-        const r = explore(cur, prev, stores[ui], units[ui].fn);
+        const r = explore(cur, prev, stores[ui], units[ui].fn, units[ui].floatNoEdge);
         for (const [k, v] of r.writes) stores[ui].set(k, v);
         unitOuts[ui].forEach((o, j) => (out[o] = r.out[j]));
       }
@@ -340,6 +351,9 @@ export function eepromImage(image: ChipParams['image'] = 'blank'): Uint8Array {
   }
   return img.slice();
 }
+
+/** CD4511 segments for 0-9, bit 0 = a .. bit 6 = g (its truth table: 6 lacks a, 9 lacks d). */
+const SEG4511 = [0x3f, 0x06, 0x5b, 0x4f, 0x66, 0x6d, 0x7c, 0x07, 0x7f, 0x67];
 
 const A28 = Array.from({ length: 11 }, (_, k) => `A${k}`);
 const IO8 = Array.from({ length: 8 }, (_, k) => `IO${k}`);
@@ -670,6 +684,109 @@ export const CHIP_MODELS: Record<string, ChipModel> = {
     },
   }]),
 
+  // ---- the digital clock (eater.net/clock)
+
+  /**
+   * 4-bit magnitude comparator: A > B or A < B decides at once. For A = B the
+   * cascading inputs from a less significant stage decide: IA=B high gives
+   * A=B; otherwise A>B = not IA<B and A<B = not IA>B (both high: neither, both
+   * low: both), as in the datasheet's function table.
+   */
+  '74LS85': unitChip('74LS85', 2, [{
+    ins: ['A0', 'A1', 'A2', 'A3', 'B0', 'B1', 'B2', 'B3', 'IA>B', 'IA<B', 'IA=B'],
+    outs: ['A>B', 'A<B', 'A=B'],
+    fn(u) {
+      const a = u.i(0) | (u.i(1) << 1) | (u.i(2) << 2) | (u.i(3) << 3);
+      const b = u.i(4) | (u.i(5) << 1) | (u.i(6) << 2) | (u.i(7) << 3);
+      if (a > b) return [1, 0, 0];
+      if (a < b) return [0, 1, 0];
+      if (u.i(10)) return [0, 0, 1];
+      return [(1 - u.i(9)) as Bit, (1 - u.i(8)) as Bit, 0];
+    },
+  }]),
+
+  /**
+   * Decade counter in two sections that count on the FALLING edge of their
+   * clock: ~CP0 toggles Q0 (÷2), ~CP1 steps Q1-Q3 through 0..4 (÷5, Q1 least
+   * significant). With Q0 wired to ~CP1 (Ben's way) Q0-Q3 count BCD 0..9 and
+   * Q3 falls as 9 goes to 0. MS1 = MS2 = 1 sets 9 at once and beats MR1 = MR2
+   * = 1, which clears at once. (States 5-7 of the ÷5 section, which a real
+   * chip can only power up in, go to 0.)
+   */
+  '74LS90': unitChip('74LS90', 2, [{
+    ins: ['~CP0', '~CP1', 'MR1', 'MR2', 'MS1', 'MS2'],
+    outs: ['Q0', 'Q1', 'Q2', 'Q3'],
+    bits: 4,
+    floatNoEdge: true,
+    fn(u) {
+      let q: Bit[];
+      if (u.i(4) && u.i(5)) q = [1, 0, 0, 1];
+      else if (u.i(2) && u.i(3)) q = [0, 0, 0, 0];
+      else {
+        q = [u.s(0), u.s(1), u.s(2), u.s(3)];
+        if (u.fell(0)) q[0] = (1 - q[0]) as Bit;
+        if (u.fell(1)) {
+          const n = q[1] | (q[2] << 1) | (q[3] << 2);
+          [q[1], q[2], q[3]] = numberToBits(n >= 4 ? 0 : n + 1, 3);
+        }
+      }
+      q.forEach((b, k) => u.w(k, b));
+      return q;
+    },
+  }]),
+
+  /**
+   * Divide-by-12 counter in two sections that count on the FALLING edge of
+   * their clock: ~CP0 toggles Q0 (÷2); ~CP1 steps Q1 Q2 through 0, 1, 2 (÷3)
+   * and Q3 toggles each time they wrap (÷6). With Q0 wired to ~CP1, Q0-Q2
+   * count 0..5 in binary twice per cycle (Ben's tens of seconds and minutes)
+   * and Q3 is a ÷12 square wave. MR1 = MR2 = 1 clears at once.
+   */
+  '74LS92': unitChip('74LS92', 2, [{
+    ins: ['~CP0', '~CP1', 'MR1', 'MR2'],
+    outs: ['Q0', 'Q1', 'Q2', 'Q3'],
+    bits: 4,
+    floatNoEdge: true,
+    fn(u) {
+      let q: Bit[];
+      if (u.i(2) && u.i(3)) q = [0, 0, 0, 0];
+      else {
+        q = [u.s(0), u.s(1), u.s(2), u.s(3)];
+        if (u.fell(0)) q[0] = (1 - q[0]) as Bit;
+        if (u.fell(1)) {
+          const n = q[1] | (q[2] << 1);
+          if (n >= 2) [q[1], q[2], q[3]] = [0, 0, (1 - q[3]) as Bit];
+          else [q[1], q[2]] = numberToBits(n + 1, 2);
+        }
+      }
+      q.forEach((b, k) => u.w(k, b));
+      return q;
+    },
+  }]),
+
+  /**
+   * BCD to 7-segment latch/decoder/driver (CMOS) for a common-cathode display:
+   * a lit segment's output is high. ~LT low lights all seven; else ~BI low
+   * blanks them; else the code on D C B A shows while LE is low and is held
+   * while LE is high. 0-9 as in the datasheet (6 and 9 without tails), 10-15
+   * blank.
+   */
+  CD4511: unitChip('CD4511', 3, [{
+    ins: ['A', 'B', 'C', 'D', '~LT', '~BI', 'LE'],
+    outs: ['a', 'b', 'c', 'd', 'e', 'f', 'g'],
+    bits: 4,
+    fn(u) {
+      let code: number;
+      if (!u.i(6)) {
+        code = u.i(0) | (u.i(1) << 1) | (u.i(2) << 2) | (u.i(3) << 3);
+        numberToBits(code, 4).forEach((b, k) => u.w(k, b));
+      } else code = u.s(0) | (u.s(1) << 1) | (u.s(2) << 2) | (u.s(3) << 3);
+      if (!u.i(4)) return [1, 1, 1, 1, 1, 1, 1];
+      if (!u.i(5)) return [0, 0, 0, 0, 0, 0, 0];
+      return numberToBits(SEG4511[code] ?? 0, 7);
+    },
+  }]),
+
   NE555,
 };
 
@@ -729,6 +846,7 @@ export function instantiateChip(circuit: Circuit, model: ChipModel, pinNets: Pin
     inputs: model.inputs.map(netFor),
     outputs: model.outputs.map(netFor),
     delay: typeof params.delay === 'number' ? params.delay : model.delay,
+    raw: model.raw,
     evaluate: (levels, ctx) => model.evaluate(levels, ctx, params),
   });
 }

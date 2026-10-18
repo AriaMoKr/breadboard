@@ -101,6 +101,28 @@ export const CHIPS: Record<string, ChipDef> = {
     pins: ['S2', 'B2', 'A2', 'S1', 'A1', 'B1', 'C0', 'GND', 'C4', 'S4', 'B4', 'A4', 'S3', 'A3', 'B3', 'VCC'],
     datasheet: 'https://eater.net/datasheets/74ls283.pdf',
   },
+  // the digital clock (eater.net/clock); pin names from the datasheets Ben links there
+  '74LS85': {
+    id: '74LS85', title: '4-bit magnitude comparator', spacing: 3, vcc: 16, gnd: 8,
+    pins: ['B3', 'IA<B', 'IA=B', 'IA>B', 'A>B', 'A=B', 'A<B', 'GND', 'B0', 'A0', 'B1', 'A1', 'A2', 'B2', 'A3', 'VCC'],
+    datasheet: 'https://eater.net/datasheets/74ls85.pdf',
+  },
+  '74LS90': {
+    id: '74LS90', title: 'Decade counter: ÷2 and ÷5 sections (falling-edge clocks)', spacing: 3, vcc: 5, gnd: 10,
+    pins: ['~CP1', 'MR1', 'MR2', 'NC', 'VCC', 'MS1', 'MS2', 'Q2', 'Q1', 'GND', 'Q3', 'Q0', 'NC', '~CP0'],
+    datasheet: 'https://eater.net/datasheets/74ls90.pdf',
+  },
+  '74LS92': {
+    id: '74LS92', title: 'Divide-by-12 counter: ÷2 and ÷6 sections (falling-edge clocks)', spacing: 3, vcc: 5, gnd: 10,
+    pins: ['~CP1', 'NC', 'NC', 'NC', 'VCC', 'MR1', 'MR2', 'Q3', 'Q2', 'GND', 'Q1', 'Q0', 'NC', '~CP0'],
+    datasheet: 'https://eater.net/datasheets/74ls92.pdf',
+  },
+  CD4511: {
+    // CMOS: the datasheet calls its supply pins VDD (16) and VSS (8)
+    id: 'CD4511', title: 'BCD to 7-segment latch/decoder/driver (common cathode)', spacing: 3, vcc: 16, gnd: 8,
+    pins: ['B', 'C', '~LT', '~BI', 'LE', 'D', 'A', 'GND', 'e', 'd', 'c', 'b', 'a', 'g', 'f', 'VCC'],
+    datasheet: 'https://eater.net/datasheets/cd4511.pdf',
+  },
   '28C16': {
     id: '28C16', title: '2K × 8 parallel EEPROM', spacing: 6, vcc: 24, gnd: 12,
     pins: ['A7', 'A6', 'A5', 'A4', 'A3', 'A2', 'A1', 'A0', 'IO0', 'IO1', 'IO2', 'GND', 'IO3', 'IO4', 'IO5', 'IO6', 'IO7', '~CE', 'A10', '~OE', '~WE', 'A9', 'A8', 'VCC'],
@@ -115,9 +137,13 @@ export const CHIPS: Record<string, ChipDef> = {
 
 export const CHIP_IDS = Object.keys(CHIPS);
 
-/** 1-based pin number of a named pin (case-insensitive). Throws if unknown. */
+/**
+ * 1-based pin number of a named pin: the exact name first (the CD4511 has inputs A-D and
+ * segment outputs a-g), else ignoring case. Throws if unknown.
+ */
 export function pinNumber(chip: ChipDef, name: string): number {
-  const i = chip.pins.findIndex((p) => p.toLowerCase() === name.toLowerCase());
+  let i = chip.pins.indexOf(name);
+  if (i < 0) i = chip.pins.findIndex((p) => p.toLowerCase() === name.toLowerCase());
   if (i < 0) throw new Error(`${chip.id} has no pin "${name}" (pins: ${chip.pins.join(', ')})`);
   return i + 1;
 }

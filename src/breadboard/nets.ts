@@ -134,7 +134,7 @@ export function pinNet(layout: Layout, nets: Netlist, partId: string, pin: strin
   const p = layout.parts.find((x) => x.id === partId);
   if (!p) throw new Error(`No part ${partId}`);
   const pins = partPins(p);
-  const hit = typeof pin === 'number' ? pins.find((x) => x.number === pin) : pins.find((x) => x.name.toLowerCase() === pin.toLowerCase());
+  const hit = typeof pin === 'number' ? pins.find((x) => x.number === pin) : pins.find((x) => x.name === pin) ?? pins.find((x) => x.name.toLowerCase() === pin.toLowerCase());
   if (!hit) throw new Error(`${partId} has no pin ${pin}`);
   return nets.netOf(p.board, hit.hole);
 }

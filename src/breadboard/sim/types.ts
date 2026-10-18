@@ -32,6 +32,8 @@ export interface ChipModel {
   outputs: number[];
   /** Propagation delay in gate delays (default 1). */
   delay?: number;
+  /** Inputs arrive as raw net levels: a floating input is 'Z' (the model reads it as 1 itself). */
+  raw?: boolean;
   /**
    * Compute output levels. Inputs are resolved net levels (a floating input
    * reads 1, like LS-TTL). Keep state in `ctx.state`, detect edges with

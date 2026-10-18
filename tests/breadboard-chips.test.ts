@@ -788,6 +788,151 @@ describe('NE555 timer', () => {
   });
 });
 
+/** A 74LS90 or 74LS92 with Q0 wired to ~CP1, as Ben uses them, clocked on ~CP0. */
+function rippleCounter(id: '74LS90' | '74LS92') {
+  const c = new Circuit();
+  const clk = c.input('clk', 1), mr = c.input('mr', 0), ms = c.input('ms', 0);
+  const q = [0, 1, 2, 3].map((k) => c.net(`Q${k}`, 'Z'));
+  const pins: Record<string, Net> = { '~CP0': clk, '~CP1': q[0], Q0: q[0], Q1: q[1], Q2: q[2], Q3: q[3], MR1: mr, MR2: mr };
+  if (id === '74LS90') Object.assign(pins, { MS1: ms, MS2: ms });
+  instantiateChip(c, CHIP_MODELS[id], pins);
+  c.settle();
+  const set = (n: Net, v: Level) => {
+    c.set(n, v);
+    c.settle();
+  };
+  return {
+    c, clk, mr, ms, q, set,
+    count: () => levelsToNumber(q.map((n) => n.value)),
+    /** Clock low then high again: one count. */
+    tick: () => (set(clk, 0), set(clk, 1)),
+  };
+}
+
+describe('clock counters: 74LS90 and 74LS92', () => {
+  it('74LS90 counts BCD 0..9 on falling edges and wraps, Q3 falling as 9 goes to 0', () => {
+    const t = rippleCounter('74LS90');
+    const seen: (number | null)[] = [];
+    let q3Falls = 0;
+    for (let k = 0; k < 12; k++) {
+      t.set(t.clk, 0);
+      const before = t.count();
+      t.set(t.clk, 1);
+      expect(t.count(), 'the rising edge does nothing').toBe(before);
+      seen.push(before);
+      if (before === 0) q3Falls++;
+    }
+    expect(seen).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2]);
+    expect(q3Falls).toBe(1);
+  });
+  it('74LS90: MR1 = MR2 = 1 clears at once and holds; MS1 = MS2 = 1 sets 9 and beats MR', () => {
+    const t = rippleCounter('74LS90');
+    for (let k = 0; k < 6; k++) t.tick();
+    expect(t.count()).toBe(6);
+    t.set(t.mr, 1);
+    expect(t.count()).toBe(0);
+    t.tick();
+    expect(t.count(), 'held at 0 while MR is high').toBe(0);
+    t.set(t.ms, 1);
+    expect(t.count()).toBe(9);
+    t.set(t.ms, 0);
+    expect(t.count(), 'MS released with MR still high: cleared').toBe(0);
+    t.set(t.mr, 0);
+    t.tick();
+    expect(t.count()).toBe(1);
+  });
+  it('74LS90 sections on their own: ÷2 on Q0, ÷5 on Q1-Q3', () => {
+    const t = bench('74LS90');
+    expect(t.num(['Q0', 'Q1', 'Q2', 'Q3']), 'MS1 and MS2 float high: set to 9').toBe(9);
+    t.set({ MS1: 0, MS2: 0, MR1: 1, MR2: 1, '~CP0': 1, '~CP1': 1 }).set({ MR1: 0, MR2: 0 });
+    const five: (number | null)[] = [];
+    for (let k = 0; k < 6; k++) {
+      t.pulse('~CP1').set({ '~CP1': 1 });
+      five.push(t.num(['Q1', 'Q2', 'Q3']));
+    }
+    expect(five).toEqual([1, 2, 3, 4, 0, 1]);
+    expect(t.get('Q0')).toBe(0);
+    t.pulse('~CP0').set({ '~CP0': 1 });
+    expect(t.get('Q0')).toBe(1);
+  });
+  it("74LS92 counts the datasheet's divide-by-12 sequence: Q0-Q2 go 0..5 twice, Q3 is ÷12", () => {
+    const t = rippleCounter('74LS92');
+    const seen: (number | null)[] = [];
+    for (let k = 0; k < 13; k++) {
+      t.tick();
+      seen.push(t.count());
+    }
+    expect(seen).toEqual([1, 2, 3, 4, 5, 8, 9, 10, 11, 12, 13, 0, 1]);
+    expect(seen.map((n) => n! & 7)).toEqual([1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5, 0, 1]);
+    t.set(t.mr, 1);
+    expect(t.count()).toBe(0);
+  });
+  it('the 60 Hz divider of clock part 3: 74LS90 (÷10) into a 74LS92 (÷6), one pulse on Q2 per 60', () => {
+    const c = new Circuit();
+    const hz60 = c.input('60hz', 1), gnd = c.input('gnd', 0);
+    const a = [0, 1, 2, 3].map((k) => c.net(`a${k}`, 'Z')), b = [0, 1, 2, 3].map((k) => c.net(`b${k}`, 'Z'));
+    instantiateChip(c, CHIP_MODELS['74LS90'], { '~CP0': hz60, '~CP1': a[0], Q0: a[0], Q1: a[1], Q2: a[2], Q3: a[3], MR1: gnd, MR2: gnd, MS1: gnd, MS2: gnd });
+    instantiateChip(c, CHIP_MODELS['74LS92'], { '~CP0': a[3], '~CP1': b[0], Q0: b[0], Q1: b[1], Q2: b[2], Q3: b[3], MR1: gnd, MR2: gnd });
+    c.settle();
+    let falls = 0;
+    for (let k = 0; k < 180; k++) {
+      const was = b[2].value;
+      c.set(hz60, 0);
+      c.settle();
+      c.set(hz60, 1);
+      c.settle();
+      if (was === 1 && b[2].value === 0) falls++;
+    }
+    expect(falls, '3 seconds of 60 Hz: 3 falling edges of the 1 Hz output').toBe(3);
+  });
+});
+
+describe('74LS85 comparator', () => {
+  const A = ['A0', 'A1', 'A2', 'A3'], B = ['B0', 'B1', 'B2', 'B3'];
+  it('compares every pair of 4-bit numbers (cascading inputs at A = B)', () => {
+    const t = bench('74LS85');
+    t.set({ 'IA>B': 0, 'IA<B': 0, 'IA=B': 1 });
+    for (let a = 0; a < 16; a++)
+      for (let b = 0; b < 16; b++) {
+        t.bus(A, a).bus(B, b);
+        expect(t.gets(['A>B', 'A<B', 'A=B']), `${a} vs ${b}`).toEqual([a > b ? 1 : 0, a < b ? 1 : 0, a === b ? 1 : 0]);
+      }
+  });
+  it("equal words pass the cascading inputs on, as in the datasheet's function table", () => {
+    const t = bench('74LS85');
+    t.bus(A, 9).bus(B, 9);
+    const row = (gt: Level, lt: Level, eq: Level) => t.set({ 'IA>B': gt, 'IA<B': lt, 'IA=B': eq }).gets(['A>B', 'A<B', 'A=B']);
+    expect(row(1, 0, 0)).toEqual([1, 0, 0]);
+    expect(row(0, 1, 0)).toEqual([0, 1, 0]);
+    expect(row(1, 1, 1)).toEqual([0, 0, 1]);
+    expect(row(1, 1, 0)).toEqual([0, 0, 0]);
+    expect(row(0, 0, 0)).toEqual([1, 1, 0]);
+  });
+});
+
+describe('CD4511 BCD to 7-segment decoder', () => {
+  const SEGS = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
+  // the datasheet's truth table, a..g
+  const TABLE = ['1111110', '0110000', '1101101', '1111001', '0110011', '1011011', '0011111', '1110000', '1111111', '1110011'];
+  it("decodes 0-9 like the datasheet (6 and 9 without tails) and blanks 10-15", () => {
+    const t = bench('CD4511');
+    t.set({ '~LT': 1, '~BI': 1, LE: 0 });
+    for (let v = 0; v < 16; v++) expect(t.bus(['A', 'B', 'C', 'D'], v).gets(SEGS).join(''), String(v)).toBe(TABLE[v] ?? '0000000');
+  });
+  it('~LT lights every segment, ~BI blanks, LE high holds the code it had', () => {
+    const t = bench('CD4511');
+    t.set({ '~LT': 1, '~BI': 1, LE: 0 }).bus(['A', 'B', 'C', 'D'], 4);
+    t.set({ LE: 1 }).bus(['A', 'B', 'C', 'D'], 7);
+    expect(t.gets(SEGS).join(''), 'still 4 while latched').toBe(TABLE[4]);
+    t.set({ LE: 0 });
+    expect(t.gets(SEGS).join('')).toBe(TABLE[7]);
+    t.set({ '~BI': 0 });
+    expect(t.gets(SEGS).join('')).toBe('0000000');
+    t.set({ '~LT': 0 });
+    expect(t.gets(SEGS).join(''), 'lamp test beats blanking').toBe('1111111');
+  });
+});
+
 describe('instantiateChip', () => {
   it('accepts pin numbers or names, Maps, and leaves missing pins floating', () => {
     const c = new Circuit();

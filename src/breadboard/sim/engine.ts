@@ -827,7 +827,7 @@ export class BreadboardSim implements BoardSimulator {
         continue;
       }
       const params: ChipParams = { ...(p.params as ChipParams | undefined), ...this.paramOverrides.get(p.id) };
-      activate(`chip:${p.id}`, p.id, model, params, model.inputs.map((n) => legs[n - 1]), model.outputs.map((n) => legs[n - 1]));
+      activate(`chip:${p.id}`, p.id, model, params, model.inputs.map((n) => legs[n - 1]), model.outputs.map((n) => legs[n - 1]), model.raw);
     }
 
     const drivable = new Set<Net>(ext.keys());
