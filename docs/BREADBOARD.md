@@ -24,6 +24,7 @@ on its own by driving its ports, which is how the boards are verified.
 | `src/breadboard/nets.ts` | Static connectivity (`buildNets`, `pinNet`, `unpoweredChips`) |
 | `src/breadboard/render.ts` | SVG renderer `LayoutView` (+ `breadboard.css`) |
 | `src/breadboard/viewer.ts` | `PanZoom` viewport |
+| `src/breadboard/move.ts` | Moving a part (the sandbox's Move tool): `movedPart` by the step between two holes, or one end of a two-legged part |
 | `src/breadboard/boards/*.board.ts` | One module of the computer each, default-export `ModuleBoardDef` (auto-registered) |
 | `src/breadboard/computer-layout.ts` | Where each module sits in the full scene (`MODULE_SLOTS`) |
 | `src/breadboard/sim/types.ts` | Engine interfaces (`ChipModel`, `BoardSimulator`) |

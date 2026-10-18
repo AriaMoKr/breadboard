@@ -2,6 +2,7 @@ import { CHIPS, CHIP_IDS, prettyPin } from '../breadboard/catalog';
 import { holeXY, parseHole, toScene } from '../breadboard/geometry';
 import { layoutBounds, partPins, validateLayout, type Layout, type LedColor, type Part, type PartSpec, type WireColor } from '../breadboard/layout';
 import { LayoutView, LED_COLORS, WIRE_COLORS, formatOhms, type PartEvent } from '../breadboard/render';
+import { endAt, movedPart, type At } from '../breadboard/move';
 import { decodeLayout, encodeLayout } from '../breadboard/share';
 import type { BoardSimulator, SimProblem } from '../breadboard/sim/types';
 import { PanZoom } from '../breadboard/viewer';
@@ -23,6 +24,7 @@ const exampleModules = import.meta.glob<{ EXAMPLES: ExampleDef[] }>('../breadboa
 
 type Tool =
   | { kind: 'select' }
+  | { kind: 'move' }
   | { kind: 'delete' }
   | { kind: 'probe' }
   | { kind: 'wire'; color: WireColor }
@@ -92,6 +94,9 @@ export function mountSandboxPage(root: HTMLElement): () => void {
   const ghost = s('g', { class: 'sb-ghost' });
 
   const rerender = () => {
+    moving = null; // what was in hand is part of the new layout, or gone (undo)
+    press = null;
+    dragging = false;
     view = new LayoutView(layout, { onEvent: (id, ev) => onPartEvent(id, ev), padding: 3 });
     view.layerOverlay.appendChild(ghost);
     pz.replaceSvg(view.el, content());
@@ -155,7 +160,7 @@ export function mountSandboxPage(root: HTMLElement): () => void {
   const switchState = new Map<string, number>(); // slide position / DIP value (per part)
 
   const onPartEvent = (id: string, ev: PartEvent) => {
-    if (tool.kind === 'delete') return; // handled by click
+    if (tool.kind === 'delete' || tool.kind === 'move') return; // they take the click themselves
     if (!sim) return;
     const part = layout.parts.find((p) => p.id === id);
     if (!part) return;
@@ -227,12 +232,13 @@ export function mountSandboxPage(root: HTMLElement): () => void {
 
   const twoPoint = () => tool.kind === 'wire' || tool.kind === 'led' || tool.kind === 'resistor' || tool.kind === 'capacitor' || tool.kind === 'button';
 
+  /** Why `p` can't go where it is, among the other parts (a moved part keeps its id). */
   const fits = (p: Part): string | null => {
-    const problems = validateLayout({ boards: layout.boards, parts: [...layout.parts, p] }).filter((x) => x.part === p.id);
+    const problems = validateLayout({ boards: layout.boards, parts: [...layout.parts.filter((x) => x.id !== p.id), p] }).filter((x) => x.part === p.id);
     return problems.length ? problems[0].message : null;
   };
 
-  const drawGhost = (p: Part | null, firstHole?: { board: string; hole: string }) => {
+  const drawGhost = (p: Part | null, firstHole?: At, bad?: At) => {
     ghost.replaceChildren();
     const mark = (board: string, hole: string, cls: string) => {
       try {
@@ -245,6 +251,7 @@ export function mountSandboxPage(root: HTMLElement): () => void {
       }
     };
     if (firstHole) mark(firstHole.board, firstHole.hole, 'sb-mark first');
+    if (bad) mark(bad.board, bad.hole, 'sb-mark bad');
     if (!p) return;
     let ok = true;
     try {
@@ -276,14 +283,52 @@ export function mountSandboxPage(root: HTMLElement): () => void {
 
   const bindPointer = () => {
     const svg = view.el;
+    // Move: a press on a part, taken before the part (a switch would flip) and the panning. It
+    // becomes a drag once the pointer moves; else the click that follows picks the part up.
+    svg.addEventListener('pointerdown', (e) => {
+      afterDrag = false;
+      if (tool.kind !== 'move' || moving || e.button !== 0) return;
+      const part = partOf(e), from = part && grabbedAt(e);
+      if (!part || !from) return;
+      e.stopPropagation();
+      press = { part, from, at: view.scenePoint(e.clientX, e.clientY), x: e.clientX, y: e.clientY, slop: e.pointerType === 'touch' ? 10 : 4 };
+    }, true);
+    svg.addEventListener('pointerup', (e) => {
+      const was = dragging;
+      press = null;
+      dragging = false;
+      if (!was) return;
+      afterDrag = true;
+      const err = putDown(targetOf(e));
+      if (err) putBack(`${err} It went back.`);
+    });
+    svg.addEventListener('pointercancel', () => {
+      if (dragging) putBack();
+      press = null;
+      dragging = false;
+    });
     svg.addEventListener('pointermove', (e) => {
+      if (press && !dragging && Math.hypot(e.clientX - press.x, e.clientY - press.y) > press.slop) {
+        dragging = true;
+        try {
+          svg.setPointerCapture(e.pointerId); // keep the drag when the pointer leaves the board
+        } catch {
+          /* the pointer is gone */
+        }
+        pickUp(press.part, press.from, press.at);
+      }
+      if (tool.kind === 'move' && moving) {
+        const to = targetOf(e);
+        const p = to && movedPart(moving.part, moving.from, to);
+        return p ? drawGhost(p) : drawGhost(null, undefined, to ?? undefined);
+      }
       const hit = view.holeAt(view.scenePoint(e.clientX, e.clientY));
       if (!hit) {
         drawGhost(null, pending ?? undefined);
         return;
       }
       setStatus(holeInfo(hit.board, hit.hole));
-      if (tool.kind === 'select' || tool.kind === 'delete' || tool.kind === 'probe') return drawGhost(null);
+      if (tool.kind === 'select' || tool.kind === 'delete' || tool.kind === 'probe' || tool.kind === 'move') return drawGhost(null);
       if (twoPoint()) drawGhost(pending ? candidate(pending, hit) : null, pending ?? hit);
       else drawGhost(candidate(hit));
     });
@@ -296,8 +341,23 @@ export function mountSandboxPage(root: HTMLElement): () => void {
       const target = (e.target as Element).closest('[data-part]') as SVGGElement | null;
       if (target?.dataset.part) commit({ ...layout, parts: layout.parts.filter((p) => p.id !== target.dataset.part) });
     }, true);
+    // Move: a click picks a part up, the next puts it down (also before the part: capture)
     svg.addEventListener('click', (e) => {
-      if (pz.wasDrag() || tool.kind === 'delete') return;
+      if (tool.kind !== 'move') return;
+      e.stopPropagation();
+      if (afterDrag) return void (afterDrag = false); // the end of a drag, already put down
+      const part = partOf(e);
+      if (!part && pz.wasDrag()) return; // panned
+      if (moving) {
+        const err = putDown(targetOf(e));
+        if (err) setStatus(err);
+        return;
+      }
+      const from = part && grabbedAt(e);
+      if (part && from) pickUp(part, from, view.scenePoint(e.clientX, e.clientY));
+    }, true);
+    svg.addEventListener('click', (e) => {
+      if (pz.wasDrag() || tool.kind === 'delete' || tool.kind === 'move') return;
       const hit = view.holeAt(view.scenePoint(e.clientX, e.clientY));
       if (hit) setStatus(holeInfo(hit.board, hit.hole)); // touch screens have no hover
       if (!hit || tool.kind === 'select' || tool.kind === 'probe') return;
@@ -332,6 +392,68 @@ export function mountSandboxPage(root: HTMLElement): () => void {
     commit({ ...layout, parts: [...layout.parts, p] });
   };
 
+  // ---- moving -----------------------------------------------------------------------
+  // The Move tool: a click on a part picks it up and a click on a hole puts it there, or a drag
+  // does both. Picked up by an end, a wire or a two-legged part moves only that end (move.ts).
+  /** The part in hand, the hole it was picked up at, and where the pointer was then (scene). */
+  let moving: { part: Part; from: At; at: { x: number; y: number } } | null = null;
+  /** A press on a part, which becomes a drag once the pointer moves further than `slop` px. */
+  let press: { part: Part; from: At; at: { x: number; y: number }; x: number; y: number; slop: number } | null = null;
+  let dragging = false;
+  let afterDrag = false; // the click a drag ends with
+
+  const partOf = (e: Event): Part | null => {
+    const el = (e.target as Element).closest('[data-part]') as SVGGElement | null;
+    return (el && layout.parts.find((p) => p.id === el.dataset.part)) ?? null;
+  };
+  /** The hole a part is picked up at: under the pointer, or the nearest (a chip's body is over the channel). */
+  const grabbedAt = (e: MouseEvent): At | null => {
+    const pt = view.scenePoint(e.clientX, e.clientY);
+    return view.holeAt(pt) ?? view.holeAt(pt, 2);
+  };
+  const nameOf = (p: Part) => p.label ?? p.id;
+  const liftedEl = () => (moving ? view.el.querySelector(`[data-part="${CSS.escape(moving.part.id)}"]`) : null);
+  /** Where the part in hand goes for the pointer at `e`: the hole it was picked up at, moved as far as the pointer has. */
+  const targetOf = (e: MouseEvent): At | null => {
+    if (!moving) return null;
+    const p = view.scenePoint(e.clientX, e.clientY), h = view.holeScene(moving.from.board, moving.from.hole);
+    return view.holeAt({ x: h.x + p.x - moving.at.x, y: h.y + p.y - moving.at.y }, 2);
+  };
+  const pickUp = (part: Part, from: At, at: { x: number; y: number }) => {
+    moving = { part, from, at };
+    liftedEl()?.classList.add('sb-lifted');
+    const what = endAt(part, from) ? `The end of ${nameOf(part)} at ${from.hole}` : nameOf(part);
+    setStatus(`${what} in hand: ${dragging ? 'let go' : 'click'} over the hole to put it in · Esc puts it back.`);
+  };
+  const putBack = (why?: string) => {
+    if (!moving) return;
+    liftedEl()?.classList.remove('sb-lifted');
+    moving = null;
+    drawGhost(null);
+    setStatus(why ?? hintFor(tool));
+  };
+  /** Put the part in hand down over `to`: null when done, else why it can't go there. */
+  const putDown = (to: At | null): string | null => {
+    if (!moving) return null;
+    const p = to && movedPart(moving.part, moving.from, to);
+    if (!p) return `${nameOf(moving.part)} can't go there: off the board.`;
+    if (JSON.stringify(p) === JSON.stringify(moving.part)) {
+      putBack(); // put down where it was
+      return null;
+    }
+    let err: string | null;
+    try {
+      err = fits(p);
+    } catch (e) {
+      err = (e as Error).message;
+    }
+    if (err) return `${nameOf(p)} can't go there: ${err}`;
+    moving = null;
+    commit({ ...layout, parts: layout.parts.map((x) => (x.id === p.id ? p : x)) });
+    setStatus(`Moved ${nameOf(p)}.`);
+    return null;
+  };
+
   // ---- palette ----------------------------------------------------------------
   // On narrow screens the palette is a drawer above the board, closed once you pick a part,
   // so the board isn't pushed off the screen. Its summary names the part in hand.
@@ -341,8 +463,10 @@ export function mountSandboxPage(root: HTMLElement): () => void {
   const toolBtn = (label: string, t: Tool, title: string, swatch?: string) => {
     const el = h('button', { type: 'button', class: 'sb-tool', title }, swatch ? h('i', { style: `background:${swatch}` }) : null, label);
     el.addEventListener('click', () => {
+      putBack();
       tool = t;
       pending = null;
+      pz.el.classList.toggle('sb-move-tool', t.kind === 'move');
       drawGhost(null);
       toolButtons.forEach((b) => b.el.classList.toggle('active', b.matches(tool)));
       setStatus(hintFor(t));
@@ -354,6 +478,7 @@ export function mountSandboxPage(root: HTMLElement): () => void {
   };
   const hintFor = (t: Tool) =>
     t.kind === 'select' ? 'Select: click buttons, switches and DIP switches to operate them.'
+    : t.kind === 'move' ? 'Move: click a part, then the hole to put it in, or drag it there. Pick a wire or a leg up by its end to move just that end.'
     : t.kind === 'delete' ? 'Delete: click a part or wire to remove it.'
     : t.kind === 'probe' ? 'Probe: hover any hole to see its logic level.'
     : t.kind === 'chip' && rotated ? `Click the hole for pin 1 (row e, chip turned round: notch on the right). ↻ 180° or R turns it back. ${CHIPS[t.chip].title}.`
@@ -375,7 +500,13 @@ export function mountSandboxPage(root: HTMLElement): () => void {
   const palette = h(
     'div',
     { class: 'sb-palette' },
-    group('Tools', toolBtn('Use', { kind: 'select' }, 'Operate switches and buttons'), toolBtn('Probe', { kind: 'probe' }, 'Hover holes to read levels'), toolBtn('Delete', { kind: 'delete' }, 'Remove parts')),
+    group(
+      'Tools',
+      toolBtn('Use', { kind: 'select' }, 'Operate switches and buttons'),
+      toolBtn('Move', { kind: 'move' }, 'Move parts and wires, or one end of a wire'),
+      toolBtn('Probe', { kind: 'probe' }, 'Hover holes to read levels'),
+      toolBtn('Delete', { kind: 'delete' }, 'Remove parts'),
+    ),
     group('Wires', ...(['red', 'black', 'blue', 'yellow', 'green', 'white', 'orange', 'purple'] as WireColor[]).map((c) => toolBtn('', { kind: 'wire', color: c }, `${c} wire`, WIRE_COLORS[c]))),
     group('Chips', rotateBtn, ...CHIP_IDS.map((c) => toolBtn(c.replace('74LS', ''), { kind: 'chip', chip: c }, `${c}: ${CHIPS[c].title}`))),
     group(
@@ -486,6 +617,7 @@ export function mountSandboxPage(root: HTMLElement): () => void {
       step();
     } else if (e.key === 'Escape') {
       pending = null;
+      putBack();
       drawGhost(null);
     }
   });

@@ -226,6 +226,64 @@ try {
     return 'a slide and a DIP switch flipped, kept through a new wire, flipped back';
   });
 
+  await check('sandbox: Move drags parts, moves a wire or just one end, and leaves switches as set', async () => {
+    await emptySandbox();
+    await tool('74LS00');
+    await click(await hole('f', 10));
+    await tool('red wire');
+    await click(await hole('a', 3));
+    await click(await hole('a', 12));
+    await tool('Slide switch');
+    await click(await hole('a', 30));
+    const knob = () => page.evaluate(`document.querySelector('.bb-svg .bb-slide-knob').getAttribute('x')`);
+    const knob0 = await knob();
+    const drag = async (from, to) => {
+      await mouse('mouseMoved', from, { button: 'none', buttons: 0 });
+      await mouse('mousePressed', from);
+      for (let i = 1; i <= 8; i++) await mouse('mouseMoved', { x: from.x + ((to.x - from.x) * i) / 8, y: from.y + ((to.y - from.y) * i) / 8 });
+      await mouse('mouseReleased', to);
+      await sleep(80);
+    };
+    const by = async (p, rows, cols) => { // a point moved by whole rows and columns
+      const a = await hole('a', 10), b = await hole(rows === 2 ? 'c' : 'a', 10 + cols);
+      return { x: p.x + b.x - a.x, y: p.y + b.y - a.y };
+    };
+    const get = async (prefix) => (await saved()).find((p) => p.id.startsWith(prefix));
+    await tool('Move parts');
+    // the chip, dragged ten columns to the right
+    const chipAt = await centre('.bb-svg [data-part^="U"]');
+    await drag(chipAt, await by(chipAt, 0, 10));
+    const chip = await get('U');
+    assert(chip.col === 20, `the chip dragged ten columns went to column ${chip.col}`);
+    // one end of the wire: a click on it, a click on the new hole
+    await click(await hole('a', 12));
+    await click(await hole('a', 15));
+    const end = await get('W');
+    assert(end.a === 'a3' && end.b === 'a15', `the end at a12 put on a15 made the wire ${end.a}-${end.b}`);
+    // the whole wire: picked up between its ends, put down two rows lower
+    const mid = await page.evaluate(`(() => { const r = document.querySelector('.bb-svg [data-part^="W"]').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
+    await click(mid);
+    await click(await by(mid, 2, 0));
+    const whole = await get('W');
+    assert(whole.a === 'c3' && whole.b === 'c15', `the wire put two rows lower went to ${whole.a}-${whole.b}`);
+    // a switch is dragged, not flipped
+    const slideAt = await centre('.bb-svg .bb-slide');
+    await drag(slideAt, await by(slideAt, 0, 10));
+    const slide = await get('SW');
+    assert(slide.a === 'a40' && (await knob()) === knob0, `the slide switch went to ${slide.a} (knob ${knob0} -> ${await knob()})`);
+    // Esc puts back what is in hand; Undo takes a move back
+    await click(await centre('.bb-svg [data-part^="U"]'));
+    await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape' });
+    await page.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape' });
+    await click(await hole('f', 40));
+    assert((await get('U')).col === 20, 'the chip moved after Esc');
+    await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'z', code: 'KeyZ', modifiers: 2 });
+    await page.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'z', code: 'KeyZ', modifiers: 2 });
+    await sleep(80);
+    assert((await get('SW')).a === 'a30', 'Undo did not take the switch back');
+    return 'a chip dragged, a wire end and a whole wire moved by clicks, a switch dragged unflipped, Esc and Undo';
+  });
+
   await check('sandbox: Step pauses the circuit and moves it on to the next change', async () => {
     await emptySandbox();
     await page.evaluate(`(() => {

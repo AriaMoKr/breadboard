@@ -94,6 +94,8 @@
 .sb-tool.active, .sb-tool[aria-pressed='true'] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 25%, var(--panel-2)); }
 .sb-drawer > summary { display: none; }
 .sb-main { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.sb-move-tool [data-part], .sb-move-tool [data-part] * { cursor: grab; }
+.sb-lifted { opacity: 0.3; } /* in hand: the ghost shows where it would go */
 .sb-status { font-size: 0.8rem; color: var(--fg-dim); min-height: 1.3em; }
 .sb-side { margin-top: 10px; }
 .sb-problems { margin: 4px 0; padding-left: 18px; font-size: 0.85rem; color: var(--wire-x); }
