@@ -4,11 +4,19 @@
 // one machine, sandbox links round-trip, the breadboard view keeps its frame rate, and the VR
 // view builds the computer, runs it and answers the mouse on its boards' switches and buttons.
 // With --dist it checks the built site instead (run `npm run build` first), plus the download
-// link, install support and offline use. Needs Node 22+ and an installed Chrome, Edge or Chromium.
+// link, install support and offline use; with --url <address> it checks a deployed copy the same
+// way, such as https://example.com/breadboard/. Needs Node 22+ and an installed Chrome, Edge or
+// Chromium.
 import { createServer, preview } from 'vite';
 import { launchChrome, sleep } from './lib/chrome.mjs';
 
-const dist = process.argv.includes('--dist');
+const urlAt = process.argv.indexOf('--url');
+const url = urlAt > 0 ? process.argv[urlAt + 1]?.replace(/\/?$/, '/') : '';
+if (urlAt > 0 && !/^https?:\/\//.test(url ?? '')) {
+  console.error('--url needs an address, such as --url https://example.com/breadboard/');
+  process.exit(2);
+}
+const dist = process.argv.includes('--dist') || !!url;
 const results = [];
 async function check(name, fn) {
   try {
@@ -30,12 +38,14 @@ const SMALL_OK = [
   ['.hexdec .seg', 'thin segments; a transparent stroke widens their hit area'],
 ];
 
-const server = dist
-  ? await preview({ logLevel: 'warn', preview: { host: '127.0.0.1', port: 4174 } })
-  : await createServer({ logLevel: 'warn', server: { host: '127.0.0.1', port: 5174 } });
+const server = url
+  ? null
+  : dist
+    ? await preview({ logLevel: 'warn', preview: { host: '127.0.0.1', port: 4174 } })
+    : await createServer({ logLevel: 'warn', server: { host: '127.0.0.1', port: 5174 } });
 if (!dist) await server.listen();
-const base = server.resolvedUrls.local[0];
-console.log(`Checking ${dist ? 'the built site (dist/)' : 'the dev server'} at ${base}`);
+const base = url || server.resolvedUrls.local[0];
+console.log(`Checking ${url ? 'the site' : dist ? 'the built site (dist/)' : 'the dev server'} at ${base}`);
 
 const chrome = await launchChrome();
 try {
@@ -446,7 +456,7 @@ try {
   page.close();
 } finally {
   await chrome.close();
-  await (server.close?.() ?? server.httpServer?.close());
+  if (server) await (server.close?.() ?? server.httpServer?.close());
 }
 
 const failed = results.filter((ok) => !ok).length;

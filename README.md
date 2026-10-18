@@ -69,7 +69,9 @@ at least 24 px, the sticky toolbar, parts drawer and tap-to-zoom, the shared com
 parts in the sandbox with real clicks and taps, sandbox links, the breadboard view's frame rate,
 and that the VR view builds the computer in 3D and runs it. `npm run check:browser -- --dist`
 checks the built site instead (run `npm run build` first), plus the download link, install and
-offline use. It needs an installed Chrome, Edge or Chromium (or `CHROME_PATH`).
+offline use, and `-- --url <address>` checks a deployed copy the same way (such as
+`https://example.com/breadboard/` after a deploy). It needs an installed Chrome, Edge or
+Chromium (or `CHROME_PATH`).
 
 `npm run verify` runs the unit tests, the build and the browser checks on the built site, in that
 order, stopping at the first failure. Run it before committing or pushing (it takes about two
