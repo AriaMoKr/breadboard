@@ -141,25 +141,31 @@ try {
     await sleep(60);
   };
 
-  await check('sandbox: a click on a hole places the part in hand, a drag pans instead', async () => {
+  // In the sandbox: the saved board's parts, a tool by its title, a hole and an element on the screen.
+  const emptySandbox = async () => {
     await page.goto(`${base}#/sandbox`);
-    await page.evaluate(`localStorage.removeItem('breadboard-sandbox-v1'); location.reload()`); // an empty board
+    await page.evaluate(`localStorage.removeItem('breadboard-sandbox-v1'); location.reload()`);
     await sleep(1500);
-    const parts = () => page.evaluate(`JSON.parse(localStorage.getItem('breadboard-sandbox-v1') || '{"parts":[]}').parts.map((p) => p.kind).join(' ')`);
-    const centre = (selector) => page.evaluate(`(() => {
-      const el = document.querySelector(${JSON.stringify(selector)});
-      el.scrollIntoView({ block: 'nearest' });
-      const r = el.getBoundingClientRect();
-      return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
-    })()`);
-    const tool = async (title) => click(await centre(`.sb-tool[title^="${title}"]`));
-    // a hole on the screen (geometry.ts: column c at x = c + 0.5, row a at y = 3.5, f at 10.5)
-    const hole = (row, col) => page.evaluate(`(() => {
-      const svg = document.querySelector('.bb-svg'), p = svg.createSVGPoint();
-      p.x = ${col + 0.5}; p.y = ${{ a: 3.5, f: 10.5 }[row]};
-      const s = p.matrixTransform(svg.getScreenCTM());
-      return { x: s.x, y: s.y };
-    })()`);
+  };
+  const saved = () => page.evaluate(`JSON.parse(localStorage.getItem('breadboard-sandbox-v1') || '{"parts":[]}').parts`);
+  const parts = async () => (await saved()).map((p) => p.kind).join(' ');
+  const centre = (selector) => page.evaluate(`(() => {
+    const el = document.querySelector(${JSON.stringify(selector)});
+    el.scrollIntoView({ block: 'nearest' });
+    const r = el.getBoundingClientRect();
+    return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+  })()`);
+  const tool = async (title) => click(await centre(`.sb-tool[title^="${title}"]`));
+  const ROW_Y = { tn: 0.9, tp: 1.9, a: 3.5, b: 4.5, c: 5.5, d: 6.5, e: 7.5, f: 10.5, g: 11.5, h: 12.5, i: 13.5, j: 14.5, bp: 16.1, bn: 17.1 }; // geometry.ts
+  const hole = (row, col) => page.evaluate(`(() => {
+    const svg = document.querySelector('.bb-svg'), p = svg.createSVGPoint();
+    p.x = ${col + 0.5}; p.y = ${ROW_Y[row]};
+    const s = p.matrixTransform(svg.getScreenCTM());
+    return { x: s.x, y: s.y };
+  })()`);
+
+  await check('sandbox: a click on a hole places the part in hand, a drag pans instead', async () => {
+    await emptySandbox();
     await tool('74LS00');
     await click(await hole('f', 10));
     const chip = await parts();
@@ -192,6 +198,32 @@ try {
     const left = await parts();
     assert(left === 'wire', `clicks on the chip and the switches with Delete left: "${left}"`);
     return 'a 74LS00, a wire and two switches by clicks, an 80 px pan, the chip and switches deleted';
+  });
+
+  await check('sandbox: switches stay where they were set when the circuit changes', async () => {
+    await emptySandbox();
+    await tool('Slide switch');
+    await click(await hole('a', 30));
+    await tool('4-position DIP');
+    await click(await hole('f', 40));
+    const knobs = () => page.evaluate(`[...document.querySelectorAll('.bb-svg .bb-slide-knob, .bb-svg .bb-dip-knob')].map((k) => k.getAttribute('x') + ',' + k.getAttribute('y')).join(' ')`);
+    const before = await knobs();
+    await tool('Operate switches');
+    await click(await centre('.bb-svg .bb-slide .bb-hit'));
+    await click(await centre('.bb-svg .bb-dip .bb-hit'));
+    const flipped = await knobs();
+    assert(flipped !== before, 'the clicks flipped neither switch');
+    await tool('red wire'); // a change to the circuit: the board and the simulator are built anew
+    await click(await hole('a', 3));
+    await click(await hole('a', 8));
+    const after = await knobs();
+    assert(after === flipped, `placing a wire put the switches back: ${flipped} -> ${after}`);
+    await tool('Operate switches');
+    await click(await centre('.bb-svg .bb-slide .bb-hit'));
+    await click(await centre('.bb-svg .bb-dip .bb-hit'));
+    const back = await knobs();
+    assert(back === before, `the next clicks didn't flip them back: ${before} -> ${back}`);
+    return 'a slide and a DIP switch flipped, kept through a new wire, flipped back';
   });
 
   await check('breadboard view keeps its frame rate while running', async () => {

@@ -122,6 +122,17 @@ export function mountSandboxPage(root: HTMLElement): () => void {
     try {
       sim = new Sim(layout);
       simError = '';
+      // the switches stay where they were set: on the new board and in the new simulator
+      for (const [id, v] of [...switchState]) {
+        const part = layout.parts.find((p) => p.id === id);
+        if (part?.kind === 'slide') {
+          sim.setSlide(id, v as 0 | 1);
+          view.setSlide(id, v as 0 | 1);
+        } else if (part?.kind === 'dip') {
+          sim.setDip(id, v);
+          view.setDip(id, v);
+        } else switchState.delete(id);
+      }
       sim.settle(5000);
     } catch (e) {
       sim = null;
