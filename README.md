@@ -127,8 +127,16 @@ host needs no rewrite rules. A build rewrites every file, so with rsync compare 
 
 ```bash
 rsync -avcO --delete dist/ user@host:path/to/breadboard/
-``` The sidebar offers the zip ("Download for offline use") wherever it
-sits next to `index.html`, so not on the dev server or in a copy.
+```
+
+The sidebar offers the zip ("Download for offline use") wherever it sits next to `index.html`,
+so not on the dev server or in a copy.
+
+On GitHub, `.github/workflows/pages.yml` publishes the site to GitHub Pages on every push to
+`main`. It runs the unit tests and `npm run build` on Linux, then deploys `dist/`, which comes out
+the same as a build on Windows. To turn it on, set the repository's **Settings → Pages → Build
+and deployment → Source** to **GitHub Actions** once. The site is then at
+`https://<user>.github.io/<repo>/`, and the Actions tab can also run the workflow by hand.
 
 Served over HTTPS, the site is an installable app: "Install" in desktop Chrome or Edge, or "Add
 to Home Screen" on a phone. After the first visit it works offline, the VR view too. The service
