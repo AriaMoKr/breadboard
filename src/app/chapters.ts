@@ -135,6 +135,77 @@ export const VIDEO_BY_INDEX = new Map(VIDEOS.map((x) => [x.index, x]));
 /** Distinct lab ids in playlist order. */
 export const LAB_IDS: string[] = [...new Set(VIDEOS.map((x) => x.lab))];
 
+/**
+ * Ben's videos outside the playlist that go with it: the ones eater.net/8bit links (his first
+ * build running programs, and an introduction to transistors and gates) and his digital clock
+ * series (eater.net/clock), built from the same kind of chips.
+ */
+export interface MoreVideo {
+  youtubeId: string;
+  title: string;
+  duration: string;
+  /** Publication date, YYYY-MM-DD. */
+  date: string;
+}
+
+export interface MoreGroup {
+  id: string;
+  title: string;
+  /** What these videos are and how they relate to the series. */
+  text: string;
+  /** Where Ben lists them. */
+  source: { href: string; label: string };
+  /** A series in parts, numbered in the list. */
+  numbered?: boolean;
+  videos: MoreVideo[];
+}
+
+const m = (youtubeId: string, title: string, duration: string, date: string): MoreVideo => ({ youtubeId, title, duration, date });
+
+export const MORE_GROUPS: MoreGroup[] = [
+  {
+    id: 'in-action',
+    title: 'The computer in action',
+    text: 'Four short videos from 2015, before the series, of Ben’s first build running programs. His Fibonacci program is one of the examples on the finished computer.',
+    source: { href: 'https://eater.net/8bit', label: 'eater.net/8bit' },
+    videos: [
+      m('9PPrrSyubG0', 'Programming my 8-bit breadboard computer', '15:23', '2015-02-08'),
+      m('35zLnS3fXeA', 'Stepping through a program on the 8-bit breadboard computer', '11:17', '2015-02-08'),
+      m('yOyaJXpAYZQ', 'Comparing C to machine language', '10:02', '2015-02-08'),
+      m('a73ZXDJtU48', 'Programming Fibonacci on a breadboard computer', '7:26', '2015-02-08'),
+    ],
+  },
+  {
+    id: 'background',
+    title: 'From semiconductors to logic gates',
+    text: 'Ben’s introduction, from 2015, for anyone unsure how transistors and logic gates work; eater.net/8bit points to these before the SR latch. The 4-bit adder video, from the same time, builds an adder like the ALU’s from XOR, AND and OR gates.',
+    source: { href: 'https://eater.net/8bit', label: 'eater.net/8bit' },
+    videos: [
+      m('33vbFFFn04k', 'How semiconductors work', '15:51', '2015-03-18'),
+      m('DXvAlwMAxiA', 'How a transistor works', '11:23', '2015-03-19'),
+      m('sTu3LwpF6XI', 'Making logic gates from transistors', '13:02', '2015-03-22'),
+      m('wvJc9CZcvBc', 'Learn how computers add numbers and build a 4 bit adder circuit', '13:39', '2015-03-01'),
+    ],
+  },
+  {
+    id: 'clock',
+    title: 'Build a digital clock',
+    text: 'Ben’s new series, from 2026: a digital clock on breadboards, from 74LS counters, decoders and 7-segment displays, meant as a gentler start than a computer. It is still coming out; these are the parts on YouTube so far.',
+    source: { href: 'https://eater.net/clock', label: 'eater.net/clock' },
+    numbered: true,
+    videos: [
+      m('3XDH-fZKnQk', "Let's build a digital clock!", '26:47', '2026-08-08'),
+      m('RT0mp4f4QIs', 'Making a square wave square: Breadboard clock part 2', '22:19', '2026-08-22'),
+      m('gnmrKDpTM7o', 'Dividing a signal by counting: Breadboard clock part 3', '14:35', '2026-09-05'),
+      m('ZymtNiyGB_g', 'Building the minutes and seconds for my clock: Breadboard clock part 4', '27:36', '2026-10-03'),
+      m('ou2RFTK86eA', 'Setting the time on my breadboard clock: Breadboard clock part 5', '20:22', '2026-10-18'),
+    ],
+  },
+];
+
+export const MORE_VIDEOS: MoreVideo[] = MORE_GROUPS.flatMap((g) => g.videos);
+
+export const watchUrl = (youtubeId: string) => `https://www.youtube.com/watch?v=${youtubeId}`;
 export const videoUrl = (vid: Video) => `https://www.youtube.com/watch?v=${vid.youtubeId}&list=${PLAYLIST_ID}&index=${vid.index}`;
-export const embedUrl = (vid: Video) => `https://www.youtube-nocookie.com/embed/${vid.youtubeId}`;
+export const embedUrl = (vid: { youtubeId: string }) => `https://www.youtube-nocookie.com/embed/${vid.youtubeId}`;
 export const videosForLab = (lab: string) => VIDEOS.filter((x) => x.lab === lab);

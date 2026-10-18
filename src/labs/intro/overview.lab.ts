@@ -43,7 +43,8 @@ export default defineLab({
       root.querySelectorAll('.module').forEach((el) => el.classList.toggle('highlight', (el as HTMLElement).dataset.module === m));
     };
     const host = h('div');
-    root.append(info, host);
+    const more = h('p', { class: 'note' }, 'To see Ben’s first build run programs, from before the series, watch ', h('a', { href: '#/more/in-action' }, 'The computer in action'), '.');
+    root.append(info, host, more);
     const wb = mountComputerWorkbench(host, { program: 'add', tabs: ['program', 'output'] });
     host.querySelectorAll('.module').forEach((el) => {
       (el as HTMLElement).style.cursor = 'pointer';

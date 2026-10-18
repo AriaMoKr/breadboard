@@ -2,17 +2,18 @@ import { buildLabel } from '../build-info';
 import type { Lab } from '../labs/types';
 import { Machine } from '../sim/machine';
 import { h } from '../ui/dom';
-import { CHAPTERS, LAB_IDS, PLAYLIST_URL, VIDEO_BY_INDEX, embedUrl, videoUrl, videosForLab, type Video } from './chapters';
+import { CHAPTERS, LAB_IDS, MORE_GROUPS, PLAYLIST_URL, VIDEO_BY_INDEX, embedUrl, videoUrl, videosForLab, watchUrl, type MoreGroup } from './chapters';
 import { mountComputerWorkbench } from './computer-page';
 import { hasLab, loadLab, loadedLab } from './lab-loader';
 
-type Route = { kind: 'computer' } | { kind: 'breadboard' } | { kind: 'sandbox' } | { kind: 'lab'; id: string; video?: number };
+type Route = { kind: 'computer' } | { kind: 'breadboard' } | { kind: 'sandbox' } | { kind: 'more'; group?: string } | { kind: 'lab'; id: string; video?: number };
 
 function parseRoute(hash: string): Route {
   const parts = hash.replace(/^#\/?/, '').split('/').filter(Boolean);
   if (parts[0] === 'lab' && parts[1]) return { kind: 'lab', id: parts[1], video: parts[2] ? Number(parts[2]) : undefined };
   if (parts[0] === 'breadboard') return { kind: 'breadboard' };
   if (parts[0] === 'sandbox') return { kind: 'sandbox' };
+  if (parts[0] === 'more') return { kind: 'more', group: parts[1] };
   if (parts[0] === 'video' && parts[1]) {
     const vid = VIDEO_BY_INDEX.get(Number(parts[1]));
     if (vid) return { kind: 'lab', id: vid.lab, video: vid.index };
@@ -21,6 +22,18 @@ function parseRoute(hash: string): Route {
 }
 
 const labHref = (id: string, video?: number) => `#/lab/${id}${video ? `/${video}` : ''}`;
+
+/** What a video card shows: a playlist video, or one of Ben's others (no number, or its part). */
+interface CardVideo {
+  num?: string;
+  youtubeId: string;
+  title: string;
+  duration: string;
+  url: string;
+  date?: string;
+}
+
+const DATE = new Intl.DateTimeFormat('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' });
 
 /** The whole site as one zip, written next to index.html by scripts/zip-dist.mjs. */
 const SITE_ZIP = 'breadboard-8bit.zip';
@@ -74,6 +87,12 @@ export class App {
       h('a', { class: 'nav-computer', href: '#/sandbox', dataset: { route: 'sandbox' } }, '✎ Breadboard sandbox'),
       h('a', { class: 'nav-computer', href: 'vr.html', dataset: { route: 'vr' }, title: 'The breadboard computer in 3D: VR headsets, or mouse and touch' }, '◈ VR view'),
       h('ol', { class: 'nav-chapters' }, items),
+      h(
+        'div',
+        { class: 'nav-chapter' },
+        h('div', { class: 'nav-chapter-title' }, 'More from Ben'),
+        h('ol', { class: 'nav-videos' }, MORE_GROUPS.map((g) => h('li', null, h('a', { href: `#/more/${g.id}`, dataset: { route: 'more', group: g.id } }, h('span', { class: 'nav-num' }, '▸'), h('span', { class: 'nav-title' }, g.title), h('span', { class: 'nav-dur' }, String(g.videos.length)))))),
+      ),
       h('p', { class: 'nav-build', title: 'The commit this site was built from, and its date' }, buildLabel()),
     );
   }
@@ -105,7 +124,8 @@ export class App {
     this.nav.querySelectorAll('a').forEach((a) => {
       const el = a as HTMLAnchorElement;
       let active = false;
-      if (route.kind !== 'lab') active = el.dataset.route === route.kind;
+      if (route.kind === 'more') active = el.dataset.route === 'more' && el.dataset.group === route.group;
+      else if (route.kind !== 'lab') active = el.dataset.route === route.kind;
       else if (el.dataset.lab === route.id) active = route.video ? el.dataset.video === String(route.video) : true;
       el.classList.toggle('active', active);
       el.classList.toggle('in-lab', route.kind === 'lab' && el.dataset.lab === route.id);
@@ -122,6 +142,7 @@ export class App {
     this.main.replaceChildren();
     window.scrollTo(0, 0);
     if (route.kind === 'computer') this.renderComputer();
+    else if (route.kind === 'more') this.renderMore(route.group);
     else if (route.kind === 'breadboard' || route.kind === 'sandbox') void this.renderBoardPage(route.kind, token);
     else void this.renderLab(route.id, route.video, token);
     this.main.focus({ preventScroll: true });
@@ -134,12 +155,33 @@ export class App {
       { class: 'page-head' },
       h('h1', null, 'The finished computer'),
       h('p', { class: 'lede' }, 'Ben Eater’s 8-bit breadboard computer as it stands at the end of the playlist: 16 bytes of RAM, A and B registers, an adder/subtractor ALU with carry and zero flags, a microcoded control unit and a decimal display. Load an example, then press Run, or pulse the clock by hand', h('span', { class: 'key-hint' }, ' (Space)'), ' and watch every control signal and bus transfer.'),
-      h('p', { class: 'note' }, 'New here? Start with ', h('a', { href: labHref('overview', 1) }, 'video 1'), ' and follow the chapters on the left: each one has a lab that rebuilds what that video builds. Or see the same computer ', h('a', { href: '#/breadboard' }, 'laid out on breadboards'), ', or build your own circuits in the ', h('a', { href: '#/sandbox' }, 'sandbox'), '.'),
+      h('p', { class: 'note' }, 'New here? Start with ', h('a', { href: labHref('overview', 1) }, 'video 1'), ' and follow the chapters on the left: each one has a lab that rebuilds what that video builds. Or see the same computer ', h('a', { href: '#/breadboard' }, 'laid out on breadboards'), ', build your own circuits in the ', h('a', { href: '#/sandbox' }, 'sandbox'), ', or watch ', h('a', { href: '#/more' }, 'Ben’s other videos'), ' that go with the series.'),
     );
     const host = h('div');
     this.main.append(intro, host);
     const wb = mountComputerWorkbench(host, { versionPicker: true, program: 'multiply', machine: this.machine(), keepProgram: true });
     this.cleanup = wb.dispose;
+  }
+
+  /** Ben's videos outside the playlist, grouped; `group` scrolls to one group. */
+  private renderMore(group: string | undefined) {
+    document.title = 'More videos · Breadboard 8-bit';
+    const head = h(
+      'div',
+      { class: 'page-head' },
+      h('h1', null, 'More videos'),
+      h('p', { class: 'lede' }, 'Ben’s videos outside the playlist that go with it: his first build running programs, his introduction to transistors and logic gates, and his new digital clock series.'),
+    );
+    const section = (g: MoreGroup) =>
+      h(
+        'section',
+        { class: 'more-group', id: `more-${g.id}` },
+        h('h2', null, g.title),
+        h('p', { class: 'lede' }, g.text, ' ', h('span', { class: 'dim' }, 'Ben lists them on ', h('a', { href: g.source.href, target: '_blank', rel: 'noopener' }, `${g.source.label} ↗`), '.')),
+        h('div', { class: 'video-list' }, g.videos.map((v, i) => this.videoCard({ ...v, num: g.numbered ? String(i + 1) : undefined, url: watchUrl(v.youtubeId) }, false))),
+      );
+    this.main.append(head, ...MORE_GROUPS.map(section));
+    if (group) this.main.querySelector(`#more-${group}`)?.scrollIntoView?.();
   }
 
   private async renderBoardPage(kind: 'breadboard' | 'sandbox', token: number) {
@@ -197,7 +239,7 @@ export class App {
       h('div', { class: 'crumbs' }, chapter ? chapter.title : 'Lab', videos.length ? ` · video${videos.length > 1 ? 's' : ''} ${videos.map((x) => x.index).join(', ')}` : ''),
       h('h1', null, title),
       lab ? h('p', { class: 'lede' }, lab.summary) : null,
-      h('div', { class: 'video-list' }, videos.map((vid) => this.videoCard(vid, vid.index === videoIndex))),
+      h('div', { class: 'video-list' }, videos.map((vid) => this.videoCard({ ...vid, num: String(vid.index), url: videoUrl(vid) }, vid.index === videoIndex))),
     );
     const body = h('div', { class: 'lab-root' });
     const prevLink = prev ? h('a', { class: 'btn btn-ghost', href: labHref(prev) }, `← ${labTitle(prev)}`) : null;
@@ -227,7 +269,7 @@ export class App {
     }
   }
 
-  private videoCard(vid: Video, focused: boolean): HTMLElement {
+  private videoCard(vid: CardVideo, focused: boolean): HTMLElement {
     const frameHost = h('div', { class: 'video-embed' });
     const watch = h('button', { type: 'button', class: 'btn btn-ghost', onClick: () => {
       if (frameHost.firstChild) {
@@ -241,8 +283,8 @@ export class App {
     return h(
       'div',
       { class: `video-card ${focused ? 'focused' : ''}` },
-      h('div', { class: 'video-meta' }, h('span', { class: 'nav-num' }, String(vid.index)), h('span', { class: 'video-title' }, vid.title), h('span', { class: 'dim' }, vid.duration)),
-      h('div', { class: 'video-actions' }, watch, h('a', { class: 'btn btn-ghost', href: videoUrl(vid), target: '_blank', rel: 'noopener' }, 'YouTube ↗')),
+      h('div', { class: 'video-meta' }, vid.num ? h('span', { class: 'nav-num' }, vid.num) : null, h('span', { class: 'video-title' }, vid.title), h('span', { class: 'dim' }, vid.duration), vid.date ? h('span', { class: 'dim small video-date' }, DATE.format(new Date(vid.date))) : null),
+      h('div', { class: 'video-actions' }, watch, h('a', { class: 'btn btn-ghost', href: vid.url, target: '_blank', rel: 'noopener' }, 'YouTube ↗')),
       frameHost,
     );
   }

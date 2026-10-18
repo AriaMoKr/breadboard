@@ -76,7 +76,7 @@ try {
   console.log('Desktop (1280 x 800, mouse)');
   await page.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
   await page.goto(base);
-  const routes = await page.evaluate(`['#/', '#/breadboard', '#/sandbox', ...new Set([...document.querySelectorAll('.sidebar a[href^="#/lab/"]')].map((a) => a.getAttribute('href').split('/').slice(0, 3).join('/')))]`);
+  const routes = await page.evaluate(`['#/', '#/breadboard', '#/sandbox', '#/more', ...new Set([...document.querySelectorAll('.sidebar a[href^="#/lab/"]')].map((a) => a.getAttribute('href').split('/').slice(0, 3).join('/')))]`);
 
   await check(`every page renders without errors (${routes.length} pages)`, async () => {
     const problems = await visitAll(routes, `() => {

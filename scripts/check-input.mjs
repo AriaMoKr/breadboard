@@ -222,7 +222,7 @@ async function checkMode(name, base) {
       await page.goto(`${base}?load=${++loads}${route}`, 1200); // a new query: a fresh load of the app
     };
     await open('#/');
-    const routes = await page.evaluate(`['#/', '#/breadboard', '#/sandbox', ...new Set([...document.querySelectorAll('.sidebar a[href^="#/lab/"]')].map((a) => a.getAttribute('href').split('/').slice(0, 3).join('/')))]`);
+    const routes = await page.evaluate(`['#/', '#/breadboard', '#/sandbox', '#/more', ...new Set([...document.querySelectorAll('.sidebar a[href^="#/lab/"]')].map((a) => a.getAttribute('href').split('/').slice(0, 3).join('/')))]`);
     const sharedDone = new Set();
     const pages = routes.filter((r) => r.includes(onlyPage));
     for (const route of pages) {

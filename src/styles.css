@@ -122,9 +122,12 @@ code, pre { font-family: var(--mono); }
 .video-card { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
 .video-meta { display: flex; gap: 10px; align-items: baseline; flex: 1; min-width: 240px; }
 .video-title { font-weight: 600; }
+.video-date { white-space: nowrap; }
 .video-actions { display: flex; gap: 6px; }
 .video-embed { flex-basis: 100%; }
 .video-embed iframe { width: 100%; max-width: 860px; aspect-ratio: 16 / 9; border: 0; border-radius: 8px; margin-top: 6px; }
+.more-group { max-width: 980px; margin-bottom: 28px; scroll-margin-top: calc(var(--topbar-h) + 12px); }
+.more-group h2 { font-size: 1.2rem; margin: 0 0 4px; }
 
 .lab-nav { display: flex; justify-content: space-between; gap: 10px; margin-top: 30px; padding-top: 16px; border-top: 1px solid var(--border); flex-wrap: wrap; }
 .placeholder { border: 1px dashed var(--border); border-radius: var(--radius); padding: 30px; text-align: center; color: var(--fg-dim); }

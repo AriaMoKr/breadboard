@@ -47,6 +47,9 @@ video by video.
   flip-flops, JK racing, tri-state buses, registers, two's complement, the ALU, RAM,
   counters, 7-segment and EEPROM decoders, the Arduino EEPROM programmer, the
   multiplexed decimal display, the control logic, microcode, flags and conditional jumps.
+* **More videos** (`#/more`): Ben's videos outside the playlist that go with it. These are his first
+  build running programs and his introduction to transistors and logic gates (both from 2015 and
+  linked from eater.net/8bit), plus his digital clock series (2026, eater.net/clock).
 
 ## Running
 
