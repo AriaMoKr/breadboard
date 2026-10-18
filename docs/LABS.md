@@ -8,6 +8,9 @@ automatically: never edit a shared file to register a lab. The app loads each
 so the file name must be exactly `<lab-id>.lab.ts`; `src/labs/registry.ts` is
 the eager map that tests use (a test checks that names and ids agree).
 
+(Vitest's on-disk module cache would keep the registry's old file list when a lab file is added, so
+`vite.config.ts` turns it off with `fsModuleCache: false`.)
+
 ```ts
 import { defineLab } from '../types';
 export default defineLab({

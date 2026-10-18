@@ -22,5 +22,8 @@ export default defineConfig(({ mode }) => ({
   test: {
     include: ['tests/**/*.test.ts', 'src/**/*.test.ts'],
     environment: 'node',
+    // Labs and boards register themselves through import.meta.glob, and Vitest's on-disk module
+    // cache keeps a glob's old file list when a new *.lab.ts or *.board.ts appears.
+    fsModuleCache: false,
   },
 }));
