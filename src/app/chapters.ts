@@ -146,6 +146,8 @@ export interface MoreVideo {
   duration: string;
   /** Publication date, YYYY-MM-DD. */
   date: string;
+  /** Lab that covers it, if any. */
+  lab?: string;
 }
 
 export interface MoreGroup {
@@ -160,7 +162,7 @@ export interface MoreGroup {
   videos: MoreVideo[];
 }
 
-const m = (youtubeId: string, title: string, duration: string, date: string): MoreVideo => ({ youtubeId, title, duration, date });
+const m = (youtubeId: string, title: string, duration: string, date: string, lab?: string): MoreVideo => ({ youtubeId, title, duration, date, lab });
 
 export const MORE_GROUPS: MoreGroup[] = [
   {
@@ -194,16 +196,33 @@ export const MORE_GROUPS: MoreGroup[] = [
     source: { href: 'https://eater.net/clock', label: 'eater.net/clock' },
     numbered: true,
     videos: [
-      m('3XDH-fZKnQk', "Let's build a digital clock!", '26:47', '2026-08-08'),
-      m('RT0mp4f4QIs', 'Making a square wave square: Breadboard clock part 2', '22:19', '2026-08-22'),
-      m('gnmrKDpTM7o', 'Dividing a signal by counting: Breadboard clock part 3', '14:35', '2026-09-05'),
-      m('ZymtNiyGB_g', 'Building the minutes and seconds for my clock: Breadboard clock part 4', '27:36', '2026-10-03'),
-      m('ou2RFTK86eA', 'Setting the time on my breadboard clock: Breadboard clock part 5', '20:22', '2026-10-18'),
+      m('3XDH-fZKnQk', "Let's build a digital clock!", '26:47', '2026-08-08', 'mains-60hz'),
+      m('RT0mp4f4QIs', 'Making a square wave square: Breadboard clock part 2', '22:19', '2026-08-22', 'square-wave'),
+      m('gnmrKDpTM7o', 'Dividing a signal by counting: Breadboard clock part 3', '14:35', '2026-09-05', 'divide-by-60'),
+      m('ZymtNiyGB_g', 'Building the minutes and seconds for my clock: Breadboard clock part 4', '27:36', '2026-10-03', 'minutes-seconds'),
+      m('ou2RFTK86eA', 'Setting the time on my breadboard clock: Breadboard clock part 5', '20:22', '2026-10-18', 'setting-time'),
     ],
   },
 ];
 
 export const MORE_VIDEOS: MoreVideo[] = MORE_GROUPS.flatMap((g) => g.videos);
+
+/** Labs for Ben's other videos (the digital clock), in order. */
+export const MORE_LAB_IDS: string[] = [...new Set(MORE_VIDEOS.flatMap((v) => (v.lab ? [v.lab] : [])))];
+
+/** Every lab: the playlist's, then those for Ben's other videos. */
+export const ALL_LAB_IDS: string[] = [...LAB_IDS, ...MORE_LAB_IDS];
+
+/** Ben's other videos a lab covers, with their group and part number (1-based). */
+export const moreVideosForLab = (lab: string) =>
+  MORE_GROUPS.flatMap((group) => group.videos.flatMap((video, i) => (video.lab === lab ? [{ group, video, part: i + 1 }] : [])));
+
+/** A video's title without the series name ("Making a square wave square: Breadboard clock part 2" -> "Making a square wave square"). */
+export const shortTitle = (title: string) =>
+  title
+    .replace(/ - (8[- ]bit (computer clock|register)|8-bit register) - [Pp]art \d/, '')
+    .replace(/: Breadboard clock part \d+$/, '')
+    .replace(/ (for my clock|on my breadboard clock)$/, '');
 
 export const watchUrl = (youtubeId: string) => `https://www.youtube.com/watch?v=${youtubeId}`;
 export const videoUrl = (vid: Video) => `https://www.youtube.com/watch?v=${vid.youtubeId}&list=${PLAYLIST_ID}&index=${vid.index}`;

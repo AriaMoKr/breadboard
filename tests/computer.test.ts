@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { CHAPTERS, LAB_IDS, MORE_GROUPS, MORE_VIDEOS, VIDEOS } from '../src/app/chapters';
+import { ALL_LAB_IDS, CHAPTERS, LAB_IDS, MORE_GROUPS, MORE_LAB_IDS, MORE_VIDEOS, VIDEOS } from '../src/app/chapters';
 import { App } from '../src/app/app';
 import { mountComputerWorkbench } from '../src/app/computer-page';
 import { clearLabCache, hasLab, loadLab } from '../src/app/lab-loader';
@@ -685,15 +685,17 @@ describe('integration: chapter map', () => {
     expect(new Set(MORE_GROUPS.map((g) => g.id)).size).toBe(MORE_GROUPS.length);
   });
   it('every lab id in chapters.ts has a *.lab.ts that registers it, and vice versa', () => {
-    const missing = LAB_IDS.filter((id) => !LABS.has(id));
+    expect(MORE_LAB_IDS).toEqual(['mains-60hz', 'square-wave', 'divide-by-60', 'minutes-seconds', 'setting-time']);
+    expect(MORE_LAB_IDS.filter((id) => LAB_IDS.includes(id))).toEqual([]);
+    const missing = ALL_LAB_IDS.filter((id) => !LABS.has(id));
     expect(missing, `labs without a *.lab.ts: ${missing.join(', ')}`).toEqual([]);
-    const orphan = [...LABS.keys()].filter((id) => !LAB_IDS.includes(id));
+    const orphan = [...LABS.keys()].filter((id) => !ALL_LAB_IDS.includes(id));
     expect(orphan, `labs not referenced by chapters.ts: ${orphan.join(', ')}`).toEqual([]);
-    expect(labFiles.length).toBe(LAB_IDS.length);
-    for (const id of LAB_IDS) expect(labFiles.some((f) => f.endsWith(`/${id}.lab.ts`)), `file for ${id}`).toBe(true);
+    expect(labFiles.length).toBe(ALL_LAB_IDS.length);
+    for (const id of ALL_LAB_IDS) expect(labFiles.some((f) => f.endsWith(`/${id}.lab.ts`)), `file for ${id}`).toBe(true);
   });
   it("the app's lazy loader finds every lab by its file name", async () => {
-    for (const id of LAB_IDS) {
+    for (const id of ALL_LAB_IDS) {
       expect(hasLab(id), id).toBe(true);
       expect((await loadLab(id))?.id).toBe(id);
     }
@@ -920,7 +922,7 @@ describe('integration: every lab mounts, runs and cleans up (fake DOM)', () => {
   beforeAll(installFakeDom);
   afterAll(uninstallFakeDom);
 
-  for (const id of LAB_IDS) {
+  for (const id of ALL_LAB_IDS) {
     it(id, () => {
       raf.clear();
       const lab = LABS.get(id);
@@ -1052,7 +1054,7 @@ describe('shared UI pieces (fake DOM)', () => {
     expect(host.querySelectorAll('.lab-root').length).toBe(1);
     expect(host.querySelector('main h1')?.textContent).toBe(LABS.get('conditional-jumps')!.title);
     expect(host.querySelector('.video-card.focused')?.textContent).toContain('Conditional jump');
-    for (const id of LAB_IDS) {
+    for (const id of ALL_LAB_IDS) {
       loc.hash = `#/lab/${id}`;
       app.render();
       await settle();

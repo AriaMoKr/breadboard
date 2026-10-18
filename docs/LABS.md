@@ -8,6 +8,11 @@ automatically: never edit a shared file to register a lab. The app loads each
 so the file name must be exactly `<lab-id>.lab.ts`; `src/labs/registry.ts` is
 the eager map that tests use (a test checks that names and ids agree).
 
+Ben's videos outside the playlist are in `MORE_GROUPS` (also in `chapters.ts`). A video there gets a
+lab through its own `lab` field: the digital clock labs in `src/labs/dclock/` are wired up like that.
+Such labs are in `MORE_LAB_IDS`, and every lab is in `ALL_LAB_IDS`. The sidebar lists them under the
+group's title, and their prev/next links stay within the series.
+
 (Vitest's on-disk module cache would keep the registry's old file list when a lab file is added, so
 `vite.config.ts` turns it off with `fsModuleCache: false`.)
 

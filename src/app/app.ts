@@ -2,7 +2,7 @@ import { buildLabel } from '../build-info';
 import type { Lab } from '../labs/types';
 import { Machine } from '../sim/machine';
 import { h } from '../ui/dom';
-import { CHAPTERS, LAB_IDS, MORE_GROUPS, PLAYLIST_URL, VIDEO_BY_INDEX, embedUrl, videoUrl, videosForLab, watchUrl, type MoreGroup } from './chapters';
+import { CHAPTERS, LAB_IDS, MORE_GROUPS, MORE_LAB_IDS, PLAYLIST_URL, VIDEO_BY_INDEX, embedUrl, moreVideosForLab, shortTitle, videoUrl, videosForLab, watchUrl, type MoreGroup } from './chapters';
 import { mountComputerWorkbench } from './computer-page';
 import { hasLab, loadLab, loadedLab } from './lab-loader';
 
@@ -31,6 +31,8 @@ interface CardVideo {
   duration: string;
   url: string;
   date?: string;
+  /** A lab to link to from the card (on the More videos page). */
+  lab?: string;
 }
 
 const DATE = new Intl.DateTimeFormat('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' });
@@ -76,7 +78,7 @@ export class App {
         'li',
         { class: 'nav-chapter' },
         h('div', { class: 'nav-chapter-title' }, ch.title),
-        h('ol', { class: 'nav-videos' }, ch.videos.map((vid) => h('li', null, h('a', { href: labHref(vid.lab, vid.index), dataset: { lab: vid.lab, video: String(vid.index) } }, h('span', { class: 'nav-num' }, String(vid.index)), h('span', { class: 'nav-title' }, vid.title.replace(/ - (8[- ]bit (computer clock|register)|8-bit register) - [Pp]art \d/, '')), h('span', { class: 'nav-dur' }, vid.duration))))),
+        h('ol', { class: 'nav-videos' }, ch.videos.map((vid) => h('li', null, h('a', { href: labHref(vid.lab, vid.index), dataset: { lab: vid.lab, video: String(vid.index) } }, h('span', { class: 'nav-num' }, String(vid.index)), h('span', { class: 'nav-title' }, shortTitle(vid.title)), h('span', { class: 'nav-dur' }, vid.duration))))),
       ),
     );
     return h(
@@ -87,6 +89,14 @@ export class App {
       h('a', { class: 'nav-computer', href: '#/sandbox', dataset: { route: 'sandbox' } }, '✎ Breadboard sandbox'),
       h('a', { class: 'nav-computer', href: 'vr.html', dataset: { route: 'vr' }, title: 'The breadboard computer in 3D: VR headsets, or mouse and touch' }, '◈ VR view'),
       h('ol', { class: 'nav-chapters' }, items),
+      ...MORE_GROUPS.filter((g) => g.videos.some((v) => v.lab)).map((g) =>
+        h(
+          'div',
+          { class: 'nav-chapter' },
+          h('div', { class: 'nav-chapter-title' }, g.title),
+          h('ol', { class: 'nav-videos' }, g.videos.filter((v) => v.lab).map((v) => h('li', null, h('a', { href: labHref(v.lab!), dataset: { lab: v.lab! } }, h('span', { class: 'nav-num' }, String(g.videos.indexOf(v) + 1)), h('span', { class: 'nav-title' }, shortTitle(v.title)), h('span', { class: 'nav-dur' }, v.duration))))),
+        ),
+      ),
       h(
         'div',
         { class: 'nav-chapter' },
@@ -178,7 +188,7 @@ export class App {
         { class: 'more-group', id: `more-${g.id}` },
         h('h2', null, g.title),
         h('p', { class: 'lede' }, g.text, ' ', h('span', { class: 'dim' }, 'Ben lists them on ', h('a', { href: g.source.href, target: '_blank', rel: 'noopener' }, `${g.source.label} ↗`), '.')),
-        h('div', { class: 'video-list' }, g.videos.map((v, i) => this.videoCard({ ...v, num: g.numbered ? String(i + 1) : undefined, url: watchUrl(v.youtubeId) }, false))),
+        h('div', { class: 'video-list' }, g.videos.map((v, i) => this.videoCard({ ...v, num: g.numbered ? String(i + 1) : undefined, url: watchUrl(v.youtubeId), lab: v.lab }, false))),
       );
     this.main.append(head, ...MORE_GROUPS.map(section));
     if (group) this.main.querySelector(`#more-${group}`)?.scrollIntoView?.();
@@ -212,9 +222,11 @@ export class App {
   }
 
   private async renderLab(id: string, videoIndex: number | undefined, token: number) {
-    const idx = LAB_IDS.indexOf(id);
-    const prev = idx > 0 ? LAB_IDS[idx - 1] : null;
-    const next = idx >= 0 && idx < LAB_IDS.length - 1 ? LAB_IDS[idx + 1] : null;
+    // prev/next within the playlist, or within the series of Ben's other videos
+    const order = LAB_IDS.includes(id) ? LAB_IDS : MORE_LAB_IDS;
+    const idx = order.indexOf(id);
+    const prev = idx > 0 ? order[idx - 1] : null;
+    const next = idx >= 0 && idx < order.length - 1 ? order[idx + 1] : null;
     let lab: Lab | undefined = loadedLab(id);
     if (!lab && hasLab(id)) {
       const pending = h('p', { class: 'dim', style: 'padding: 20px 0' }, 'Loading the lab…');
@@ -228,23 +240,35 @@ export class App {
 
   private mountLab(id: string, lab: Lab | undefined, videoIndex: number | undefined, prev: string | null, next: string | null) {
     const videos = videosForLab(id);
+    const more = moreVideosForLab(id);
     const chapter = CHAPTERS.find((c) => c.videos.some((x) => x.lab === id));
-    const title = lab?.title ?? videos[0]?.title ?? id;
+    const title = lab?.title ?? videos[0]?.title ?? more[0]?.video.title ?? id;
     document.title = `${title} · Breadboard 8-bit`;
-    const labTitle = (lid: string) => loadedLab(lid)?.title ?? videosForLab(lid)[0]?.title ?? lid;
+    const labTitle = (lid: string) => loadedLab(lid)?.title ?? videosForLab(lid)[0]?.title ?? moreVideosForLab(lid)[0]?.video.title ?? lid;
+    const crumbs = chapter
+      ? [chapter.title, videos.length ? ` · video${videos.length > 1 ? 's' : ''} ${videos.map((x) => x.index).join(', ')}` : '']
+      : more.length
+        ? [more[0].group.title, more[0].group.numbered ? ` · part${more.length > 1 ? 's' : ''} ${more.map((x) => x.part).join(', ')}` : '']
+        : ['Lab', ''];
 
     const head = h(
       'div',
       { class: 'page-head' },
-      h('div', { class: 'crumbs' }, chapter ? chapter.title : 'Lab', videos.length ? ` · video${videos.length > 1 ? 's' : ''} ${videos.map((x) => x.index).join(', ')}` : ''),
+      h('div', { class: 'crumbs' }, ...crumbs),
       h('h1', null, title),
       lab ? h('p', { class: 'lede' }, lab.summary) : null,
-      h('div', { class: 'video-list' }, videos.map((vid) => this.videoCard({ ...vid, num: String(vid.index), url: videoUrl(vid) }, vid.index === videoIndex))),
+      h(
+        'div',
+        { class: 'video-list' },
+        videos.map((vid) => this.videoCard({ ...vid, num: String(vid.index), url: videoUrl(vid) }, vid.index === videoIndex)),
+        more.map(({ group, video, part }) => this.videoCard({ ...video, num: group.numbered ? String(part) : undefined, url: watchUrl(video.youtubeId), lab: undefined }, false)),
+      ),
     );
     const body = h('div', { class: 'lab-root' });
     const prevLink = prev ? h('a', { class: 'btn btn-ghost', href: labHref(prev) }, `← ${labTitle(prev)}`) : null;
     const nextLink = next ? h('a', { class: 'btn btn-ghost', href: labHref(next) }, `${labTitle(next)} →`) : null;
-    const nav = h('div', { class: 'lab-nav' }, prevLink ?? h('span'), nextLink ?? h('a', { class: 'btn btn-ghost', href: '#/' }, 'The finished computer →'));
+    const end = more.length ? h('a', { class: 'btn btn-ghost', href: `#/more/${more[0].group.id}` }, 'More videos →') : h('a', { class: 'btn btn-ghost', href: '#/' }, 'The finished computer →');
+    const nav = h('div', { class: 'lab-nav' }, prevLink ?? h('span'), nextLink ?? end);
     // swap in the real lab titles once the neighbours have loaded
     const token = this.renderToken;
     for (const [lid, link, fmt] of [[prev, prevLink, (t: string) => `← ${t}`], [next, nextLink, (t: string) => `${t} →`]] as const) {
@@ -284,7 +308,7 @@ export class App {
       'div',
       { class: `video-card ${focused ? 'focused' : ''}` },
       h('div', { class: 'video-meta' }, vid.num ? h('span', { class: 'nav-num' }, vid.num) : null, h('span', { class: 'video-title' }, vid.title), h('span', { class: 'dim' }, vid.duration), vid.date ? h('span', { class: 'dim small video-date' }, DATE.format(new Date(vid.date))) : null),
-      h('div', { class: 'video-actions' }, watch, h('a', { class: 'btn btn-ghost', href: vid.url, target: '_blank', rel: 'noopener' }, 'YouTube ↗')),
+      h('div', { class: 'video-actions' }, watch, h('a', { class: 'btn btn-ghost', href: vid.url, target: '_blank', rel: 'noopener' }, 'YouTube ↗'), vid.lab ? h('a', { class: 'btn btn-ghost', href: labHref(vid.lab) }, 'Lab →') : null),
       frameHost,
     );
   }

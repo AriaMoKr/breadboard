@@ -47,6 +47,16 @@ video by video.
   flip-flops, JK racing, tri-state buses, registers, two's complement, the ALU, RAM,
   counters, 7-segment and EEPROM decoders, the Arduino EEPROM programmer, the
   multiplexed decimal display, the control logic, microcode, flags and conditional jumps.
+* **Digital clock labs** (`#/lab/mains-60hz` …): a lab for each part of Ben's breadboard clock
+  series published so far. They cover:
+  * the 5 V supply and squaring the 60 Hz from the mains with an LM339 and hysteresis;
+  * the edge detector and ramp that make the square wave independent of the input;
+  * dividing by 60 with the 74LS90 and 74LS92;
+  * the seconds and minutes with CD4511 decoders;
+  * setting the time through an XOR gate, with switch bounce and its debounce.
+
+  The analog parts are small time-step models with Ben's component values (`src/labs/dclock/_analog.ts`).
+  The counters are the sandbox's chip models.
 * **More videos** (`#/more`): Ben's videos outside the playlist that go with it. These are his first
   build running programs and his introduction to transistors and logic gates (both from 2015 and
   linked from eater.net/8bit), plus his digital clock series (2026, eater.net/clock).
@@ -156,7 +166,8 @@ Then open http://localhost:8000/.
 
 Research notes with sources, used for fidelity:
 [docs/research/computer-spec.md](docs/research/computer-spec.md) (exact behaviour of the
-final machine) and [docs/research/videos.md](docs/research/videos.md) (per-video content).
+final machine), [docs/research/videos.md](docs/research/videos.md) (per-video content) and
+[docs/research/clock.md](docs/research/clock.md) (the digital clock series).
 
 ## Credits
 

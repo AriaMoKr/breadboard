@@ -439,6 +439,8 @@ export interface ScopeChannel {
   max?: number;
   /** Optional horizontal guide lines for analog channels (e.g. 1/3 and 2/3 Vcc). */
   guides?: number[];
+  /** Colour of a second, dashed trace in an analog lane (`draw`'s `overlays`), e.g. a moving threshold. */
+  overlayColor?: string;
 }
 
 export class Scope {
@@ -462,9 +464,10 @@ export class Scope {
   /**
    * samples[channel][i]; all channels same length; newest last. `cursor`
    * (and any `markers`) draw vertical lines at a sample position in window
-   * coordinates: 0 is the left edge, `window - 1` the right edge.
+   * coordinates: 0 is the left edge, `window - 1` the right edge. `overlays[c]` adds a dashed
+   * second trace to analog channel c, in its `overlayColor`.
    */
-  draw(samples: (Level | number)[][], opts: { window?: number; cursor?: number | null; markers?: ScopeMarker[] } = {}) {
+  draw(samples: (Level | number)[][], opts: { window?: number; cursor?: number | null; markers?: ScopeMarker[]; overlays?: (number[] | undefined)[] } = {}) {
     const ctx = this.ctx;
     if (!ctx) return;
     const W = this.canvas.width;
@@ -508,13 +511,26 @@ export class Scope {
           ctx.stroke();
           ctx.restore();
         }
-        ctx.beginPath();
-        data.forEach((v, i) => {
-          const px = labelW + (i + offset) * dx;
-          const py = y(typeof v === 'number' ? v : 0);
-          if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
-        });
-        ctx.stroke();
+        const trace = (vals: readonly (Level | number)[]) => {
+          const off = n - vals.length;
+          ctx.beginPath();
+          vals.forEach((v, i) => {
+            const px = labelW + (i + off) * dx;
+            const py = y(typeof v === 'number' ? v : 0);
+            if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+          });
+          ctx.stroke();
+        };
+        trace(data);
+        const over = opts.overlays?.[c];
+        if (over?.length) {
+          ctx.save();
+          ctx.setLineDash([10, 6]);
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = ch.overlayColor ?? fg;
+          trace(over);
+          ctx.restore();
+        }
         return;
       }
       // digital
