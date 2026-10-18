@@ -273,13 +273,16 @@ export function mountSandboxPage(root: HTMLElement): () => void {
       else drawGhost(candidate(hit));
     });
     svg.addEventListener('pointerleave', () => drawGhost(null, pending ?? undefined));
+    // Delete takes the click before the part does (capture): a switch's own click handler would
+    // flip it and keep the click to itself.
     svg.addEventListener('click', (e) => {
-      if (pz.wasDrag()) return;
+      if (tool.kind !== 'delete' || pz.wasDrag()) return;
+      e.stopPropagation();
       const target = (e.target as Element).closest('[data-part]') as SVGGElement | null;
-      if (tool.kind === 'delete') {
-        if (target?.dataset.part) commit({ ...layout, parts: layout.parts.filter((p) => p.id !== target.dataset.part) });
-        return;
-      }
+      if (target?.dataset.part) commit({ ...layout, parts: layout.parts.filter((p) => p.id !== target.dataset.part) });
+    }, true);
+    svg.addEventListener('click', (e) => {
+      if (pz.wasDrag() || tool.kind === 'delete') return;
       const hit = view.holeAt(view.scenePoint(e.clientX, e.clientY));
       if (hit) setStatus(holeInfo(hit.board, hit.hole)); // touch screens have no hover
       if (!hit || tool.kind === 'select' || tool.kind === 'probe') return;

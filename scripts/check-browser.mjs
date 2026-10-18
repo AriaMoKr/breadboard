@@ -180,11 +180,18 @@ try {
     const dragged = await parts();
     assert(Math.abs(moved - 80) < 2, `an 80 px drag moved the board ${moved.toFixed(1)} px`);
     assert(dragged === 'chip wire', `the drag placed something: "${dragged}"`);
+    await tool('Slide switch');
+    await click(await hole('a', 30));
+    await tool('4-position DIP');
+    await click(await hole('f', 40));
+    const switches = await parts();
+    assert(switches === 'chip wire slide dip', `a slide and a DIP switch by clicks: "${switches}"`);
+    // Delete takes switches too, whose own click handlers would flip them
     await tool('Remove parts');
-    await click(await centre('.bb-svg [data-part^="U"]'));
+    for (const part of ['[data-part^="U"]', '.bb-slide', '.bb-dip']) await click(await centre(`.bb-svg ${part}`));
     const left = await parts();
-    assert(left === 'wire', `a click on the chip with Delete left: "${left}"`);
-    return 'a 74LS00 and a wire by clicks, an 80 px pan, the chip deleted';
+    assert(left === 'wire', `clicks on the chip and the switches with Delete left: "${left}"`);
+    return 'a 74LS00, a wire and two switches by clicks, an 80 px pan, the chip and switches deleted';
   });
 
   await check('breadboard view keeps its frame rate while running', async () => {
