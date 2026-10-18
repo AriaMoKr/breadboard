@@ -41,6 +41,14 @@ host.appendChild(renderer.domElement);
 const vrButton = VRButton.createButton(renderer); // "Enter VR" on the page; the panel's VR button clicks it too
 document.body.appendChild(vrButton);
 const inVR = () => renderer.xr.isPresenting;
+// three's button offers the browser a session when it is made (for the browser's own Enter VR,
+// navigator.xr.offerSession), and its Exit VR offers another. After a session the button started,
+// the first offer is still open and a second cancels it, with a warning in the console: so leave
+// such a session by ending it, and through the button only one that took the browser's offer.
+let clicked = false;
+let fromButton = false;
+vrButton.addEventListener('click', () => (clicked = !inVR()));
+const exitVR = () => (fromButton ? void renderer.xr.getSession()?.end() : vrButton.click());
 let vrSupported = false;
 void navigator.xr?.isSessionSupported('immersive-vr').then((ok) => {
   vrSupported = ok;
@@ -166,7 +174,7 @@ function setExhibit(next: Exhibit, c: ExhibitChoice) {
       { label: () => (inVR() ? 'Put back' : 'Fit view'), run: () => (putBack(), inVR() || homeView()) },
       // In a headset, the way out without the system menu. A click on it counts as the user's
       // gesture that a browser wants before it starts VR, so on a screen it enters VR.
-      { label: () => (inVR() ? 'Exit VR' : 'Enter VR'), run: () => vrButton.click(), disabled: () => !inVR() && !vrSupported },
+      { label: () => (inVR() ? 'Exit VR' : 'Enter VR'), run: () => (inVR() ? exitVR() : vrButton.click()), disabled: () => !inVR() && !vrSupported },
     ],
     next.title,
     buildLabel(),
@@ -355,8 +363,10 @@ function pointControllers() {
   else showTip(); // follow the boards while they are carried
 }
 renderer.xr.addEventListener('sessionstart', () => {
+  fromButton = clicked;
+  clicked = false;
   dirty = true;
-  debugLog('session', { vr: true });
+  debugLog('session', { vr: true, from: fromButton ? 'button' : 'browser' });
 });
 
 // With ?debug in the URL, what the controllers do goes to the console as "[vr] …" lines: to see
