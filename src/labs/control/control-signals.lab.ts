@@ -4,7 +4,7 @@ import { PROGRAM_BY_ID } from '../../sim/programs';
 import { SIGNAL_BITS, SIGNAL_INFO, SIGNALS, formatControlWord, type ModuleId, type Signal } from '../../sim/signals';
 import { Led, note, panel } from '../../ui/components';
 import { ComputerView } from '../../ui/computer-view';
-import { Disposer, h, setClass, setText } from '../../ui/dom';
+import { Disposer, growOnly, h, setClass, setText } from '../../ui/dom';
 import { defineLab } from '../types';
 import { describeTransfer } from './_models';
 import { highlightModules, machineToolbar, scopedStyle } from './_shared';
@@ -162,6 +162,7 @@ export default defineLab({
       h('table', { class: 'truth-table', style: 'text-align:left' }, h('thead', null, h('tr', null, ['', 'step', 'control word', 'what moves'].map((x) => h('th', null, x)))), h('tbody', null, wrows.map((r) => r.tr))),
     );
     const now = h('div', { class: 'callout' });
+    growOnly(now); // changes with every clock edge; the clock's buttons are below it on phones
 
     const update = () => {
       const c = m.computer;

@@ -94,6 +94,29 @@ export function animate(cb: (dtMs: number, nowMs: number) => void): () => void {
   };
 }
 
+/**
+ * Let a box whose text follows the running clock grow but not shrink back, so what comes after
+ * it stays where it is: otherwise the buttons below jump up and down as the text wraps onto more
+ * or fewer lines, and a tap aimed at one lands on whatever moved under the finger. It starts
+ * over when its width changes (a turned phone, a resized window), as the text then wraps anew.
+ */
+export function growOnly(el: HTMLElement): void {
+  if (typeof ResizeObserver === 'undefined') return;
+  el.style.boxSizing = 'border-box';
+  let width = -1;
+  let tallest = 0;
+  new ResizeObserver(() => {
+    const r = el.getBoundingClientRect();
+    if (Math.abs(r.width - width) > 0.5) {
+      width = r.width;
+      el.style.minHeight = '';
+      tallest = el.getBoundingClientRect().height;
+    } else if (r.height > tallest) tallest = r.height;
+    else return;
+    el.style.minHeight = `${tallest}px`;
+  }).observe(el);
+}
+
 /** Collects cleanup callbacks; call `dispose()` once. */
 export class Disposer {
   private fns: (() => void)[] = [];

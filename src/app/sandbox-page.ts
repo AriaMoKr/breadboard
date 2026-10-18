@@ -378,7 +378,7 @@ export function mountSandboxPage(root: HTMLElement): () => void {
   if (narrow) d.listen(narrow, 'change', () => (drawer.open = !narrow.matches));
 
   // ---- toolbar ----------------------------------------------------------------
-  const runBtn = new Button({ label: 'Pause', onClick: () => { running = !running; runBtn.setLabel(running ? 'Pause' : 'Run'); } });
+  const runBtn = new Button({ label: 'Pause', labels: ['Pause', 'Run'], onClick: () => { running = !running; runBtn.setLabel(running ? 'Pause' : 'Run'); } });
   const speedSlider = new Slider({ label: 'Speed', min: 1, max: 5000, value: speed, log: true, format: (v) => `${Math.round(v)} gate delays/frame`, onInput: (v) => (speed = Math.round(v)) });
   const exampleHost = h('span');
   const toolbar = h(

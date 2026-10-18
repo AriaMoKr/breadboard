@@ -89,7 +89,7 @@ export function mountBreadboardPage(root: HTMLElement, opts: { machine?: Machine
   d.add(animate((dt) => machine.frame(dt)));
 
   // ---- toolbar ----
-  const run = new Button({ label: 'Run', kind: 'primary', onClick: () => (machine.running && machine.mode === 'auto' ? machine.stop() : machine.start()) });
+  const run = new Button({ label: 'Run', labels: ['Run', 'Stop'], kind: 'primary', onClick: () => (machine.running && machine.mode === 'auto' ? machine.stop() : machine.start()) });
   const pulse = new Button({ label: 'Clock pulse', shortLabel: 'Pulse', onClick: () => machine.pulse() });
   const step = new Button({ label: 'Step instruction', shortLabel: 'Step', onClick: () => machine.stepInstruction() });
   const reset = new Button({ label: 'Reset', kind: 'danger', onClick: () => machine.reset() });

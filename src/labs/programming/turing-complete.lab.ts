@@ -2,7 +2,7 @@ import { mountComputerWorkbench } from '../../app/computer-page';
 import { Machine } from '../../sim/machine';
 import type { MicrocodeVersionId } from '../../sim/microcode';
 import { Button, note, panel, row, select } from '../../ui/components';
-import { Disposer, animate, h, s, setClass, setText } from '../../ui/dom';
+import { Disposer, animate, growOnly, h, s, setClass, setText } from '../../ui/dom';
 import { onRisingEdge, scopedStyle } from '../control/_shared';
 import { defineLab } from '../types';
 import { INCREMENTER, multiplyNoBranchSource, multiplySource, tapeValue, tmFindRule, tmInit, tmStep, type TmRule, type TmState } from './_models';
@@ -57,6 +57,7 @@ export default defineLab({
     let tmRunning = false;
     const tapeEl = h('div', { class: 'tape', 'aria-label': 'Tape' });
     const tmState = h('div', { class: 'callout' });
+    growOnly(tmState); // changes with every step of the machine, above the buttons
     const ruleRows = INCREMENTER.map((r) => ({
       r,
       tr: h('tr', null, h('td', null, r.state), h('td', null, r.read), h('td', null, r.write), h('td', null, r.move < 0 ? '← left' : r.move > 0 ? 'right →' : 'stay'), h('td', null, r.next)),
@@ -64,7 +65,7 @@ export default defineLab({
     const ruleTable = h('table', { class: 'truth-table' }, h('thead', null, h('tr', null, ['state', 'read', 'write', 'move', 'next state'].map((x) => h('th', null, x)))), h('tbody', null, ruleRows.map((x) => x.tr)));
     const inputSel = select(['1011', '111', '1001', '0', '10111'].map((v) => ({ value: v, label: v })), '1011', (v) => { tm = tmInit(v); lastRule = null; renderTm(); }, 'Start with');
     const stepB = new Button({ label: 'Step', kind: 'primary', onClick: () => { lastRule = tmStep(INCREMENTER, tm); renderTm(); } });
-    const runB = new Button({ label: 'Run', onClick: () => { tmRunning = !tmRunning; renderTm(); } });
+    const runB = new Button({ label: 'Run', labels: ['Run', 'Pause'], onClick: () => { tmRunning = !tmRunning; renderTm(); } });
     const resetB = new Button({ label: 'Reset', onClick: () => { tm = tmInit((inputSel.querySelector('select') as HTMLSelectElement).value); lastRule = null; tmRunning = false; renderTm(); } });
     const renderTm = () => {
       tapeEl.replaceChildren(...tm.tape.map((sym, i) => h('div', { class: `cell ${i === tm.head ? 'head' : ''} ${sym === '_' ? 'blank' : ''}` }, sym === '_' ? '·' : sym)));
@@ -145,6 +146,7 @@ export default defineLab({
     const iOut = h('span', { class: 'big' });
     const spark = s('svg', { viewBox: '0 0 320 110', class: 'spark', role: 'img', 'aria-label': 'product after each pass through the loop' });
     const status = h('div', { class: 'callout' });
+    growOnly(status); // follows the program as it runs
     let lastLen = -1;
     const renderSpark = () => {
       if (products.length === lastLen) return;

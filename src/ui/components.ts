@@ -148,6 +148,11 @@ export interface ButtonOptions {
   label: string;
   /** Shown instead of `label` on narrow screens (e.g. "Pulse" for "Clock pulse"). */
   shortLabel?: string;
+  /**
+   * Every label `setLabel` will show (["Run", "Stop"]): the button stays as wide as the widest,
+   * so the buttons after it don't move when it changes.
+   */
+  labels?: string[];
   title?: string;
   kind?: 'default' | 'primary' | 'danger' | 'ghost';
   onClick?: () => void;
@@ -160,7 +165,11 @@ export interface ButtonOptions {
 export class Button {
   readonly el: HTMLButtonElement;
   constructor(opts: ButtonOptions) {
-    const label = opts.shortLabel ? [h('span', { class: 'btn-label-long' }, opts.label), h('span', { class: 'btn-label-short' }, opts.shortLabel)] : opts.label;
+    const label = opts.labels
+      ? h('span', { class: 'btn-labels' }, opts.labels.map((t) => h('span', { class: t === opts.label ? 'shown' : '' }, t)))
+      : opts.shortLabel
+        ? [h('span', { class: 'btn-label-long' }, opts.label), h('span', { class: 'btn-label-short' }, opts.shortLabel)]
+        : opts.label;
     this.el = h('button', { class: `btn btn-${opts.kind ?? 'default'}`, title: opts.title, type: 'button', disabled: opts.disabled }, label);
     if (opts.onClick) this.el.addEventListener('click', opts.onClick);
     if (opts.onPress || opts.onRelease) {
@@ -185,9 +194,12 @@ export class Button {
       this.el.addEventListener('keyup', (e) => (e.key === ' ' || e.key === 'Enter') && release());
     }
   }
-  /** Replaces the label (and any short label). */
+  /** Replaces the label (and any short label), or shows another of `labels`. */
   setLabel(text: string) {
-    setText(this.el, text);
+    const labels = this.el.querySelector(':scope > .btn-labels');
+    if (labels && [...labels.children].some((l) => l.textContent === text)) {
+      for (const l of labels.children) setClass(l, 'shown', l.textContent === text);
+    } else setText(this.el, text);
   }
   setDisabled(d: boolean) {
     this.el.disabled = d;

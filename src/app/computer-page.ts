@@ -57,7 +57,7 @@ export function mountComputerWorkbench(root: HTMLElement, opts: ComputerWorkbenc
   d.add(() => view.dispose());
 
   // ---- toolbar ----
-  const runBtn = new Button({ label: 'Run', kind: 'primary', title: 'Start/stop the astable clock (R)', onClick: () => (machine.running && machine.mode === 'auto' ? machine.stop() : machine.start()) });
+  const runBtn = new Button({ label: 'Run', labels: ['Run', 'Stop'], kind: 'primary', title: 'Start/stop the astable clock (R)', onClick: () => (machine.running && machine.mode === 'auto' ? machine.stop() : machine.start()) });
   const stepBtn = new Button({ label: 'Clock pulse', shortLabel: 'Pulse', title: 'One clock cycle (Space)', onClick: () => machine.pulse() });
   const instrBtn = new Button({ label: 'Step instruction', shortLabel: 'Step', title: 'Run until the next T0 (I)', onClick: () => machine.stepInstruction() });
   const resetBtn = new Button({ label: 'Reset', kind: 'danger', title: 'Reset (Backspace)', onClick: () => machine.reset() });

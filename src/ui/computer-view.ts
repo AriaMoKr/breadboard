@@ -313,7 +313,7 @@ export class ComputerView {
     const tLeds = Array.from({ length: 5 }, (_, i) => new Led('green', `T${i}`));
     const cwBar = new LedBar({ bits: 16, color: 'blue', captions: [...SIGNALS] });
     cwBar.el.classList.add('control-word');
-    const text = h('span', { class: 'mono' });
+    const text = h('span', { class: 'mono cw-text' });
     const reset = new Button({ label: 'Reset', kind: 'danger', title: 'Clear PC, step counter and registers (RAM is kept)', onClick: () => m.reset() });
     this.on(() => {
       steps.set(c.step);

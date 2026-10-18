@@ -8,7 +8,7 @@ import type { Machine } from '../../sim/machine';
 import { microIndex } from '../../sim/microcode';
 import { HLT, SIGNAL_BITS, SIGNAL_INFO, SIGNALS, formatControlWord, type ModuleId, type Signal } from '../../sim/signals';
 import { Button, Toggle, select } from '../../ui/components';
-import { Disposer, h, setClass, setText } from '../../ui/dom';
+import { Disposer, growOnly, h, setClass, setText } from '../../ui/dom';
 import { describeTransfer, explainMicrostepMistake, microstepGoal } from './_models';
 
 // ---------------------------------------------------------------------------
@@ -214,7 +214,7 @@ export interface ToolbarOptions {
 
 export function machineToolbar(m: Machine, opts: ToolbarOptions = {}): { el: HTMLElement; dispose: () => void } {
   const d = new Disposer();
-  const run = new Button({ label: 'Run', kind: 'primary', title: 'Start/stop the astable clock', onClick: () => (m.running && m.mode === 'auto' ? m.stop() : m.start()) });
+  const run = new Button({ label: 'Run', labels: ['Run', 'Stop'], kind: 'primary', title: 'Start/stop the astable clock', onClick: () => (m.running && m.mode === 'auto' ? m.stop() : m.start()) });
   const pulse = new Button({ label: 'Clock pulse', title: 'One clock cycle (Space)', onClick: () => m.pulse() });
   const instr = new Button({ label: 'Step instruction', title: 'Clock until the next T0', onClick: () => m.stepInstruction() });
   const reset = new Button({ label: 'Reset', kind: 'danger', onClick: () => m.reset() });
@@ -401,6 +401,8 @@ export class ControlUnitExercise {
     const stepsEl = h('div', { class: 'cu-steps' });
     const goal = h('div', { class: 'callout' });
     const fb = h('div', { class: 'cu-feedback' });
+    // these change with every step (every clock pulse while it runs): what's below mustn't move
+    for (const el of [stepsEl, goal, fb]) growOnly(el);
     const score = h('span', { class: 'mono dim small' });
 
     const setWord = (w: number) => {

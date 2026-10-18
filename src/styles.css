@@ -285,6 +285,7 @@ pre.error { color: var(--danger); white-space: pre-wrap; }
 .bus-warn.show { display: block; }
 .alu-eq { font-size: 0.8rem; }
 .tleds { display: inline-flex; gap: 6px; }
+.cw-text { min-width: 15ch; } /* "T4: AI|EO|SU|FI", the longest: Reset after it stays put */
 .control-word .ledbar-leds { gap: 7px; flex-wrap: wrap; }
 .control-word .led-caption { min-width: 22px; text-align: center; }
 .manual-switches { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 8px; }
@@ -296,6 +297,10 @@ pre.error { color: var(--danger); white-space: pre-wrap; }
 .toolbar .status { margin-left: auto; font-size: 0.8rem; }
 .workbench-toolbar { position: sticky; top: var(--topbar-h); z-index: 10; background: var(--bg); padding: 6px 0; border-bottom: 1px solid var(--border); }
 .btn-label-short { display: none; }
+/* a button's labels on top of each other, the one showing visible: as wide as the widest */
+.btn-labels { display: inline-grid; justify-items: center; }
+.btn-labels > span { grid-area: 1 / 1; visibility: hidden; }
+.btn-labels > span.shown { visibility: visible; }
 .tabs { display: flex; border-bottom: 1px solid var(--border); background: var(--panel-2); }
 .tabs button { flex: 1; font: inherit; font-size: 0.84rem; font-weight: 600; background: none; border: 0; color: var(--fg-dim); padding: 9px 8px; cursor: pointer; border-bottom: 2px solid transparent; }
 .tabs button.active { color: var(--fg); border-bottom-color: var(--accent); }
@@ -313,7 +318,7 @@ table.memory th { color: var(--fg-faint); font-weight: 500; text-align: left; fo
 table.memory td { padding: 1px 4px; white-space: nowrap; }
 table.memory tr.pc { background: color-mix(in srgb, var(--led-green) 12%, transparent); }
 table.memory tr.mar td.mem-marker { color: var(--led-yellow); }
-.mem-marker { width: 26px; color: var(--led-green); font-size: 0.7rem; }
+.mem-marker { width: 26px; min-width: 26px; color: var(--led-green); font-size: 0.7rem; } /* a squeezed table would size it to its ▶ and ●, moving the bits as they come and go */
 .bits { display: flex; gap: 2px; }
 .bit { width: 11px; height: 11px; border-radius: 50%; border: 1px solid rgba(0, 0, 0, 0.3); background: var(--led-off); padding: 0; cursor: pointer; }
 .bit.on { background: var(--led-red); box-shadow: 0 0 4px var(--led-red); }

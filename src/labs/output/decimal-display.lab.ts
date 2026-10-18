@@ -2,7 +2,7 @@ import { Circuit } from '../../logic/circuit';
 import { bin, hex } from '../../sim/assembler';
 import { DEC_DIGITS, MINUS, toSigned8 } from '../../sim/display';
 import { Button, DipSwitch, Led, Slider, Toggle, note, panel, row } from '../../ui/components';
-import { Disposer, animate, h, s, setText } from '../../ui/dom';
+import { Disposer, animate, growOnly, h, s, setText } from '../../ui/dom';
 import { Schematic } from '../../ui/schematic';
 import { busLine, ledCell, ledRow, liveText, makeTable, scopedStyle } from '../ram/_ui';
 import { defineLab } from '../types';
@@ -71,6 +71,7 @@ export default defineLab({
     const enLeds = [3, 2, 1, 0].map((k) => new Led('yellow', `${DIGIT_NAMES[k]} enabled (Y̅${k} low)`));
     const digitCells = digits.map((g, i) => h('div', { class: 'digit' }, g.el, ledCell(enLeds[i], DIGIT_NAMES[3 - i])));
     const dispCallout = h('div', { class: 'callout' });
+    growOnly(dispCallout); // follows the 555, above the switches on phones
     const timingText = h('div', { class: 'mono small' });
 
     // ---- clock controls ----
