@@ -23,7 +23,7 @@ video by video.
   a wire or a two-legged part when picked up by that end. **Step** (key S)
   pauses it and moves it on to the next change: a gate delay at a time while a change spreads
   through the gates, or on to the 555's next edge when nothing else is coming. It comes with
-  five example circuits, and **Share link** puts your circuit in a link (`#/sandbox/c1.…`) that
+  seven example circuits, two of them from the digital clock (its ÷60 divider and its seconds), and **Share link** puts your circuit in a link (`#/sandbox/c1.…`) that
   opens it in anyone's sandbox. **View in VR** shows it in the VR view. See
   [docs/BREADBOARD.md](docs/BREADBOARD.md).
 * **VR view** (`vr.html`): the breadboard computer in 3D on a table, run live by the simulator,
@@ -37,7 +37,7 @@ video by video.
   as the breadboard view (`src/vr/`), at 1.5x real size. It also shows sandbox circuits:
   `vr.html#c1.…` (the code from a share link, or the sandbox's **View in VR**) or
   `vr.html#example/<id>`, run by the sandbox's chip-level engine. **Next ▸** on the panel goes
-  through the computer and the five examples.
+  through the computer and the seven examples.
   In VR the speed pot changes the speed evenly, tenfold per ~100° of twist (Ben's linear pot
   crowds 7–480 Hz into its first tenth). `vr.html?debug` logs to the console what the
   controllers do and, once a second, how evenly the frames come, to read from a headset over

@@ -3,8 +3,10 @@ import aRegister from '../src/breadboard/boards/a-register.board';
 import { EXAMPLES, exampleById } from '../src/breadboard/examples';
 import { COUNTER_HALF_PERIOD, buildCounter } from '../src/breadboard/examples/counter';
 import { buildDLatch } from '../src/breadboard/examples/d-latch';
+import { DIVIDE60_HALF_PERIOD, buildDivide60 } from '../src/breadboard/examples/divide60';
 import { buildHexDisplay } from '../src/breadboard/examples/hex-display';
 import { buildRegister } from '../src/breadboard/examples/register';
+import { SECONDS_HALF_PERIOD, buildSeconds } from '../src/breadboard/examples/seconds';
 import { buildSrLatch } from '../src/breadboard/examples/sr-latch';
 import { RAILS, RAIL_COLUMNS, ROWS } from '../src/breadboard/geometry';
 import { LayoutBuilder, SEG7_PINS, validateLayout, type BoardBuilder, type Layout, type Part } from '../src/breadboard/layout';
@@ -853,7 +855,7 @@ describe('BreadboardSim: ports and time', () => {
 
 describe('examples', () => {
   it('are valid, powered layouts that simulate without problems', () => {
-    expect(EXAMPLES.map((e) => e.id)).toEqual(['sr-latch', 'd-latch', 'counter', 'register', 'hex-display']);
+    expect(EXAMPLES.map((e) => e.id)).toEqual(['sr-latch', 'd-latch', 'counter', 'register', 'hex-display', 'divide-60', 'seconds']);
     for (const ex of EXAMPLES) {
       expect(exampleById(ex.id)).toBe(ex);
       expect(ex.title.length).toBeGreaterThan(0);
@@ -868,6 +870,57 @@ describe('examples', () => {
       expect(ex.build()).toEqual(L); // a fresh copy every time
     }
     expect(exampleById('nope')).toBeUndefined();
+  });
+
+  it('divide-60: each stage of the 74LS90 and 74LS92 halves or thirds the last, 60 in to 1 out', () => {
+    const sim = new BreadboardSim(buildDivide60());
+    const nets: [string, number | string][] = [['U1', 'OUT'], ['U2', 'Q0'], ['U2', 'Q3'], ['U3', 'Q0'], ['U3', 'Q2']];
+    const falls = nets.map(() => 0);
+    let last = nets.map(([u, pin]) => sim.pinLevel(u, pin));
+    for (let t = 0; t < 120 * 2 * DIVIDE60_HALF_PERIOD; t++) {
+      sim.step(1);
+      const now = nets.map(([u, pin]) => sim.pinLevel(u, pin));
+      now.forEach((l, i) => l === 0 && last[i] === 1 && falls[i]++);
+      last = now;
+    }
+    // 120 pulses: 60, 30, 6, 3 and 1 Hz make 120, 60, 12, 6 and 2 falling edges (give or take the first)
+    expect(falls[0]).toBeGreaterThanOrEqual(119);
+    expect(falls.slice(1)).toEqual([Math.floor(falls[0] / 2), Math.floor(falls[0] / 10), Math.floor(falls[0] / 20), Math.floor(falls[0] / 60)]);
+    expect(sim.problems()).toEqual([]);
+  });
+
+  it('seconds: the displays count 00 to 59 and wrap, ZERO resets them', () => {
+    const sim = new BreadboardSim(buildSeconds());
+    // the CD4511's digits as dp a b c d e f g bytes (6 and 9 without tails)
+    const SEG = ['1111110', '0110000', '1101101', '1111001', '0110011', '1011011', '0011111', '1110000', '1111111', '1110011'].map((a2g) => parseInt(a2g, 2));
+    const shown = () => {
+      const [t, u] = [sim.seg7('DS1'), sim.seg7('DS2')].map((byte) => SEG.indexOf(byte));
+      return t < 0 || u < 0 ? -1 : 10 * t + u;
+    };
+    expect(shown()).toBe(0);
+    let pulses = 0;
+    let out = sim.pinLevel('U1', 'OUT');
+    const seen: number[] = [];
+    while (pulses < 65) {
+      sim.step(1);
+      const now = sim.pinLevel('U1', 'OUT');
+      if (out === 1 && now === 0) {
+        pulses++;
+        sim.step(20); // let the ripple through the counters settle
+        seen.push(shown());
+      }
+      out = now;
+    }
+    expect(seen).toEqual(Array.from({ length: 65 }, (_, k) => (k + 1) % 60));
+    sim.press('S1');
+    sim.step(20);
+    expect(shown()).toBe(0);
+    sim.step(4 * SECONDS_HALF_PERIOD);
+    expect(shown(), 'held at 00 while ZERO is down').toBe(0);
+    sim.release('S1');
+    sim.step(4 * SECONDS_HALF_PERIOD);
+    expect(shown()).toBe(2);
+    expect(sim.problems()).toEqual([]);
   });
 
   it('sr-latch: S sets, R resets, released holds, both pressed turns both outputs off', () => {

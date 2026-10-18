@@ -1,8 +1,10 @@
 import type { Layout } from '../layout';
 import { buildCounter } from './counter';
 import { buildDLatch } from './d-latch';
+import { buildDivide60 } from './divide60';
 import { buildHexDisplay } from './hex-display';
 import { buildRegister } from './register';
+import { buildSeconds } from './seconds';
 import { buildSrLatch } from './sr-latch';
 
 /** A ready-made circuit for the breadboard sandbox, simulated by BreadboardSim. */
@@ -43,6 +45,18 @@ export const EXAMPLES: BreadboardExample[] = [
     title: 'EEPROM hex display',
     description: 'A 28C16 EEPROM used as a lookup table: the DIP switch sets the address, and the byte stored there (Ben\'s hex-digit table) lights a common-anode 7-segment display.',
     build: buildHexDisplay,
+  },
+  {
+    id: 'divide-60',
+    title: 'Divide by 60 (clock part 3)',
+    description: 'Ben’s 60 Hz divider from his digital clock: a 74LS90 divides by 2 and 5, a 74LS92 by 2 and 3, so the red LED blinks once for every 60 pulses. A 555 stands in for the 60 Hz he takes from the mains.',
+    build: buildDivide60,
+  },
+  {
+    id: 'seconds',
+    title: 'Seconds 00-59 (clock part 4)',
+    description: 'The seconds of Ben’s digital clock: a 74LS90 counts the units, a 74LS92 the tens 0-5, and two CD4511 decoders light the displays. ZERO resets them. A 555 stands in for the one pulse a second.',
+    build: buildSeconds,
   },
 ];
 
