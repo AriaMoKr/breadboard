@@ -2,7 +2,7 @@
 // (check-browser.mjs, make-icons.mjs). Needs Node 22+ (built-in WebSocket) and an installed
 // Chrome, Edge or Chromium; set CHROME_PATH to choose one.
 import { spawn } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -33,6 +33,14 @@ export function findChrome() {
 export async function launchChrome() {
   if (typeof WebSocket === 'undefined') throw new Error('This script needs Node 22 or newer (built-in WebSocket).');
   const profile = mkdtempSync(join(tmpdir(), 'bb-chrome-'));
+  if (process.platform === 'win32') {
+    // A new profile makes Chrome on Windows test whether the account's password is blank by logging
+    // on with an empty one. Each test is a failed logon, and ten in ten minutes lock the account, so
+    // hand Chrome the answer stamped now; it only retests if the password changes after that.
+    const now = (BigInt(Date.now()) + 11644473600000n) * 1000n; // Chrome's clock: microseconds since 1601
+    const localState = { password_manager: { os_password_blank: false, os_password_last_changed: String(now) } };
+    writeFileSync(join(profile, 'Local State'), JSON.stringify(localState));
+  }
   const args = ['--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`, '--no-first-run', '--no-default-browser-check', '--disable-extensions', 'about:blank'];
   const proc = spawn(findChrome(), args, { stdio: 'ignore' });
   let port = '';
