@@ -50,6 +50,7 @@ video by video.
   (`src/vr/hallway.ts`). The doorway shows the room through `public/hallway-preview.jpg`, the
   view from eye height 1.2 m behind the start, framed as the Hallway hangs a door's picture
   (`npm run preview-image` renders it again after the room changes).
+  [![The VR view's room seen from just inside its door: the computer on a table, its control panel behind it](public/hallway-preview.jpg)](https://ariamokr.github.io/breadboard/vr.html)
 * **Chapter labs** (`#/lab/<id>`): each of the 44 videos maps to an interactive lab
   that rebuilds what that video builds. Examples: the 555 timer modes, SR/D latches,
   flip-flops, JK racing, tri-state buses, registers, two's complement, the ALU, RAM,
