@@ -51,11 +51,15 @@ export class ControlPanel {
   /** Status redraws (each a texture upload), for the debug log. */
   statusDraws = 0;
 
-  /** `note`: small print in the bottom right corner (which version this is). */
-  constructor(actions: PanelAction[], title: string, note = '') {
+  /**
+   * `note`: small print in the bottom right corner (which version this is). `corner`: a smaller
+   * button in the top right corner, beside the title (the way back to the Hallway, hallway.ts).
+   */
+  constructor(actions: PanelAction[], title: string, note = '', corner?: PanelAction) {
     // two rows of four buttons, or of five (wider, not taller: the screen's home view shows it whole)
     const cols = actions.length > 8 ? 5 : 4, rows = Math.ceil(actions.length / cols);
     const W = 0.032 + cols * 0.142, H = 0.196 + rows * 0.072; // 0.6 x 0.34 for 2 x 4
+    const cw = 0.15, ch = 0.044, inset = 0.016; // the corner button
     const back = new CanvasPlane(W, H);
     back.draw((g, w, h) => {
       g.fillStyle = 'rgba(23, 26, 33, 0.94)';
@@ -65,7 +69,11 @@ export class ControlPanel {
       g.lineWidth = 4;
       g.stroke();
       g.fillStyle = '#e6e8ee';
+      // smaller, not cut off, when a long title meets the corner button
+      const room = w - 56 - (corner ? (cw + inset) * PX_PER_M : 0);
       g.font = '600 34px system-ui, sans-serif';
+      const wide = g.measureText(title).width;
+      if (wide > room) g.font = `600 ${Math.floor((34 * room) / wide)}px system-ui, sans-serif`;
       g.fillText(title, 28, 52);
       g.fillStyle = '#6b7385';
       g.font = '400 17px ui-monospace, Consolas, monospace';
@@ -87,6 +95,13 @@ export class ControlPanel {
       this.targets.push(plane.mesh);
       this.buttons.push({ action, plane, text: '', hover: false, flash: 0 });
     });
+    if (corner) {
+      const plane = new CanvasPlane(cw, ch);
+      plane.mesh.position.set(W / 2 - inset - cw / 2, H / 2 - inset - ch / 2, 0.004);
+      this.group.add(plane.mesh);
+      this.targets.push(plane.mesh);
+      this.buttons.push({ action: corner, plane, text: '', hover: false, flash: 0 });
+    }
     this.refresh(true);
   }
 
@@ -108,7 +123,7 @@ export class ControlPanel {
         g.font = `600 ${Math.round(h * 0.42)}px system-ui, sans-serif`;
         g.textAlign = 'center';
         g.textBaseline = 'middle';
-        g.fillText(text, w / 2, h / 2 + 1);
+        g.fillText(text, w / 2, h / 2 + 1, w - 16); // a long label (another host's name) squeezed in
       });
     }
   }

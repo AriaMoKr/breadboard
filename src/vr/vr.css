@@ -7,7 +7,8 @@ html, body { margin: 0; height: 100%; background: #111318; color: #e6e8ee; font-
 .vr-bar > * { pointer-events: auto; }
 .vr-bar a { color: #8ab8ff; text-decoration: none; font-weight: 600; }
 .vr-bar h1 { font-size: 1rem; margin: 0; }
-.vr-hint { color: #9aa3b2; font-size: 0.85rem; }
+/* only words: a click on them goes to the scene, where the panel's top can sit under them */
+.vr-hint { color: #9aa3b2; font-size: 0.85rem; pointer-events: none; }
 .vr-status { position: fixed; left: 16px; bottom: 64px; z-index: 2; margin: 0; color: #9aa3b2; font: 0.8rem ui-monospace, Consolas, monospace; }
 @media (max-width: 600px) { .vr-hint { display: none; } }
 .vr-build { margin-left: auto; color: #6b7385; font: 0.72rem ui-monospace, Consolas, monospace; }

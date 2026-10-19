@@ -9,6 +9,11 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <meta name="theme-color" content="#111318" />
+    <script>
+      // Walking in through a door of the Hallway in VR, Quest Browser may grant this page a session
+      // without a click, before src/vr/main.ts has loaded: note it, for main.ts to take.
+      if (navigator.xr && navigator.xr.addEventListener) navigator.xr.addEventListener('sessiongranted', function () { window.breadboardXrGranted = true; });
+    </script>
   </head>
   <body>
     <header class="vr-bar">

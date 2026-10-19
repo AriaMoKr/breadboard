@@ -5,6 +5,7 @@ import { decodeLayout } from '../breadboard/share';
 import { buildLabel } from '../build-info';
 import { Carry, Twist } from './carry';
 import { EXAMPLE_IDS, circuitExhibit, computerExhibit, exampleExhibit, exhibitHash, parseExhibitHash, type Exhibit, type ExhibitChoice, type Hold } from './exhibits';
+import { wayBack, withoutVisit, type WayBack } from './hallway';
 import { BOARD_T, buildComputerModel, disposeTree, type ComputerModel, type ControlHit } from './model';
 import { ControlPanel, Tooltip } from './panel';
 import { boardTexture, labelTexture } from './textures';
@@ -45,6 +46,7 @@ const inVR = () => renderer.xr.isPresenting;
 // navigator.xr.offerSession), and its Exit VR offers another. After a session the button started,
 // the first offer is still open and a second cancels it, with a warning in the console: so leave
 // such a session by ending it, and through the button only one that took the browser's offer.
+// A session taken from a grant (takeGranted, below) is this page's own too.
 let clicked = false;
 let fromButton = false;
 vrButton.addEventListener('click', () => (clicked = !inVR()));
@@ -55,6 +57,29 @@ void navigator.xr?.isSessionSupported('immersive-vr').then((ok) => {
   dirty = true;
 }, () => {});
 document.querySelector('.vr-bar')?.append(Object.assign(document.createElement('span'), { className: 'vr-build', title: 'The commit this was built from, and its date', textContent: buildLabel() }));
+
+// ---- the way back, when a door of the Hallway led here (hallway.ts) ----
+// What the door added to the address is read once and taken off it. The way back stays for this
+// tab (a reload, or the main page and back) in sessionStorage. It is on the page's bar and in the
+// panel's corner; taken in VR, Quest Browser can keep the visitor in VR on the Hallway's side.
+const WAY_KEY = 'breadboard:wayBack';
+const way: WayBack | null = (() => {
+  const found = wayBack(location.search, location.origin);
+  try {
+    if (found) sessionStorage.setItem(WAY_KEY, JSON.stringify(found));
+    else {
+      const kept = JSON.parse(sessionStorage.getItem(WAY_KEY) ?? 'null') as WayBack | null;
+      if (kept && /^https?:/.test(kept.url) && kept.label && kept.title) return kept;
+    }
+  } catch {
+    // no storage (a private window, blocked site data): the way back lasts this page only
+  }
+  return found;
+})();
+const unvisited = withoutVisit(location.href);
+if (unvisited !== location.pathname + location.search + location.hash) history.replaceState(null, '', unvisited);
+const leave = () => void (way && location.assign(way.url));
+if (way) document.querySelector('.vr-bar')?.prepend(Object.assign(document.createElement('a'), { className: 'vr-hallway', href: way.url, title: way.title, textContent: way.label }));
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#111318');
@@ -178,6 +203,7 @@ function setExhibit(next: Exhibit, c: ExhibitChoice) {
     ],
     next.title,
     buildLabel(),
+    way ? { label: () => way.label, run: leave } : undefined,
   );
   panel.group.position.set(0, TABLE_TOP + 0.3, TABLE_Z - 0.62);
   panel.group.rotation.x = -0.12;
@@ -451,9 +477,37 @@ renderer.setAnimationLoop(() => {
 });
 void open(parseExhibitHash(location.hash));
 
+// Walked in from another page's immersive session (a door of the Hallway): Quest Browser can grant
+// this page a session without a click (sessiongranted; vr.html notes one that came before this
+// script ran). It is taken at once, as Enter VR would, so the visitor stays in VR: a grant lasts
+// about 5 s from the page's start (the Hallway's README, "Linking back").
+const SESSION: XRSessionInit = { optionalFeatures: ['local-floor', 'bounded-floor', 'layers'] }; // what three's VRButton asks for
+const early = window as { breadboardXrGranted?: boolean };
+function takeGranted() {
+  early.breadboardXrGranted = false;
+  if (inVR() || !navigator.xr) return;
+  clicked = true; // this page's own session, so Exit VR ends it (exitVR)
+  navigator.xr.requestSession('immersive-vr', SESSION).then(
+    (session) => renderer.xr.setSession(session),
+    (e) => {
+      clicked = false;
+      debugLog('granted', { error: String(e) });
+    },
+  );
+}
+if (early.breadboardXrGranted) takeGranted();
+navigator.xr?.addEventListener('sessiongranted', takeGranted);
+
 // For the browser check (scripts/check-browser.mjs) and the console: what is on the table, the
 // computer's machine when that is it, and where on the screen a control is (the middle of its hit
-// box's top; DIP switches by bit).
+// box's top; DIP switches by bit) or a button of the panel.
+function onScreen(o: THREE.Object3D, point: (box: THREE.Box3) => THREE.Vector3) {
+  scene.updateMatrixWorld(); // also before the first frame
+  camera.updateMatrixWorld();
+  const p = point(new THREE.Box3().setFromObject(o)).project(camera);
+  const r = renderer.domElement.getBoundingClientRect();
+  return { x: r.left + ((p.x + 1) / 2) * r.width, y: r.top + ((1 - p.y) / 2) * r.height };
+}
 Object.assign(window, {
   breadboardVR: {
     get exhibit() {
@@ -462,15 +516,18 @@ Object.assign(window, {
     get machine() {
       return exhibit && 'machine' in exhibit ? exhibit.machine : undefined;
     },
+    /** Where "← Hallway" leads (hallway.ts), or null. */
+    way,
+    /** The panel's buttons, by label. */
+    panelLabels: () => panel?.targets.map((t) => panel!.labelOf(t)) ?? [],
     screenPoint(part: string, bit?: number) {
       const o = model?.hitTargets.find((t) => t.userData.part === part && (bit === undefined || t.userData.bit === bit));
-      if (!o) return null;
-      scene.updateMatrixWorld(); // also before the first frame
-      camera.updateMatrixWorld();
-      const b = new THREE.Box3().setFromObject(o);
-      const p = b.getCenter(new THREE.Vector3()).setY(b.max.y).project(camera);
-      const r = renderer.domElement.getBoundingClientRect();
-      return { x: r.left + ((p.x + 1) / 2) * r.width, y: r.top + ((1 - p.y) / 2) * r.height };
+      return o ? onScreen(o, (b) => b.getCenter(new THREE.Vector3()).setY(b.max.y)) : null;
+    },
+    /** Where on the screen the panel's button with this label is (its middle). */
+    panelPoint(label: string) {
+      const o = panel?.targets.find((t) => panel!.labelOf(t) === label);
+      return o ? onScreen(o, (b) => b.getCenter(new THREE.Vector3())) : null;
     },
   },
 });

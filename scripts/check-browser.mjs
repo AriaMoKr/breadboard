@@ -443,6 +443,48 @@ try {
     return `SR latch from the sandbox: S lit Q; "${counting.title}" showed ${counting.seen} LED patterns in 2 s`;
   });
 
+  await check('VR view: a door of the Hallway leads in, and its way back out', async () => {
+    // A door's link (the Hallway's README, "Going in"), its way back a page of this site, so the
+    // click on it can be followed without leaving: "← Hallway" on the bar and the panel, what the
+    // door added off the address, a session granted on arrival asked for at once (src/vr/hallway.ts).
+    const before = errors.length;
+    const back = `${base}#/more`;
+    await page.goto(`${base}vr.html?from=hallway&back=${encodeURIComponent(back)}&dx=0.12&yaw=-8&pitch=-3&dw=1.1&dh=2.25&glow=d8543f`, 3000);
+    const r = await page.evaluate(`(async () => {
+      const a = document.querySelector('.vr-bar a.vr-hallway');
+      let asked = null; // no WebXR in this browser: nothing to grant
+      if (navigator.xr) {
+        asked = [];
+        navigator.xr.requestSession = (mode) => (asked.push(mode), new Promise(() => {}));
+        navigator.xr.dispatchEvent(new Event('sessiongranted'));
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      return { link: a && [a.textContent, a.href], search: location.search, panel: breadboardVR.panelLabels(), asked };
+    })()`);
+    assert(r.link?.[0] === '← Hallway' && r.link[1] === back, `the bar's link: ${JSON.stringify(r.link)}`);
+    assert(r.search === '', `the address kept ${r.search}`);
+    assert(r.panel.includes('← Hallway'), `the panel: ${r.panel.join(', ')}`);
+    assert(!r.asked || r.asked.join() === 'immersive-vr', `on sessiongranted it asked for ${JSON.stringify(r.asked)}`);
+    // the way back lasts the visit (this tab), and a real click on the panel's corner button takes it
+    await page.goto(`${base}vr.html`, 3000);
+    const p = await page.evaluate(`breadboardVR.panelPoint('← Hallway')`);
+    assert(p, 'after a reload, no "← Hallway" on the panel');
+    const under = await page.evaluate(`document.elementFromPoint(${p.x}, ${p.y})?.tagName`);
+    assert(under === 'CANVAS', `the panel's corner button is under a ${under}`);
+    for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await page.send('Input.dispatchMouseEvent', { type, x: p.x, y: p.y, button: type === 'mouseMoved' ? 'none' : 'left', buttons: type === 'mousePressed' ? 1 : 0, clickCount: 1 });
+    await sleep(1500);
+    const went = await page.evaluate('location.href');
+    assert(went === back, `the corner button went to ${went}`);
+    // through no door, no way back
+    await page.evaluate('sessionStorage.clear()');
+    await page.goto(`${base}vr.html`, 3000);
+    const none = await page.evaluate(`({ way: breadboardVR.way, link: !!document.querySelector('.vr-hallway'), panel: breadboardVR.panelLabels() })`);
+    assert(!none.way && !none.link && !none.panel.includes('← Hallway'), `through no door, yet ${JSON.stringify(none)}`);
+    const errs = errors.slice(before);
+    assert(!errs.length, errs.join('\n'));
+    return `"← Hallway" on the bar and the panel, the address cleaned, ${r.asked ? 'a granted session asked for, ' : ''}kept on reload, taken by a click; none through no door`;
+  });
+
   // ---- phone --------------------------------------------------------------------------
   console.log('Phone (375 x 812, touch)');
   await page.send('Emulation.setDeviceMetricsOverride', { width: 375, height: 812, deviceScaleFactor: 2, mobile: true });

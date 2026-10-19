@@ -42,6 +42,12 @@ video by video.
   crowds 7–480 Hz into its first tenth). `vr.html?debug` logs to the console what the
   controllers do and, once a second, how evenly the frames come, to read from a headset over
   adb (`chrome://inspect`).
+  The view is also behind a door of the [Hallway](https://ariamokr.github.io/hallway/), a WebXR
+  corridor whose doors lead to other places. Its link (`vr.html?from=hallway&back=…`) puts
+  **← Hallway** on the page's bar and in the corner of the panel, back to that door, for the rest
+  of the visit; what the door added is taken off the address. Walking in from the Hallway's VR,
+  a session that Quest Browser grants is taken at once, so the visitor stays in VR
+  (`src/vr/hallway.ts`).
 * **Chapter labs** (`#/lab/<id>`): each of the 44 videos maps to an interactive lab
   that rebuilds what that video builds. Examples: the 555 timer modes, SR/D latches,
   flip-flops, JK racing, tri-state buses, registers, two's complement, the ALU, RAM,
@@ -88,7 +94,8 @@ MinGW-built Node in MSYS2's UCRT64 shell, so Vite 8 doesn't start there.
 that every page renders without errors, that phones get no sideways scrolling and controls of
 at least 24 px, the sticky toolbar, parts drawer and tap-to-zoom, the shared computer, placing,
 moving, deleting and stepping in the sandbox with real clicks, taps and drags, sandbox links, the
-breadboard view's frame rate, and that the VR view builds the computer in 3D and runs it.
+breadboard view's frame rate, and that the VR view builds the computer in 3D, runs it, and
+leads back to the Hallway when a door of it led there.
 `npm run check:browser -- --dist`
 checks the built site instead (run `npm run build` first), plus the download link, install and
 offline use, and `-- --url <address>` checks a deployed copy the same way (such as
