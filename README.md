@@ -47,7 +47,9 @@ video by video.
   **← Hallway** on the page's bar and in the corner of the panel, back to that door, for the rest
   of the visit; what the door added is taken off the address. Walking in from the Hallway's VR,
   a session that Quest Browser grants is taken at once, so the visitor stays in VR
-  (`src/vr/hallway.ts`).
+  (`src/vr/hallway.ts`). The doorway shows the room through `public/hallway-preview.jpg`, the
+  view from eye height 1.2 m behind the start, framed as the Hallway hangs a door's picture
+  (`npm run preview-image` renders it again after the room changes).
 * **Chapter labs** (`#/lab/<id>`): each of the 44 videos maps to an interactive lab
   that rebuilds what that video builds. Examples: the 555 timer modes, SR/D latches,
   flip-flops, JK racing, tri-state buses, registers, two's complement, the ALU, RAM,
@@ -85,7 +87,8 @@ npm run dev
 
 Then open http://localhost:5173. Other scripts: `npm test` (vitest), `npm run typecheck`,
 `npm run build` (static site in `dist/`, see [Deploying](#deploying)), `npm run icons` (renders
-the app icons from `public/icons/icon.svg`).
+the app icons from `public/icons/icon.svg`), `npm run preview-image` (renders
+`public/hallway-preview.jpg`, the VR room for the Hallway's door; see VR view above).
 
 Vite stays on version 7 for now. Vite 8's bundler, Rolldown, has no native build for the
 MinGW-built Node in MSYS2's UCRT64 shell, so Vite 8 doesn't start there.

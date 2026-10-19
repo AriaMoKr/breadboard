@@ -529,6 +529,33 @@ Object.assign(window, {
       const o = panel?.targets.find((t) => panel!.labelOf(t) === label);
       return o ? onScreen(o, (b) => b.getCenter(new THREE.Vector3())) : null;
     },
+    /**
+     * The room as the Hallway's doorway shows it, as a JPEG data URL, `width` x `width` / 2
+     * (scripts/make-preview.mjs writes it to public/hallway-preview.jpg). The Hallway hangs a door's
+     * picture 2.4 m behind the opening, 3 m tall and twice as wide, its horizon at 0.56 of its height
+     * and at eye height, 1.6 m (its hall.js, PICTURE): so this is the view from 1.6 m up, looking
+     * straight in, through that frame. `back`: how far behind the start (the origin) it is taken.
+     */
+    preview(width = 2048, back = 0) {
+      const P = { depth: 2.4, height: 3, eye: 1.6, horizon: 0.56 };
+      const cam = new THREE.PerspectiveCamera();
+      cam.position.set(0, P.eye, back);
+      cam.updateMatrixWorld();
+      const k = 0.05 / P.depth; // the frame, moved to the near plane
+      cam.projectionMatrix.makePerspective(-P.height * k, P.height * k, (1 - P.horizon) * P.height * k, -P.horizon * P.height * k, 0.05, 50);
+      cam.projectionMatrixInverse.copy(cam.projectionMatrix).invert();
+      hover(null);
+      sync();
+      statusAt = -Infinity; // the panel's status now, not at its next redraw
+      syncStatus(performance.now());
+      renderer.setPixelRatio(1);
+      renderer.setSize(width, width / 2, false);
+      renderer.render(scene, cam);
+      const jpeg = renderer.domElement.toDataURL('image/jpeg', 0.85); // read before the page composites it
+      renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+      fitScreen();
+      return jpeg;
+    },
   },
 });
 

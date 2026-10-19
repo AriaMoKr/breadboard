@@ -16,6 +16,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "icons": "node scripts/make-icons.mjs",
+    "preview-image": "node scripts/make-preview.mjs",
     "check:browser": "node scripts/check-browser.mjs",
     "check:input": "node scripts/check-input.mjs",
     "verify": "node scripts/verify.mjs"
