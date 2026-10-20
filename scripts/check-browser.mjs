@@ -492,6 +492,65 @@ try {
     return `"← Hallway" on the bar and the panel and a doorway back, the address cleaned, ${r.asked ? 'a granted session asked for, ' : ''}kept on reload, taken by clicks on the panel and the doorway; none through no door`;
   });
 
+  // IWER (vr.html?xr=emulate) is on the dev server only: a build leaves it out.
+  if (!dist)
+    await check('VR view (emulated Quest 3): arriving at the door, walking, turning, a jump, and back out through it', async () => {
+      // The Hallway's door link again; then in the emulated headset: lined up where the door says,
+      // the left stick walks (stopping at the table), the right one snaps 30°, a jump aimed at the
+      // floor (move: teleport), and a step back through the doorway leads back (src/vr/move.ts, door.ts).
+      const before = errors.length;
+      const back = `${base}#/more`;
+      await page.evaluate('sessionStorage.clear()');
+      await page.goto(`${base}vr.html?xr=emulate&from=hallway&back=${encodeURIComponent(back)}&dx=0.2&yaw=10`, 3000);
+      const at = await page.evaluate(`(() => { const b = document.getElementById('VRButton'); const r = b.getBoundingClientRect(); return { text: b.textContent, x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
+      assert(at.text === 'ENTER VR', `the VR button says ${at.text}`);
+      for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await page.send('Input.dispatchMouseEvent', { type, x: at.x, y: at.y, button: type === 'mouseMoved' ? 'none' : 'left', buttons: type === 'mousePressed' ? 1 : 0, clickCount: 1 });
+      await sleep(1000);
+      const pose = () => page.evaluate(`(() => {
+        const c = breadboardVR.camera, h = c.getWorldPosition(c.position.clone()), d = c.getWorldDirection(c.position.clone());
+        return { x: +h.x.toFixed(2), z: +h.z.toFixed(2), yaw: Math.round(Math.atan2(-d.x, -d.z) * 180 / Math.PI) };
+      })()`);
+      const stick = async (hand, x, y, ms) => {
+        await page.evaluate(`breadboardVR.xrDevice.controllers.${hand}.updateAxes('thumbstick', ${x}, ${y})`);
+        await sleep(ms);
+        await page.evaluate(`breadboardVR.xrDevice.controllers.${hand}.updateAxes('thumbstick', 0, 0)`);
+        await sleep(200);
+      };
+      const arrived = await pose();
+      assert(Math.abs(arrived.x - 0.2) < 0.03 && Math.abs(arrived.z - 1.2) < 0.03 && Math.abs(arrived.yaw - 10) <= 1, `arrived at ${JSON.stringify(arrived)}, not at the door (0.2, 1.2), turned 10°`);
+      await stick('left', 0, -1, 1500); // walk forward, into the table
+      const walked = await pose();
+      assert(Math.abs(walked.yaw - 10) <= 1 && Math.abs(walked.z + 0.07) < 0.03, `walked to ${JSON.stringify(walked)}: not stopped at the table's near edge (z -0.07)`);
+      await stick('right', 1, 0, 150); // a push right: 30° to the right
+      const turned = await pose();
+      assert(Math.abs(turned.yaw + 20) <= 1 && Math.abs(turned.x - walked.x) < 0.01 && Math.abs(turned.z - walked.z) < 0.01, `a snap turn: ${JSON.stringify(turned)}`);
+      // a jump: the left controller aimed down at the floor to the right, the stick forward, let go
+      await page.evaluate(`(() => {
+        const v = breadboardVR, l = v.xrDevice.controllers.left;
+        v.nav.move = 'teleport';
+        const q = new v.camera.quaternion.constructor().setFromEuler(new v.camera.rotation.constructor(-0.6, -1.2, 0, 'YXZ'));
+        l.quaternion.set(q.x, q.y, q.z, q.w);
+      })()`);
+      await stick('left', 0, -1, 500);
+      await sleep(400);
+      const jumped = await pose();
+      assert(Math.hypot(jumped.x - turned.x, jumped.z - turned.z) > 1, `no jump: ${JSON.stringify(jumped)}`);
+      // in front of the doorway, then a step back through it
+      await page.evaluate(`(() => {
+        const v = breadboardVR, d = v.xrDevice.position;
+        v.rig.rotation.set(0, 0, 0);
+        v.rig.position.set(-d.x, 0, 1.4 - d.z);
+      })()`);
+      await sleep(300);
+      await page.evaluate('breadboardVR.xrDevice.position.z += 0.6');
+      await sleep(1500);
+      const went = await page.evaluate('location.href');
+      assert(went === back, `a step back through the doorway went to ${went}`);
+      const errs = errors.slice(before);
+      assert(!errs.length, errs.join('\n'));
+      return `at the door turned ${arrived.yaw}°, walked to the table (z ${walked.z}), snapped to ${turned.yaw}°, jumped ${Math.hypot(jumped.x - turned.x, jumped.z - turned.z).toFixed(1)} m, out through the doorway`;
+    });
+
   // ---- phone --------------------------------------------------------------------------
   console.log('Phone (375 x 812, touch)');
   await page.send('Emulation.setDeviceMetricsOverride', { width: 375, height: 812, deviceScaleFactor: 2, mobile: true });

@@ -32,7 +32,13 @@ video by video.
   manual/auto and speed pot, the address and data DIP switches, write, program/run, signed and
   reset. In a WebXR headset (Quest Browser, or Chrome/Edge with a PC headset) press **Enter VR**,
   point and pull the trigger (twist the controller to turn the pot); the grip buttons pick the
-  computer up, and pulling both grips apart makes it bigger (up to 8x). On a screen, drag to look
+  computer up, and pulling both grips apart makes it bigger (up to 8x). The sticks move you about
+  the room as in the Hallway: the left one walks the way you face (or, with **Move: Teleport**,
+  aims a jump at the floor for when you let go), the right one turns 30° a push (or, with **Turn:
+  Smooth**, while held), and the trigger at the floor jumps there; each jump blinks the view. The
+  room's own panel, left of the table, sets **Move** and **Turn**, kept in the browser as the
+  Hallway keeps them (`hallway.nav`), so the choice is the same on both sides of its doors
+  (`src/vr/move.ts`, `src/vr/nav.ts`). On a screen, drag to look
   around, double-click to look closer, and click. It is built with three.js from the same layout
   as the breadboard view (`src/vr/`), at 1.5x real size. It also shows sandbox circuits:
   `vr.html#c1.…` (the code from a share link, or the sandbox's **View in VR**) or

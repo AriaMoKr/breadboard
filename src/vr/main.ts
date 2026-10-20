@@ -6,8 +6,11 @@ import { buildLabel } from '../build-info';
 import { Carry, Twist } from './carry';
 import { EXAMPLE_IDS, circuitExhibit, computerExhibit, exampleExhibit, exhibitHash, parseExhibitHash, type Exhibit, type ExhibitChoice, type Hold } from './exhibits';
 import { buildDoorway } from './door';
+import { Fade } from './fade';
 import { DOOR, doorOf, hallwayViews, keptDoor, leaveUrl, readVisit, wayBack, withoutVisit } from './hallway';
 import { BOARD_T, buildComputerModel, disposeTree, type ComputerModel, type ControlHit } from './model';
+import { AimStick, TurnStick, XR_WALK, clampWalk, headYaw, standable, turnedAbout, walkDelta, wrapAngle, type Rect } from './move';
+import { loadNav, saveNav, type Nav } from './nav';
 import { ControlPanel, Tooltip } from './panel';
 import { boardTexture, labelTexture } from './textures';
 import './vr.css';
@@ -17,7 +20,8 @@ import './vr.css';
  * sandbox (vr.html#c1.… from a share link, or #example/<id>). In a headset (WebXR, "Enter VR")
  * you point with a controller and pull the trigger, at the control panel behind the table or at
  * the switches and buttons on the boards; the grip buttons pick the boards up (both grips: pull
- * apart to make them bigger). On a screen you orbit with the mouse or a finger and click the
+ * apart to make them bigger); the sticks walk and turn, as in the Hallway (move.ts, nav.ts, and the
+ * room's panel left of the table). On a screen you orbit with the mouse or a finger and click the
  * panel and the boards. "Next ▸" on the panel goes through the computer and the examples.
  */
 
@@ -93,15 +97,25 @@ const way = kept?.way ?? null;
 const unvisited = withoutVisit(location.href);
 if (unvisited !== location.pathname + location.search + location.hash) history.replaceState(null, '', unvisited);
 let leaving = false;
-/** Back through the door. */
+let leaveTimer = 0;
+/** Back through the door: in VR after a moment of black, as the Hallway goes through its doors. */
 function go() {
   if (!way || leaving) return;
   leaving = true;
-  location.assign(leaveUrl(way, null));
-  setTimeout(() => (leaving = false), 12000); // still here: the navigation was stopped or failed
+  const url = leaveUrl(way, null);
+  if (inVR()) fade.to(1, 0.3, () => location.assign(url));
+  else location.assign(url);
+  clearTimeout(leaveTimer);
+  leaveTimer = setTimeout(cameBack, 12000); // still here: the navigation was stopped or failed
+}
+/** Here again after going back (the browser's back/forward cache, or a navigation that didn't happen). */
+function cameBack() {
+  leaving = false;
+  clearTimeout(leaveTimer);
+  fade.to(0, 0.6);
 }
 addEventListener('pageshow', (e) => {
-  if (e.persisted) leaving = false; // back from the Hallway through the browser's back/forward cache
+  if (e.persisted) cameBack();
 });
 if (way) document.querySelector('.vr-bar')?.prepend(Object.assign(document.createElement('a'), { className: 'vr-hallway', href: way.url, title: way.title, textContent: way.label }));
 
@@ -114,6 +128,9 @@ const rig = new THREE.Group();
 rig.name = 'rig';
 rig.add(camera);
 scene.add(rig);
+const fade = new Fade(camera, 0);
+const head = new THREE.Vector3(); // the camera's world position, and the way it looks
+const facing = new THREE.Vector3();
 const HOME = { eye: new THREE.Vector3(0, 1.3, -0.02), target: new THREE.Vector3(0, TABLE_TOP + 0.1, TABLE_Z - 0.2) };
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
@@ -180,6 +197,45 @@ if (door) {
   if (views) void door.loadView(views);
 }
 const jamb = (kept?.width ?? DOOR.width) / 2 - 0.25;
+
+// Where a head can go in VR (move.ts): the floor, round the table, with a hand's breadth to spare.
+const ROOM: Rect = { x0: -6.6, x1: 6.6, z0: -6.6, z1: 6.6 };
+const OBSTACLES: Rect[] = [{ x0: -0.56 - 0.15, x1: 0.56 + 0.15, z0: TABLE_Z - 0.5 - 0.15, z1: TABLE_Z + 0.5 + 0.15 }];
+
+// The room's own panel, left of the table, as the Hallway has one on its wall: how to move in VR,
+// kept as the Hallway keeps it (nav.ts), so the choice is the same on both sides of its doors.
+const store = (() => {
+  try {
+    return localStorage;
+  } catch {
+    return null;
+  }
+})();
+const nav: Nav = loadNav(store);
+function setNav(next: Partial<Nav>) {
+  Object.assign(nav, next);
+  saveNav(store, nav);
+  for (const ray of rays) ray.aim.aiming = false;
+  showRoom();
+}
+const roomPanel = new ControlPanel(
+  [
+    { label: () => `Move: ${nav.move === 'smooth' ? 'Smooth' : 'Teleport'}`, run: () => setNav({ move: nav.move === 'smooth' ? 'teleport' : 'smooth' }) },
+    { label: () => `Turn: ${nav.turn === 'snap' ? 'Snap' : 'Smooth'}`, run: () => setNav({ turn: nav.turn === 'snap' ? 'smooth' : 'snap' }) },
+  ],
+  'Moving about',
+);
+roomPanel.group.position.set(-1.05, 1.2, -0.45);
+roomPanel.group.lookAt(0, 1.45, 0.4);
+scene.add(roomPanel.group);
+function showRoom() {
+  roomPanel.refresh();
+  roomPanel.setStatus([
+    nav.move === 'smooth' ? 'Left stick: walk the way you face' : 'Left stick forward: aim; let go: jump',
+    nav.turn === 'snap' ? 'Right stick: turn 30° a push' : 'Right stick: turn while held',
+  ]);
+}
+showRoom();
 /** Where a visitor coming through the door now stands and faces (yaw + to the left), or null. */
 let arrival = found ? { x: Math.min(jamb, Math.max(-jamb, visit.dx ?? 0)), yaw: visit.yaw ?? 0, pitch: visit.pitch ?? 0 } : null;
 
@@ -260,7 +316,7 @@ function setExhibit(next: Exhibit, c: ExhibitChoice) {
   panel.group.position.set(0, TABLE_TOP + 0.3, TABLE_Z - 0.62);
   panel.group.rotation.x = -0.12;
   scene.add(panel.group);
-  targets = [...panel.targets, ...model.hitTargets, ...(door ? [door.portal] : [])];
+  targets = [...panel.targets, ...roomPanel.targets, ...model.hitTargets, ...(door ? [door.portal] : [])];
   hover(null);
 
   history.replaceState(null, '', location.pathname + location.search + exhibitHash(c));
@@ -294,7 +350,9 @@ function syncStatus(now: number) {
 const raycaster = new THREE.Raycaster();
 const pick = (): THREE.Intersection | undefined => raycaster.intersectObjects(targets, false)[0];
 const hitOf = (o: THREE.Object3D | null | undefined): ControlHit | null => (o && model?.hitTargets.includes(o as THREE.Mesh) ? (o.userData as ControlHit) : null);
-const isPanel = (o: THREE.Object3D | null | undefined) => !!o && !!panel?.targets.includes(o as THREE.Mesh);
+/** The panel (the exhibit's, or the room's) whose button `o` is, or null. */
+const panelOf = (o: THREE.Object3D | null | undefined) => (o ? ([panel, roomPanel].find((p) => p?.targets.includes(o as THREE.Mesh)) ?? null) : null);
+const isPanel = (o: THREE.Object3D | null | undefined) => !!panelOf(o);
 const isDoor = (o: THREE.Object3D | null | undefined) => !!door && o === door.portal;
 const begin = (hit: ControlHit): Hold | null => exhibit?.begin(hit) ?? null;
 
@@ -313,6 +371,7 @@ function showTip() {
 function hover(o: THREE.Object3D | null) {
   hovered = o;
   panel?.setHover(o);
+  roomPanel.setHover(o);
   model?.setHover(o);
   showTip();
 }
@@ -356,7 +415,7 @@ const finish = (e: PointerEvent, cancelled: boolean) => {
   if (press.hold) press.hold.end(click);
   else if (click) {
     const o = fromPointer(e);
-    if (isPanel(o)) panel!.press(o!);
+    if (isPanel(o)) panelOf(o)!.press(o!);
     else if (isDoor(o)) go();
   }
   press = null;
@@ -404,23 +463,42 @@ if (arrival) {
 const holding: THREE.XRTargetRaySpace[] = [];
 /** A control held with the trigger: what it does, the hit box (it stays the hovered one), and the wrist's twist for pots. */
 type Held = { hold: Hold; object: THREE.Object3D; twist: Twist };
-const rays: { ctrl: THREE.XRTargetRaySpace; line: THREE.Line; hold: Held | null }[] = [];
+/**
+ * A controller: its ray, the control its trigger holds, its input source (handedness, sticks), and
+ * the teleport its left stick aims (move 'teleport') with where on the floor it lands, ringed.
+ */
+type Ray = { ctrl: THREE.XRTargetRaySpace; line: THREE.Line<THREE.BufferGeometry, THREE.LineBasicMaterial>; hold: Held | null; source: XRInputSource | null; aim: AimStick; target: THREE.Vector3 | null; ring: THREE.Mesh };
+const rays: Ray[] = [];
+const RAY_COLOR = '#8ab8ff', AIM_COLOR = '#ffd27a';
+const ringGeometry = new THREE.RingGeometry(0.12, 0.16, 32).rotateX(-Math.PI / 2);
+const turnStick = new TurnStick();
 for (const i of [0, 1]) {
   const ctrl = renderer.xr.getController(i);
-  const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, -1)]), new THREE.LineBasicMaterial({ color: '#8ab8ff' }));
+  const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, -1)]), new THREE.LineBasicMaterial({ color: RAY_COLOR }));
   line.scale.z = 3;
   ctrl.add(line);
-  const ray = { ctrl, line, hold: null as Held | null };
+  const ring = new THREE.Mesh(ringGeometry, new THREE.MeshBasicMaterial({ color: AIM_COLOR, transparent: true, opacity: 0.9, depthWrite: false }));
+  ring.visible = false;
+  scene.add(ring);
+  const ray: Ray = { ctrl, line, hold: null, source: null, aim: new AimStick(), target: null, ring };
+  ctrl.addEventListener('connected', (e) => (ray.source = e.data));
+  ctrl.addEventListener('disconnected', () => (ray.source = null));
   ctrl.addEventListener('selectstart', () => {
     raycaster.setFromXRController(ctrl);
     const picked = pick();
     const o = picked?.object;
     const hit = hitOf(o);
     const hold = hit && begin(hit);
-    debugLog('trigger', { hand: i, on: hit ? `${hit.part}${hit.bit === undefined ? '' : `#${hit.bit}`}` : isPanel(o) ? `panel: ${panel!.labelOf(o!)}` : isDoor(o) ? 'doorway' : 'nothing', m: picked && +picked.distance.toFixed(3) });
+    debugLog('trigger', { hand: i, on: hit ? `${hit.part}${hit.bit === undefined ? '' : `#${hit.bit}`}` : isPanel(o) ? `panel: ${panelOf(o)!.labelOf(o!)}` : isDoor(o) ? 'doorway' : 'nothing', m: picked && +picked.distance.toFixed(3) });
     if (hold) ray.hold = { hold, object: o!, twist: new Twist(ctrl.quaternion) };
-    else if (isPanel(o)) panel!.press(o!);
+    else if (isPanel(o)) panelOf(o)!.press(o!);
     else if (isDoor(o)) go();
+    else {
+      // at the floor (not just past a switch by the table's edge): a jump there
+      const at = floorTarget(ctrl);
+      camera.getWorldPosition(head);
+      if (at && Math.hypot(at.x - head.x, at.z - head.z) > 0.6) teleport(at.x, at.z);
+    }
   });
   ctrl.addEventListener('selectend', () => {
     ray.hold?.hold.end(true);
@@ -449,6 +527,17 @@ function pointControllers() {
       hold.hold.turn(hold.twist.update(ctrl.quaternion));
       debugTwist(ctrl, hold);
     }
+    if (ray.aim.aiming) {
+      // aiming a jump: the ray to the floor, a ring where it lands (none where one can't stand)
+      ray.target = floorTarget(ctrl);
+      line.scale.z = ray.target ? ray.target.distanceTo(raycaster.ray.origin) : 3;
+      line.material.color.set(ray.target ? AIM_COLOR : RAY_COLOR);
+      ray.ring.visible = !!ray.target;
+      if (ray.target) ray.ring.position.set(ray.target.x, 0.005, ray.target.z);
+      continue;
+    }
+    ray.ring.visible = false;
+    line.material.color.set(RAY_COLOR);
     raycaster.setFromXRController(ctrl);
     const hit = pick();
     line.scale.z = hit ? hit.distance : 3;
@@ -457,14 +546,81 @@ function pointControllers() {
   if (over !== hovered) hover(over);
   else showTip(); // follow the boards while they are carried
 }
+
+// ---- moving about in VR (move.ts; how, from nav) ----
+const solids = () => ([table, model?.root, panel?.group, roomPanel.group, door?.group] as (THREE.Object3D | undefined)[]).filter((o): o is THREE.Object3D => !!o);
+/** Where a controller's ray meets the floor, if a head can stand there and nothing is in the way; else null. */
+function floorTarget(ctrl: THREE.Object3D): THREE.Vector3 | null {
+  raycaster.setFromXRController(ctrl as THREE.XRTargetRaySpace);
+  const r = raycaster.ray;
+  if (r.direction.y > -0.02) return null;
+  const t = -r.origin.y / r.direction.y;
+  if (t > 12) return null;
+  const blocked = raycaster.intersectObjects(solids(), true)[0];
+  if (blocked && blocked.distance < t) return null;
+  const at = r.at(t, new THREE.Vector3());
+  return standable(at.x, at.z, ROOM, OBSTACLES) ? at : null;
+}
+/** Turns the rig by `angle` (+ to the left) about the head, so the visitor turns in place. */
+function turnAboutHead(angle: number) {
+  camera.getWorldPosition(head);
+  [rig.position.x, rig.position.z] = turnedAbout(rig.position.x, rig.position.z, head.x, head.z, angle);
+  rig.rotation.y += angle;
+}
+/** Moves the rig so the head goes to (x, z): as far as the room lets a walk go, or straight there. */
+function moveHead(x: number, z: number, walk = true) {
+  camera.getWorldPosition(head);
+  const [cx, cz] = walk ? clampWalk(head.x, head.z, x, z, ROOM, OBSTACLES) : [x, z];
+  rig.position.x += cx - head.x;
+  rig.position.z += cz - head.z;
+}
+/** A jump: a moment of black hides it. */
+function teleport(x: number, z: number) {
+  fade.to(1, 0.08, () => {
+    moveHead(x, z, false);
+    fade.to(0, 0.2);
+  });
+}
+/** The sticks, every frame in VR: the right one turns, the left one walks or aims a jump. */
+function moveWithSticks(dt: number) {
+  for (const ray of rays) {
+    const pad = ray.source?.gamepad;
+    if (!pad || pad.axes.length < 2) continue;
+    const ax = pad.axes.length >= 4 ? pad.axes[2] : pad.axes[0];
+    const ay = pad.axes.length >= 4 ? pad.axes[3] : pad.axes[1];
+    if (ray.source!.handedness === 'right') {
+      const angle = turnStick.turn(ax, dt, nav.turn);
+      if (angle) turnAboutHead(angle);
+    } else if (nav.move === 'teleport') {
+      if (ray.aim.update(ay) === 'jump' && ray.target) teleport(ray.target.x, ray.target.z);
+    } else {
+      camera.getWorldDirection(facing);
+      const [dx, dz] = walkDelta(ax, ay, facing.x, facing.z, XR_WALK * dt);
+      camera.getWorldPosition(head);
+      if (dx || dz) moveHead(head.x + dx, head.z + dz);
+    }
+  }
+}
+// Entering VR, the headset is lined up a moment later (once it has a pose) with where the visitor
+// enters: at the door, turned as they went through, when they came through it just now; else at
+// the start, facing the table.
+let entry = { x: 0, z: 0, yaw: 0 };
+let recenter = 0;
+function lineUp() {
+  camera.getWorldDirection(facing);
+  turnAboutHead(wrapAngle(entry.yaw - headYaw(facing.x, facing.z)));
+  moveHead(entry.x, entry.z, false);
+}
+
 renderer.xr.addEventListener('sessionstart', () => {
   fromButton = clicked;
   clicked = false;
   dirty = true;
-  // Through the door just now: at the door, turned as they went through. Else at the start.
-  rig.position.set(arrival?.x ?? 0, 0, arrival ? ARRIVE_Z : 0);
-  rig.rotation.set(0, arrival?.yaw ?? 0, 0);
+  rig.position.set(0, 0, 0);
+  rig.rotation.set(0, 0, 0);
+  entry = arrival ? { x: arrival.x, z: ARRIVE_Z, yaw: arrival.yaw } : { x: 0, z: 0, yaw: 0 };
   arrival = null;
+  recenter = 2;
   debugLog('session', { vr: true, from: fromButton ? 'button' : 'browser' });
 });
 
@@ -511,7 +667,12 @@ renderer.xr.addEventListener('sessionend', () => {
   debugLog('session', { vr: false });
   holding.length = 0;
   carry?.grip(holding);
-  for (const ray of rays) ray.hold = null;
+  for (const ray of rays) {
+    ray.hold = null;
+    ray.aim.aiming = false;
+    ray.ring.visible = false;
+  }
+  if (!leaving) fade.set(0);
   rig.position.set(0, 0, 0); // the screen view orbits from the origin
   rig.rotation.set(0, 0, 0);
   putBack(); // the screen view looks at the table
@@ -529,15 +690,20 @@ function fitScreen() {
 addEventListener('resize', fitScreen);
 addEventListener('hashchange', () => void open(parseExhibitHash(location.hash)));
 let last = performance.now();
-const head = new THREE.Vector3();
 renderer.setAnimationLoop(() => {
   const now = performance.now();
+  const dt = Math.min(0.1, (now - last) / 1000);
   if (exhibit?.frame(now - last)) dirty = true;
+  if (inVR()) {
+    if (recenter > 0 && --recenter === 0) lineUp();
+    else if (!leaving) moveWithSticks(dt);
+  }
   if (door) {
     camera.getWorldPosition(head);
-    door.update(Math.min(0.1, (now - last) / 1000), head, isDoor(hovered));
-    if (inVR() && door.crossed(head)) go(); // stepped back through it (on a screen the orbit may swing through it)
+    door.update(dt, head, isDoor(hovered));
+    if (inVR() && door.crossed(head)) go(); // walked or stepped back through it (on a screen the orbit may swing through it)
   }
+  fade.update(dt);
   if (inVR()) {
     carry?.follow(holding);
     pointControllers();
@@ -602,6 +768,8 @@ Object.assign(window, {
     door,
     /** In VR: where the visitor stands and which way the room is turned for them. */
     rig,
+    /** How the visitor moves in VR (nav.ts), as the room's panel shows it. */
+    nav,
     camera,
     /** IWER's emulated headset (?xr=emulate on the dev server), else null. */
     xrDevice,
@@ -615,14 +783,14 @@ Object.assign(window, {
       controls.update();
     },
     /** The panel's buttons, by label. */
-    panelLabels: () => panel?.targets.map((t) => panel!.labelOf(t)) ?? [],
+    panelLabels: () => [panel, roomPanel].flatMap((p) => (p ? p.targets.map((t) => p.labelOf(t)) : [])),
     screenPoint(part: string, bit?: number) {
       const o = model?.hitTargets.find((t) => t.userData.part === part && (bit === undefined || t.userData.bit === bit));
       return o ? onScreen(o, (b) => b.getCenter(new THREE.Vector3()).setY(b.max.y)) : null;
     },
     /** Where on the screen the panel's button with this label is (its middle). */
     panelPoint(label: string) {
-      const o = panel?.targets.find((t) => panel!.labelOf(t) === label);
+      const o = [panel, roomPanel].flatMap((p) => (p ? p.targets.filter((t) => p.labelOf(t) === label) : []))[0];
       return o ? onScreen(o, (b) => b.getCenter(new THREE.Vector3())) : null;
     },
     /**

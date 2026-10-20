@@ -90,7 +90,8 @@ export class ControlPanel {
     actions.forEach((action, i) => {
       const plane = new CanvasPlane(bw, bh);
       const col = i % cols, row = Math.floor(i / cols);
-      plane.mesh.position.set((col - (cols - 1) / 2) * (bw + gap), H / 2 - 0.19 - row * (bh + gap), 0.004);
+      const inRow = Math.min(cols, actions.length - row * cols); // a row that isn't full is centred
+      plane.mesh.position.set((col - (inRow - 1) / 2) * (bw + gap), H / 2 - 0.19 - row * (bh + gap), 0.004);
       this.group.add(plane.mesh);
       this.targets.push(plane.mesh);
       this.buttons.push({ action, plane, text: '', hover: false, flash: 0 });
