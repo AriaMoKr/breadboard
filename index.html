@@ -5,6 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="An interactive simulator that follows Ben Eater's 'Building an 8-bit breadboard computer!' playlist, video by video." />
     <title>Breadboard 8-bit</title>
+    <!-- link previews (Open Graph, X/Twitter): absolute URLs, the GitHub Pages copy; the picture is
+         public/social-preview.jpg (npm run preview-image). tests/link-preview.test.ts keeps them in step. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Breadboard 8-bit" />
+    <meta property="og:title" content="Breadboard 8-bit" />
+    <meta property="og:description" content="An interactive simulator that follows Ben Eater's 'Building an 8-bit breadboard computer!' playlist, video by video." />
+    <meta property="og:url" content="https://ariamokr.github.io/breadboard/" />
+    <meta property="og:image" content="https://ariamokr.github.io/breadboard/social-preview.jpg" />
+    <meta property="og:image:width" content="1280" />
+    <meta property="og:image:height" content="640" />
+    <meta property="og:image:alt" content="Ben Eater's 8-bit computer on breadboards in the simulator: registers, microcode EEPROMs and the decimal display showing 42, wired to the bus between them" />
+    <meta name="twitter:card" content="summary_large_image" />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='6' fill='%23ff3b3b'/%3E%3C/svg%3E" />
     <!-- installable app: manifest + icons (public/), service worker written by scripts/sw-dist.mjs -->
     <link rel="manifest" href="/manifest.webmanifest" />

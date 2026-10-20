@@ -25,7 +25,10 @@ From this folder:
 then open http://localhost:8000/ (any static file server works).
 `;
 
-/** Every file under `dir` except the zip, relative to `dir` with forward slashes. */
+/**
+ * Every file under `dir` except the zip and the `*-preview.jpg` pictures (link previews and the
+ * Hallway's door, which only other sites show), relative to `dir` with forward slashes.
+ */
 function filesIn(dir) {
   const out = [];
   const walk = (d) => {
@@ -36,7 +39,7 @@ function filesIn(dir) {
     }
   };
   walk(dir);
-  return out.filter((f) => f !== zipName);
+  return out.filter((f) => f !== zipName && !f.endsWith('-preview.jpg'));
 }
 
 const CRC_TABLE = Array.from({ length: 256 }, (_, n) => {

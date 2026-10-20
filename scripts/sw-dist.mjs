@@ -1,6 +1,7 @@
 // Runs after `vite build`: writes dist/sw.js, the service worker that keeps the app working
 // offline after the first visit (and makes it installable). It caches every built file (not the
-// zip) under a name made from their contents, so each new build replaces the old cache.
+// zip, nor the `*-preview.jpg` pictures that only other sites show: link previews and the
+// Hallway's door) under a name made from their contents, so each new build replaces the old cache.
 import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
@@ -19,7 +20,7 @@ const walk = (d) => {
   }
 };
 walk(dist);
-const cached = files.filter((f) => f !== 'sw.js' && !f.endsWith('.zip') && f !== 'index.html').sort();
+const cached = files.filter((f) => f !== 'sw.js' && !f.endsWith('.zip') && !f.endsWith('-preview.jpg') && f !== 'index.html').sort();
 const hash = createHash('sha256');
 for (const f of ['index.html', ...cached]) hash.update(f).update(readFileSync(join(dist, f)));
 const cache = `${name}-${hash.digest('hex').slice(0, 12)}`;

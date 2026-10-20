@@ -88,8 +88,9 @@ npm run dev
 
 Then open http://localhost:5173. Other scripts: `npm test` (vitest), `npm run typecheck`,
 `npm run build` (static site in `dist/`, see [Deploying](#deploying)), `npm run icons` (renders
-the app icons from `public/icons/icon.svg`), `npm run preview-image` (renders
-`public/hallway-preview.jpg`, the VR room for the Hallway's door; see VR view above).
+the app icons from `public/icons/icon.svg`), `npm run preview-image` (renders the pictures that
+show the site elsewhere: `public/social-preview.jpg`, the breadboard view close up, and
+`public/hallway-preview.jpg`, the VR room for the Hallway's door; see [Link previews](#link-previews)).
 
 Vite stays on version 7 for now. Vite 8's bundler, Rolldown, has no native build for the
 MinGW-built Node in MSYS2's UCRT64 shell, so Vite 8 doesn't start there.
@@ -175,6 +176,17 @@ python -m http.server 8000
 ```
 
 Then open http://localhost:8000/.
+
+### Link previews
+
+`index.html` and `vr.html` carry Open Graph and X/Twitter tags, so a shared link shows a title,
+the page's description and a picture: `public/social-preview.jpg` (1280 × 640) for the site and
+`public/hallway-preview.jpg` (2048 × 1024) for the VR view. Link previews need absolute URLs, so
+these tags name the GitHub Pages copy, wherever the site is served from;
+`tests/link-preview.test.ts` checks them against each page and its picture. The pages don't show
+the pictures, so the zip and the offline cache leave them out. `public/social-preview.jpg` is also the repository's social preview on GitHub (**Settings →
+General → Social preview**, uploaded by hand: upload it again after `npm run preview-image`
+changes it).
 
 ## How it's built
 
