@@ -1,8 +1,9 @@
 import type { Lab } from '../labs/types';
 
 /**
- * Lazy lab loading for the app: each `*.lab.ts` becomes its own chunk, so the
- * finished-computer page doesn't download all the chapter labs. Files are
+ * Lab loading for the app, by id: an `import()` of each `*.lab.ts`. On the dev
+ * server a lab loads when it is first opened; the build inlines them all into
+ * the page's one JS file (vite.config.ts), so a wget mirror gets every lab. Files are
  * keyed by name (`<lab-id>.lab.ts`); tests/computer.test.ts checks that every
  * file name matches the id it registers. (src/labs/registry.ts still offers
  * the eager map for tests and tools.)
