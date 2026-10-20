@@ -41,15 +41,23 @@ video by video.
   In VR the speed pot changes the speed evenly, tenfold per ~100° of twist (Ben's linear pot
   crowds 7–480 Hz into its first tenth). `vr.html?debug` logs to the console what the
   controllers do and, once a second, how evenly the frames come, to read from a headset over
-  adb (`chrome://inspect`).
+  adb (`chrome://inspect`). On the dev server, `vr.html?xr=emulate` emulates a Quest 3 with
+  Meta's [IWER](https://github.com/meta-quest/immersive-web-emulation-runtime), to try VR without
+  a headset (a build leaves it out).
   The view is also behind a door of the [Hallway](https://ariamokr.github.io/hallway/), a WebXR
   corridor whose doors lead to other places. Its link (`vr.html?from=hallway&back=…`) puts
   **← Hallway** on the page's bar and in the corner of the panel, back to that door, for the rest
   of the visit; what the door added is taken off the address. Walking in from the Hallway's VR,
   a session that Quest Browser grants is taken at once, so the visitor stays in VR
-  (`src/vr/hallway.ts`). The doorway shows the room through `public/hallway-preview.jpg`, the
-  view from eye height 1.2 m behind the start, framed as the Hallway hangs a door's picture
-  (`npm run preview-image` renders it again after the room changes).
+  (`src/vr/hallway.ts`). The Hallway's doorway shows the room through
+  `public/hallway-preview.jpg`, the view from eye height 1.2 m behind the start, framed as the
+  Hallway hangs a door's picture (`npm run preview-image` renders it again after the room
+  changes). The visitor arrives there, as far to the side and turned as they went through, and
+  behind them stands the door back: a doorway glowing in the door's colour, with the Hallway seen
+  through it as the Hallway publishes the view from its door to here (its `views/views.json`,
+  hung with the Hallway's own doorway shader: `src/vr/door.ts`, `src/vr/portal.ts`). Pointing at
+  it, clicking it or stepping back through it leads back. On a screen the view starts where the
+  doorway showed the room from, then glides to the table.
   [![The VR view's room seen from just inside its door: the computer on a table, its control panel behind it](public/hallway-preview.jpg)](https://ariamokr.github.io/breadboard/vr.html)
 * **Chapter labs** (`#/lab/<id>`): each of the 44 videos maps to an interactive lab
   that rebuilds what that video builds. Examples: the 555 timer modes, SR/D latches,

@@ -445,8 +445,9 @@ try {
 
   await check('VR view: a door of the Hallway leads in, and its way back out', async () => {
     // A door's link (the Hallway's README, "Going in"), its way back a page of this site, so the
-    // click on it can be followed without leaving: "← Hallway" on the bar and the panel, what the
-    // door added off the address, a session granted on arrival asked for at once (src/vr/hallway.ts).
+    // click on it can be followed without leaving: "← Hallway" on the bar and the panel, the doorway
+    // back in the room (src/vr/door.ts; with no views.json here it shows its name), what the door
+    // added off the address, a session granted on arrival asked for at once (src/vr/hallway.ts).
     const before = errors.length;
     const back = `${base}#/more`;
     await page.goto(`${base}vr.html?from=hallway&back=${encodeURIComponent(back)}&dx=0.12&yaw=-8&pitch=-3&dw=1.1&dh=2.25&glow=d8543f`, 3000);
@@ -459,30 +460,36 @@ try {
         navigator.xr.dispatchEvent(new Event('sessiongranted'));
         await new Promise((r) => setTimeout(r, 100));
       }
-      return { link: a && [a.textContent, a.href], search: location.search, panel: breadboardVR.panelLabels(), asked };
+      return { link: a && [a.textContent, a.href], search: location.search, panel: breadboardVR.panelLabels(), asked, door: breadboardVR.door?.group.name ?? null };
     })()`);
     assert(r.link?.[0] === '← Hallway' && r.link[1] === back, `the bar's link: ${JSON.stringify(r.link)}`);
     assert(r.search === '', `the address kept ${r.search}`);
     assert(r.panel.includes('← Hallway'), `the panel: ${r.panel.join(', ')}`);
     assert(!r.asked || r.asked.join() === 'immersive-vr', `on sessiongranted it asked for ${JSON.stringify(r.asked)}`);
-    // the way back lasts the visit (this tab), and a real click on the panel's corner button takes it
+    assert(r.door === 'doorway', 'no doorway back in the room');
+    // the way back lasts the visit (this tab), and a real click on the panel's corner button takes
+    // it, and one on the doorway (turned to face it)
+    const clickAt = async (what, at) => {
+      assert(at, `no ${what}`);
+      const under = await page.evaluate(`document.elementFromPoint(${at.x}, ${at.y})?.tagName`);
+      assert(under === 'CANVAS', `the ${what} is under a ${under}`);
+      for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await page.send('Input.dispatchMouseEvent', { type, x: at.x, y: at.y, button: type === 'mouseMoved' ? 'none' : 'left', buttons: type === 'mousePressed' ? 1 : 0, clickCount: 1 });
+      await sleep(1500);
+      const went = await page.evaluate('location.href');
+      assert(went === back, `the ${what} went to ${went}`);
+    };
     await page.goto(`${base}vr.html`, 3000);
-    const p = await page.evaluate(`breadboardVR.panelPoint('← Hallway')`);
-    assert(p, 'after a reload, no "← Hallway" on the panel');
-    const under = await page.evaluate(`document.elementFromPoint(${p.x}, ${p.y})?.tagName`);
-    assert(under === 'CANVAS', `the panel's corner button is under a ${under}`);
-    for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await page.send('Input.dispatchMouseEvent', { type, x: p.x, y: p.y, button: type === 'mouseMoved' ? 'none' : 'left', buttons: type === 'mousePressed' ? 1 : 0, clickCount: 1 });
-    await sleep(1500);
-    const went = await page.evaluate('location.href');
-    assert(went === back, `the corner button went to ${went}`);
+    await clickAt(`panel's corner button`, await page.evaluate(`breadboardVR.panelPoint('← Hallway')`));
+    await page.goto(`${base}vr.html`, 3000);
+    await clickAt('doorway', await page.evaluate(`(breadboardVR.look([0, 1.55, -0.5], [0, 1.25, 1.8]), breadboardVR.doorPoint())`));
     // through no door, no way back
     await page.evaluate('sessionStorage.clear()');
     await page.goto(`${base}vr.html`, 3000);
-    const none = await page.evaluate(`({ way: breadboardVR.way, link: !!document.querySelector('.vr-hallway'), panel: breadboardVR.panelLabels() })`);
-    assert(!none.way && !none.link && !none.panel.includes('← Hallway'), `through no door, yet ${JSON.stringify(none)}`);
+    const none = await page.evaluate(`({ way: breadboardVR.way, link: !!document.querySelector('.vr-hallway'), panel: breadboardVR.panelLabels(), door: !!breadboardVR.door })`);
+    assert(!none.way && !none.link && !none.panel.includes('← Hallway') && !none.door, `through no door, yet ${JSON.stringify(none)}`);
     const errs = errors.slice(before);
     assert(!errs.length, errs.join('\n'));
-    return `"← Hallway" on the bar and the panel, the address cleaned, ${r.asked ? 'a granted session asked for, ' : ''}kept on reload, taken by a click; none through no door`;
+    return `"← Hallway" on the bar and the panel and a doorway back, the address cleaned, ${r.asked ? 'a granted session asked for, ' : ''}kept on reload, taken by clicks on the panel and the doorway; none through no door`;
   });
 
   // ---- phone --------------------------------------------------------------------------

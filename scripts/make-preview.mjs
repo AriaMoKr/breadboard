@@ -6,7 +6,8 @@
 //   shows it through this site's door (the Hallway's door entry names it as its `preview`), also
 //   the picture of vr.html's link preview.
 // Run it again after changing the breadboard view or the VR room; the JPEGs are committed.
-// `--back <m>` stands that far behind the VR view's start, `--dir <folder>` writes both elsewhere.
+// `--back <m>` takes the VR room from that far behind its start (by default where a visitor coming
+// through the Hallway's door arrives: breadboardVR.preview), `--dir <folder>` writes both elsewhere.
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -17,9 +18,7 @@ const arg = (name, fallback) => {
   const i = process.argv.indexOf(name);
   return i > 0 ? process.argv[i + 1] : fallback;
 };
-// From the start (0 m) the panel fills the picture and the table is below it; 1.2 m back the whole
-// table and the computer on it are in the picture's lower middle, which a doorway shows best.
-const BACK = Number(arg('--back', '1.2'));
+const BACK = arg('--back', null);
 const dir = arg('--dir', fileURLToPath(new URL('../public/', import.meta.url)));
 // The part of the breadboard view's layout shown (x y w h, in 0.1" pitches, as the SVG's viewBox):
 // both columns of boards across their middle rows, from the RAM and B register down to the decimal
@@ -73,9 +72,9 @@ try {
     m.stop();
     m.reset();
     for (let i = 0; i < 40; i++) m.stepInstruction();
-    return breadboardVR.preview(2048, ${BACK});
+    return breadboardVR.preview(2048${BACK === null ? '' : `, ${Number(BACK)}`});
   })()`);
-  save('hallway-preview.jpg', jpeg.slice(jpeg.indexOf(',') + 1), `2048 x 1024, the VR room from ${BACK} m behind the start`);
+  save('hallway-preview.jpg', jpeg.slice(jpeg.indexOf(',') + 1), `2048 x 1024, the VR room${BACK === null ? '' : ` from ${BACK} m behind its start`}`);
 } finally {
   await chrome.close();
   await server.close();

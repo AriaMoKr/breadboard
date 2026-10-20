@@ -5,7 +5,8 @@ import { decodeLayout } from '../breadboard/share';
 import { buildLabel } from '../build-info';
 import { Carry, Twist } from './carry';
 import { EXAMPLE_IDS, circuitExhibit, computerExhibit, exampleExhibit, exhibitHash, parseExhibitHash, type Exhibit, type ExhibitChoice, type Hold } from './exhibits';
-import { wayBack, withoutVisit, type WayBack } from './hallway';
+import { buildDoorway } from './door';
+import { DOOR, doorOf, hallwayViews, keptDoor, leaveUrl, readVisit, wayBack, withoutVisit } from './hallway';
 import { BOARD_T, buildComputerModel, disposeTree, type ComputerModel, type ControlHit } from './model';
 import { ControlPanel, Tooltip } from './panel';
 import { boardTexture, labelTexture } from './textures';
@@ -27,6 +28,17 @@ const TITLE = document.title;
 
 const host = document.getElementById('vr-root')!;
 const statusEl = document.getElementById('vr-status')!;
+
+// On the dev server, vr.html?xr=emulate emulates a Quest 3 with Meta's IWER, before anything asks
+// navigator.xr (Chromium has a native one even without a headset, so it is replaced). A build
+// leaves this out: import.meta.env.DEV is false there, and the import goes with it.
+let xrDevice: import('iwer').XRDevice | null = null;
+if (import.meta.env.DEV && new URLSearchParams(location.search).get('xr') === 'emulate') {
+  const { XRDevice, metaQuest3 } = await import('iwer');
+  xrDevice = new XRDevice(metaQuest3);
+  xrDevice.installRuntime({ forceInstall: true });
+  console.info('breadboard: IWER WebXR emulation installed (Meta Quest 3)');
+}
 
 let renderer: THREE.WebGLRenderer;
 try {
@@ -58,32 +70,50 @@ void navigator.xr?.isSessionSupported('immersive-vr').then((ok) => {
 }, () => {});
 document.querySelector('.vr-bar')?.append(Object.assign(document.createElement('span'), { className: 'vr-build', title: 'The commit this was built from, and its date', textContent: buildLabel() }));
 
-// ---- the way back, when a door of the Hallway led here (hallway.ts) ----
-// What the door added to the address is read once and taken off it. The way back stays for this
-// tab (a reload, or the main page and back) in sessionStorage. It is on the page's bar and in the
-// panel's corner; taken in VR, Quest Browser can keep the visitor in VR on the Hallway's side.
-const WAY_KEY = 'breadboard:wayBack';
-const way: WayBack | null = (() => {
-  const found = wayBack(location.search, location.origin);
+// ---- the way back, when a door of the Hallway led here (hallway.ts, door.ts) ----
+// What the door added to the address is read once and taken off it. The way back and its doorway
+// (size, glow) stay for this tab (a reload, or the main page and back) in sessionStorage. It is on
+// the page's bar, in the panel's corner, and a doorway in the room behind where the visitor
+// arrives, with the Hallway seen through it; taken in VR, Quest Browser can keep the visitor in VR
+// on the Hallway's side.
+const DOOR_KEY = 'breadboard:door';
+const visit = readVisit(location.search);
+const found = wayBack(location.search, location.origin);
+const kept = (() => {
   try {
-    if (found) sessionStorage.setItem(WAY_KEY, JSON.stringify(found));
-    else {
-      const kept = JSON.parse(sessionStorage.getItem(WAY_KEY) ?? 'null') as WayBack | null;
-      if (kept && /^https?:/.test(kept.url) && kept.label && kept.title) return kept;
-    }
+    if (!found) return keptDoor(sessionStorage.getItem(DOOR_KEY));
+    const k = doorOf(found, visit);
+    sessionStorage.setItem(DOOR_KEY, JSON.stringify(k));
+    return k;
   } catch {
-    // no storage (a private window, blocked site data): the way back lasts this page only
+    return found && doorOf(found, visit); // no storage (a private window, blocked site data): the way back lasts this page only
   }
-  return found;
 })();
+const way = kept?.way ?? null;
 const unvisited = withoutVisit(location.href);
 if (unvisited !== location.pathname + location.search + location.hash) history.replaceState(null, '', unvisited);
-const leave = () => void (way && location.assign(way.url));
+let leaving = false;
+/** Back through the door. */
+function go() {
+  if (!way || leaving) return;
+  leaving = true;
+  location.assign(leaveUrl(way, null));
+  setTimeout(() => (leaving = false), 12000); // still here: the navigation was stopped or failed
+}
+addEventListener('pageshow', (e) => {
+  if (e.persisted) leaving = false; // back from the Hallway through the browser's back/forward cache
+});
 if (way) document.querySelector('.vr-bar')?.prepend(Object.assign(document.createElement('a'), { className: 'vr-hallway', href: way.url, title: way.title, textContent: way.label }));
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#111318');
 const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.01, 50);
+// The camera and the controllers ride on a rig: in VR it is where the visitor stands in the room
+// and which way the room is turned for them. On a screen it stays at the origin.
+const rig = new THREE.Group();
+rig.name = 'rig';
+rig.add(camera);
+scene.add(rig);
 const HOME = { eye: new THREE.Vector3(0, 1.3, -0.02), target: new THREE.Vector3(0, TABLE_TOP + 0.1, TABLE_Z - 0.2) };
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
@@ -96,13 +126,17 @@ const fitLens = () => {
   camera.fov = camera.aspect < 1 ? 66 : 50;
   camera.updateProjectionMatrix();
 };
-/** The home view, pulled back on narrow screens until the table fits across as on a 16:10 one. */
-function homeView() {
+/** The home view's eye and target, pulled back on narrow screens until the table fits across as on a 16:10 one. */
+function homePose(): [THREE.Vector3, THREE.Vector3] {
   fitLens();
   const want = Math.tan(THREE.MathUtils.degToRad(25)) * 1.6 * 0.85;
   const shown = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect;
-  camera.position.copy(HOME.target).addScaledVector(HOME.eye.clone().sub(HOME.target), Math.max(1, want / shown));
-  controls.target.copy(HOME.target);
+  return [HOME.target.clone().addScaledVector(HOME.eye.clone().sub(HOME.target), Math.max(1, want / shown)), HOME.target.clone()];
+}
+function homeView() {
+  const [eye, target] = homePose();
+  camera.position.copy(eye);
+  controls.target.copy(target);
   controls.update();
 }
 homeView();
@@ -131,8 +165,26 @@ for (const [x, z] of [[-0.5, -0.44], [0.5, -0.44], [-0.5, 0.44], [0.5, 0.44]]) {
 table.position.z = TABLE_Z;
 scene.add(table);
 
+// The doorway back stands behind the start, facing the table. Coming through it, the visitor
+// arrives where the Hallway's picture of this room is taken (preview(), below), so the room
+// carries on from what the doorway showed: dx to the side, turned by yaw, as they went through.
+// From the start (0 m) the panel would fill that picture with the table below it; 1.2 m back the
+// whole table and the computer on it are in its lower middle, which a doorway shows best.
+const DOOR_Z = 1.8;
+const ARRIVE_Z = 1.2;
+const anisotropy = renderer.capabilities.getMaxAnisotropy();
+const door = kept && buildDoorway({ width: kept.width, height: kept.height, z: DOOR_Z, glow: kept.glow, name: kept.way.name, anisotropy });
+if (door) {
+  scene.add(door.group);
+  const views = hallwayViews(kept.way);
+  if (views) void door.loadView(views);
+}
+const jamb = (kept?.width ?? DOOR.width) / 2 - 0.25;
+/** Where a visitor coming through the door now stands and faces (yaw + to the left), or null. */
+let arrival = found ? { x: Math.min(jamb, Math.max(-jamb, visit.dx ?? 0)), yaw: visit.yaw ?? 0, pitch: visit.pitch ?? 0 } : null;
+
 // ---- what is on the table: the exhibit, its model, and its control panel ----
-const boardTex = boardTexture(renderer.capabilities.getMaxAnisotropy()); // shared by every model
+const boardTex = boardTexture(anisotropy); // shared by every model
 let exhibit: Exhibit | null = null;
 let choice: ExhibitChoice = { kind: 'computer' };
 let model: ComputerModel | null = null;
@@ -203,12 +255,12 @@ function setExhibit(next: Exhibit, c: ExhibitChoice) {
     ],
     next.title,
     buildLabel(),
-    way ? { label: () => way.label, run: leave } : undefined,
+    way ? { label: () => way.label, run: go } : undefined,
   );
   panel.group.position.set(0, TABLE_TOP + 0.3, TABLE_Z - 0.62);
   panel.group.rotation.x = -0.12;
   scene.add(panel.group);
-  targets = [...panel.targets, ...model.hitTargets];
+  targets = [...panel.targets, ...model.hitTargets, ...(door ? [door.portal] : [])];
   hover(null);
 
   history.replaceState(null, '', location.pathname + location.search + exhibitHash(c));
@@ -243,6 +295,7 @@ const raycaster = new THREE.Raycaster();
 const pick = (): THREE.Intersection | undefined => raycaster.intersectObjects(targets, false)[0];
 const hitOf = (o: THREE.Object3D | null | undefined): ControlHit | null => (o && model?.hitTargets.includes(o as THREE.Mesh) ? (o.userData as ControlHit) : null);
 const isPanel = (o: THREE.Object3D | null | undefined) => !!o && !!panel?.targets.includes(o as THREE.Mesh);
+const isDoor = (o: THREE.Object3D | null | undefined) => !!door && o === door.portal;
 const begin = (hit: ControlHit): Hold | null => exhibit?.begin(hit) ?? null;
 
 const tooltip = new Tooltip();
@@ -304,6 +357,7 @@ const finish = (e: PointerEvent, cancelled: boolean) => {
   else if (click) {
     const o = fromPointer(e);
     if (isPanel(o)) panel!.press(o!);
+    else if (isDoor(o)) go();
   }
   press = null;
   controls.enabled = true;
@@ -312,8 +366,8 @@ renderer.domElement.addEventListener('pointerup', (e) => finish(e, false));
 renderer.domElement.addEventListener('pointercancel', (e) => finish(e, true));
 
 // Double-click (or double-tap) the boards to fly three times closer to that spot: on a screen the
-// switches are small from the home view.
-let fly: { from: [THREE.Vector3, THREE.Vector3]; to: [THREE.Vector3, THREE.Vector3]; t: number } | null = null;
+// switches are small from the home view. (Coming through the door, the view flies home the same way.)
+let fly: { from: [THREE.Vector3, THREE.Vector3]; to: [THREE.Vector3, THREE.Vector3]; t: number; ms: number; wait: number } | null = null;
 renderer.domElement.addEventListener('dblclick', (e) => {
   if (!model) return;
   fromPointer(e);
@@ -321,15 +375,28 @@ renderer.domElement.addEventListener('dblclick', (e) => {
   if (!spot) return;
   const dist = Math.max(controls.minDistance, camera.position.distanceTo(controls.target) / 3);
   const eye = spot.clone().add(camera.position.clone().sub(controls.target).setLength(dist));
-  fly = { from: [camera.position.clone(), controls.target.clone()], to: [eye, spot], t: 0 };
+  fly = { from: [camera.position.clone(), controls.target.clone()], to: [eye, spot], t: 0, ms: 350, wait: 0 };
 });
 function flyOn(ms: number) {
   if (!fly) return;
-  fly.t = Math.min(1, fly.t + ms / 350);
+  if (fly.wait > 0) return void (fly.wait -= ms);
+  fly.t = Math.min(1, fly.t + ms / fly.ms);
   const k = 1 - (1 - fly.t) ** 3; // ease out
   camera.position.lerpVectors(fly.from[0], fly.to[0], k);
   controls.target.lerpVectors(fly.from[1], fly.to[1], k);
   if (fly.t === 1) fly = null;
+}
+// Through the door on a screen: the view starts where the doorway showed the room from, looking as
+// the visitor did, then flies to the table.
+if (arrival) {
+  const a = arrival;
+  const eye = new THREE.Vector3(a.x, 1.6, ARRIVE_Z);
+  const ahead = new THREE.Vector3(-Math.sin(a.yaw) * Math.cos(a.pitch), Math.sin(a.pitch), -Math.cos(a.yaw) * Math.cos(a.pitch));
+  const target = eye.clone().addScaledVector(ahead, 2);
+  camera.position.copy(eye);
+  controls.target.copy(target);
+  controls.update();
+  fly = { from: [eye, target], to: homePose(), t: 0, ms: 1600, wait: 700 };
 }
 
 // VR controllers: the trigger points and presses, the grip picks the boards up (both grips: pull
@@ -346,13 +413,14 @@ for (const i of [0, 1]) {
   const ray = { ctrl, line, hold: null as Held | null };
   ctrl.addEventListener('selectstart', () => {
     raycaster.setFromXRController(ctrl);
-    const found = pick();
-    const o = found?.object;
+    const picked = pick();
+    const o = picked?.object;
     const hit = hitOf(o);
     const hold = hit && begin(hit);
-    debugLog('trigger', { hand: i, on: hit ? `${hit.part}${hit.bit === undefined ? '' : `#${hit.bit}`}` : isPanel(o) ? `panel: ${panel!.labelOf(o!)}` : 'nothing', m: found && +found.distance.toFixed(3) });
+    debugLog('trigger', { hand: i, on: hit ? `${hit.part}${hit.bit === undefined ? '' : `#${hit.bit}`}` : isPanel(o) ? `panel: ${panel!.labelOf(o!)}` : isDoor(o) ? 'doorway' : 'nothing', m: picked && +picked.distance.toFixed(3) });
     if (hold) ray.hold = { hold, object: o!, twist: new Twist(ctrl.quaternion) };
     else if (isPanel(o)) panel!.press(o!);
+    else if (isDoor(o)) go();
   });
   ctrl.addEventListener('selectend', () => {
     ray.hold?.hold.end(true);
@@ -369,7 +437,7 @@ for (const i of [0, 1]) {
     carry?.grip(holding);
     debugLog('grip', { hand: i, hands: holding.length, scale: model && +(model.root.scale.x / home).toFixed(2) });
   });
-  scene.add(ctrl);
+  rig.add(ctrl); // with the visitor, wherever the rig stands
   rays.push(ray);
 }
 function pointControllers() {
@@ -393,6 +461,10 @@ renderer.xr.addEventListener('sessionstart', () => {
   fromButton = clicked;
   clicked = false;
   dirty = true;
+  // Through the door just now: at the door, turned as they went through. Else at the start.
+  rig.position.set(arrival?.x ?? 0, 0, arrival ? ARRIVE_Z : 0);
+  rig.rotation.set(0, arrival?.yaw ?? 0, 0);
+  arrival = null;
   debugLog('session', { vr: true, from: fromButton ? 'button' : 'browser' });
 });
 
@@ -440,6 +512,8 @@ renderer.xr.addEventListener('sessionend', () => {
   holding.length = 0;
   carry?.grip(holding);
   for (const ray of rays) ray.hold = null;
+  rig.position.set(0, 0, 0); // the screen view orbits from the origin
+  rig.rotation.set(0, 0, 0);
   putBack(); // the screen view looks at the table
   homeView();
   setTimeout(fitScreen); // once three.js has given the canvas back
@@ -455,9 +529,15 @@ function fitScreen() {
 addEventListener('resize', fitScreen);
 addEventListener('hashchange', () => void open(parseExhibitHash(location.hash)));
 let last = performance.now();
+const head = new THREE.Vector3();
 renderer.setAnimationLoop(() => {
   const now = performance.now();
   if (exhibit?.frame(now - last)) dirty = true;
+  if (door) {
+    camera.getWorldPosition(head);
+    door.update(Math.min(0.1, (now - last) / 1000), head, isDoor(hovered));
+    if (inVR() && door.crossed(head)) go(); // stepped back through it (on a screen the orbit may swing through it)
+  }
   if (inVR()) {
     carry?.follow(holding);
     pointControllers();
@@ -516,8 +596,24 @@ Object.assign(window, {
     get machine() {
       return exhibit && 'machine' in exhibit ? exhibit.machine : undefined;
     },
-    /** Where "← Hallway" leads (hallway.ts), or null. */
+    /** Where "← Hallway" leads (hallway.ts), or null; the door's link, read; the doorway back (door.ts), or null. */
     way,
+    visit,
+    door,
+    /** In VR: where the visitor stands and which way the room is turned for them. */
+    rig,
+    camera,
+    /** IWER's emulated headset (?xr=emulate on the dev server), else null. */
+    xrDevice,
+    /** Where on the screen the doorway's opening is (its middle), or null without one. */
+    doorPoint: () => (door ? onScreen(door.portal, (b) => b.getCenter(new THREE.Vector3())) : null),
+    /** Looks from `eye` at `target` on the screen (metres, [x, y, z]), as dragging the view would. */
+    look(eye: [number, number, number], target: [number, number, number]) {
+      fly = null;
+      camera.position.set(...eye);
+      controls.target.set(...target);
+      controls.update();
+    },
     /** The panel's buttons, by label. */
     panelLabels: () => panel?.targets.map((t) => panel!.labelOf(t)) ?? [],
     screenPoint(part: string, bit?: number) {
@@ -534,9 +630,10 @@ Object.assign(window, {
      * (scripts/make-preview.mjs writes it to public/hallway-preview.jpg). The Hallway hangs a door's
      * picture 2.4 m behind the opening, 3 m tall and twice as wide, its horizon at 0.56 of its height
      * and at eye height, 1.6 m (its hall.js, PICTURE): so this is the view from 1.6 m up, looking
-     * straight in, through that frame. `back`: how far behind the start (the origin) it is taken.
+     * straight in, through that frame. `back`: how far behind the start (the origin) it is taken;
+     * by default where a visitor coming through the door arrives, in front of the doorway back.
      */
-    preview(width = 2048, back = 0) {
+    preview(width = 2048, back = ARRIVE_Z) {
       const P = { depth: 2.4, height: 3, eye: 1.6, horizon: 0.56 };
       const cam = new THREE.PerspectiveCamera();
       cam.position.set(0, P.eye, back);
