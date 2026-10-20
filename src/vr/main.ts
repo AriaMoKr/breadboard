@@ -13,6 +13,8 @@ import { AimStick, TurnStick, XR_WALK, clampWalk, headYaw, standable, turnedAbou
 import { loadNav, saveNav, type Nav } from './nav';
 import { ControlPanel, Tooltip } from './panel';
 import { boardTexture, labelTexture } from './textures';
+import { Together } from './together';
+import { roomFromUrl } from 'layersharedsession/room.js';
 import './vr.css';
 
 /**
@@ -102,7 +104,10 @@ let leaveTimer = 0;
 function go() {
   if (!way || leaving) return;
   leaving = true;
-  const url = leaveUrl(way, null);
+  // The link carries the shared session's room on; leaving it now lets the others see the visitor
+  // go at once (the fade gives the leaving message time to go out).
+  const url = leaveUrl(way, together.room);
+  together.pause();
   if (inVR()) fade.to(1, 0.3, () => location.assign(url));
   else location.assign(url);
   clearTimeout(leaveTimer);
@@ -113,11 +118,15 @@ function cameBack() {
   leaving = false;
   clearTimeout(leaveTimer);
   fade.to(0, 0.6);
+  together.resume();
 }
 addEventListener('pageshow', (e) => {
   if (e.persisted) cameBack();
 });
-if (way) document.querySelector('.vr-bar')?.prepend(Object.assign(document.createElement('a'), { className: 'vr-hallway', href: way.url, title: way.title, textContent: way.label }));
+// Leaving another way (the bar's link, the address bar, closing the tab): out of the session too.
+addEventListener('pagehide', () => together.pause());
+const wayLink = way && Object.assign(document.createElement('a'), { className: 'vr-hallway', href: way.url, title: way.title, textContent: way.label });
+if (wayLink) document.querySelector('.vr-bar')?.prepend(wayLink);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#111318');
@@ -212,6 +221,9 @@ const store = (() => {
   }
 })();
 const nav: Nav = loadNav(store);
+// The shared session (together.ts): an address with ?room= (an invitation, or the Hallway's door
+// in a session) joins it, below; the room's panel and the page's bar start and leave one.
+const together = new Together({ scene, camera, renderer, hands: () => rays.map((r) => ({ controller: r.ctrl, source: r.source })) });
 function setNav(next: Partial<Nav>) {
   Object.assign(nav, next);
   saveNav(store, nav);
@@ -222,20 +234,55 @@ const roomPanel = new ControlPanel(
   [
     { label: () => `Move: ${nav.move === 'smooth' ? 'Smooth' : 'Teleport'}`, run: () => setNav({ move: nav.move === 'smooth' ? 'teleport' : 'smooth' }) },
     { label: () => `Turn: ${nav.turn === 'snap' ? 'Snap' : 'Smooth'}`, run: () => setNav({ turn: nav.turn === 'snap' ? 'smooth' : 'snap' }) },
+    { label: () => (together.active ? 'Leave session' : 'Start session'), run: () => toggleSession() },
   ],
-  'Moving about',
+  'Moving about · Together',
 );
 roomPanel.group.position.set(-1.05, 1.2, -0.45);
 roomPanel.group.lookAt(0, 1.45, 0.4);
 scene.add(roomPanel.group);
+/** The panel's status: in a session how it goes and its invitation, else what the sticks do. */
 function showRoom() {
   roomPanel.refresh();
-  roomPanel.setStatus([
-    nav.move === 'smooth' ? 'Left stick: walk the way you face' : 'Left stick forward: aim; let go: jump',
-    nav.turn === 'snap' ? 'Right stick: turn 30° a push' : 'Right stick: turn while held',
-  ]);
+  roomPanel.setStatus(
+    together.active
+      ? [`Together: ${together.status()}`, together.inviteLink.replace(/^https?:\/\//, '')]
+      : [nav.move === 'smooth' ? 'Left stick: walk the way you face' : 'Left stick forward: aim; let go: jump', nav.turn === 'snap' ? 'Right stick: turn 30° a push' : 'Right stick: turn while held'],
+  );
 }
-showRoom();
+function toggleSession() {
+  if (together.active) {
+    together.stop();
+    toast('You left the shared session');
+  } else {
+    together.start();
+    toast(inVR() ? 'Shared session started: its link is on the room’s panel' : 'Shared session started: Copy invite link brings others in');
+  }
+}
+// On a screen, the session on the page's bar: start it, and in one, how it goes, the invitation to
+// copy, and leaving it.
+const bar = document.querySelector('.vr-bar');
+const sessionBox = Object.assign(document.createElement('span'), { className: 'vr-together' });
+const sessionState = Object.assign(document.createElement('span'), { className: 'vr-together-status' });
+const sessionButton = Object.assign(document.createElement('button'), { type: 'button' });
+const copyButton = Object.assign(document.createElement('button'), { type: 'button', textContent: 'Copy invite link' });
+sessionButton.addEventListener('click', toggleSession);
+copyButton.addEventListener('click', () => {
+  navigator.clipboard.writeText(together.inviteLink).then(() => toast('Invite link copied'), () => toast(`Copy this link: ${together.inviteLink}`));
+});
+sessionBox.append(sessionState, copyButton, sessionButton);
+bar?.querySelector('.vr-build')?.before(sessionBox);
+function showSession() {
+  showRoom();
+  sessionButton.textContent = together.active ? 'Leave' : 'Start shared session';
+  sessionButton.title = together.active ? 'Leave the shared session' : 'Share this room: others who open its link see you here, and in the Hallway';
+  copyButton.hidden = !together.active;
+  sessionState.textContent = together.active ? `Together: ${together.status()}` : '';
+  if (wayLink && way) wayLink.href = leaveUrl(way, together.room);
+}
+together.onChange = showSession;
+together.onNotice = (text) => toast(text);
+showSession();
 /** Where a visitor coming through the door now stands and faces (yaw + to the left), or null. */
 let arrival = found ? { x: Math.min(jamb, Math.max(-jamb, visit.dx ?? 0)), yaw: visit.yaw ?? 0, pitch: visit.pitch ?? 0 } : null;
 
@@ -249,7 +296,19 @@ let home = UNIT; // the model's scale on the table
 let carry: Carry | null = null;
 let targets: THREE.Object3D[] = [];
 let notice = '';
+let toastText = '';
+let toastTimer = 0;
 let dirty = true;
+/** A message on the status line for a few seconds. */
+function toast(text: string) {
+  toastText = text;
+  statusDue = true;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    toastText = '';
+    statusDue = true;
+  }, 4000);
+}
 
 /** What "Next ▸" goes through: the computer, the sandbox's examples, and first a shared circuit when the link had one. */
 const order: ExhibitChoice[] = [{ kind: 'computer' }, ...EXAMPLE_IDS.map((id): ExhibitChoice => ({ kind: 'example', id }))];
@@ -343,7 +402,7 @@ function syncStatus(now: number) {
   statusAt = now;
   const lines = exhibit.status();
   panel.setStatus(lines);
-  statusEl.textContent = [notice, ...lines].filter(Boolean).join(' · ');
+  statusEl.textContent = [toastText || notice, ...lines].filter(Boolean).join(' · ');
 }
 
 // ---- pointing: mouse / finger on screen, controller rays in VR ----
@@ -704,6 +763,7 @@ renderer.setAnimationLoop(() => {
     if (inVR() && door.crossed(head)) go(); // walked or stepped back through it (on a screen the orbit may swing through it)
   }
   fade.update(dt);
+  together.update(now);
   if (inVR()) {
     carry?.follow(holding);
     pointControllers();
@@ -722,6 +782,9 @@ renderer.setAnimationLoop(() => {
   debugPerf(now, gap);
 });
 void open(parseExhibitHash(location.hash));
+// An invitation, or the Hallway's door in a shared session, names a room: join it.
+const invited = roomFromUrl(location.href);
+if (invited) together.start(invited);
 
 // Walked in from another page's immersive session (a door of the Hallway): Quest Browser can grant
 // this page a session without a click (sessiongranted; vr.html notes one that came before this
@@ -770,6 +833,8 @@ Object.assign(window, {
     rig,
     /** How the visitor moves in VR (nav.ts), as the room's panel shows it. */
     nav,
+    /** The shared session (together.ts). */
+    together,
     camera,
     /** IWER's emulated headset (?xr=emulate on the dev server), else null. */
     xrDevice,

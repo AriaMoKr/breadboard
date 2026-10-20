@@ -64,6 +64,15 @@ video by video.
   hung with the Hallway's own doorway shader: `src/vr/door.ts`, `src/vr/portal.ts`). Pointing at
   it, clicking it or stepping back through it leads back. On a screen the view starts where the
   doorway showed the room from, then glides to the table.
+  **Together**: **Start session** on the room's panel (or, on a screen, **Start shared session**
+  on the page's bar) shares the room through the Hallway's shared session
+  ([layersharedsession](https://github.com/AriaMoKr/layersharedsession): peer to peer over
+  WebRTC, finding the others through public Nostr relays; nothing connects until a session
+  starts). Its address (`vr.html?room=…`) is the invitation (**Copy invite link**). Everyone in
+  it sees the others who are here as a head with a visor, their hands in VR, a ring on the floor
+  and their name, and the status says how many are here and elsewhere (in the Hallway, or behind
+  another of its doors). A visitor who comes through the Hallway's door in a session stays in it,
+  and the way back carries it on (`src/vr/together.ts`).
   [![The VR view's room seen from just inside its door: the computer on a table, its control panel behind it](public/hallway-preview.jpg)](https://ariamokr.github.io/breadboard/vr.html)
 * **Chapter labs** (`#/lab/<id>`): each of the 44 videos maps to an interactive lab
   that rebuilds what that video builds. Examples: the 555 timer modes, SR/D latches,
