@@ -487,7 +487,9 @@ try {
     await page.goto(`${base}vr.html`, 3000);
     const none = await page.evaluate(`({ way: breadboardVR.way, link: !!document.querySelector('.vr-hallway'), panel: breadboardVR.panelLabels(), door: !!breadboardVR.door })`);
     assert(!none.way && !none.link && !none.panel.includes('← Hallway') && !none.door, `through no door, yet ${JSON.stringify(none)}`);
-    const errs = errors.slice(before);
+    // The doorway asks for the Hallway's views.json next to the way back: here this site, which
+    // has none, so the opening shows its name. A static host answers 404, which Chrome logs.
+    const errs = errors.slice(before).filter((e) => !/404.*\/views\/views\.json/.test(e));
     assert(!errs.length, errs.join('\n'));
     return `"← Hallway" on the bar and the panel and a doorway back, the address cleaned, ${r.asked ? 'a granted session asked for, ' : ''}kept on reload, taken by clicks on the panel and the doorway; none through no door`;
   });
