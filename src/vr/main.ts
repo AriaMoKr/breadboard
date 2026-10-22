@@ -7,10 +7,11 @@ import { Carry, Twist } from './carry';
 import { EXAMPLE_IDS, circuitExhibit, computerExhibit, exampleExhibit, exhibitHash, parseExhibitHash, type Exhibit, type ExhibitChoice, type Hold } from './exhibits';
 import { buildDoorway } from './door';
 import { Fade } from './fade';
-import { DOOR, doorOf, hallwayViews, keptDoor, leaveUrl, readVisit, wayBack, withoutVisit } from './hallway';
+import { hallwayViews, leaveUrl, readVisit, wayBack, withoutVisit } from 'common/door.js';
+import { loadNav, saveNav, type Nav } from 'common/nav.js';
+import { BREADBOARD_ID, DOOR, doorOf, keptDoor } from './hallway';
 import { BOARD_T, buildComputerModel, disposeTree, type ComputerModel, type ControlHit } from './model';
 import { AimStick, TurnStick, XR_WALK, clampWalk, headYaw, standable, turnedAbout, walkDelta, wrapAngle, type Rect } from './move';
-import { loadNav, saveNav, type Nav } from './nav';
 import { ControlPanel, Tooltip } from './panel';
 import { boardTexture, labelTexture } from './textures';
 import { Together } from './together';
@@ -22,9 +23,10 @@ import './vr.css';
  * sandbox (vr.html#c1.… from a share link, or #example/<id>). In a headset (WebXR, "Enter VR")
  * you point with a controller and pull the trigger, at the control panel behind the table or at
  * the switches and buttons on the boards; the grip buttons pick the boards up (both grips: pull
- * apart to make them bigger); the sticks walk and turn, as in the Hallway (move.ts, nav.ts, and the
- * room's panel left of the table). On a screen you orbit with the mouse or a finger and click the
- * panel and the boards. "Next ▸" on the panel goes through the computer and the examples.
+ * apart to make them bigger); the sticks walk and turn, as in the Hallway (move.ts, common's
+ * nav.js, and the room's panel left of the table). On a screen you orbit with the mouse or a
+ * finger and click the panel and the boards. "Next ▸" on the panel goes through the computer and
+ * the examples.
  */
 
 const UNIT = 0.00254 * 1.5; // one breadboard pitch (0.1") in metres, at 1.5x real size
@@ -76,7 +78,7 @@ void navigator.xr?.isSessionSupported('immersive-vr').then((ok) => {
 }, () => {});
 document.querySelector('.vr-bar')?.append(Object.assign(document.createElement('span'), { className: 'vr-build', title: 'The commit this was built from, and its date', textContent: buildLabel() }));
 
-// ---- the way back, when a door of the Hallway led here (hallway.ts, door.ts) ----
+// ---- the way back, when a door of the Hallway led here (common's door.js, hallway.ts, door.ts) ----
 // What the door added to the address is read once and taken off it. The way back and its doorway
 // (size, glow) stay for this tab (a reload, or the main page and back) in sessionStorage. It is on
 // the page's bar, in the panel's corner, and a doorway in the room behind where the visitor
@@ -84,7 +86,8 @@ document.querySelector('.vr-bar')?.append(Object.assign(document.createElement('
 // on the Hallway's side.
 const DOOR_KEY = 'breadboard:door';
 const visit = readVisit(location.search);
-const found = wayBack(location.search, location.origin);
+// Visited without a door (the main page's link, a bookmark), there is no way back: always: false.
+const found = wayBack(location.search, BREADBOARD_ID, { origin: location.origin, always: false });
 const kept = (() => {
   try {
     if (!found) return keptDoor(sessionStorage.getItem(DOOR_KEY));
@@ -202,7 +205,7 @@ const anisotropy = renderer.capabilities.getMaxAnisotropy();
 const door = kept && buildDoorway({ width: kept.width, height: kept.height, z: DOOR_Z, glow: kept.glow, name: kept.way.name, anisotropy });
 if (door) {
   scene.add(door.group);
-  const views = hallwayViews(kept.way);
+  const views = hallwayViews(kept.way, BREADBOARD_ID);
   if (views) void door.loadView(views);
 }
 const jamb = (kept?.width ?? DOOR.width) / 2 - 0.25;
@@ -212,7 +215,7 @@ const ROOM: Rect = { x0: -6.6, x1: 6.6, z0: -6.6, z1: 6.6 };
 const OBSTACLES: Rect[] = [{ x0: -0.56 - 0.15, x1: 0.56 + 0.15, z0: TABLE_Z - 0.5 - 0.15, z1: TABLE_Z + 0.5 + 0.15 }];
 
 // The room's own panel, left of the table, as the Hallway has one on its wall: how to move in VR,
-// kept as the Hallway keeps it (nav.ts), so the choice is the same on both sides of its doors.
+// kept as the Hallway keeps it (common's nav.js), so the choice is the same on both sides of its doors.
 const store = (() => {
   try {
     return localStorage;
@@ -226,7 +229,7 @@ const nav: Nav = loadNav(store);
 const together = new Together({ scene, camera, renderer, hands: () => rays.map((r) => ({ controller: r.ctrl, source: r.source })) });
 function setNav(next: Partial<Nav>) {
   Object.assign(nav, next);
-  saveNav(store, nav);
+  saveNav(nav, store);
   for (const ray of rays) ray.aim.aiming = false;
   showRoom();
 }
@@ -831,7 +834,7 @@ Object.assign(window, {
     door,
     /** In VR: where the visitor stands and which way the room is turned for them. */
     rig,
-    /** How the visitor moves in VR (nav.ts), as the room's panel shows it. */
+    /** How the visitor moves in VR (common's nav.js), as the room's panel shows it. */
     nav,
     /** The shared session (together.ts). */
     together,

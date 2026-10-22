@@ -37,8 +37,8 @@ video by video.
   aims a jump at the floor for when you let go), the right one turns 30° a push (or, with **Turn:
   Smooth**, while held), and the trigger at the floor jumps there; each jump blinks the view. The
   room's own panel, left of the table, sets **Move** and **Turn**, kept in the browser as the
-  Hallway keeps them (`hallway.nav`), so the choice is the same on both sides of its doors
-  (`src/vr/move.ts`, `src/vr/nav.ts`). On a screen, drag to look
+  Hallway keeps them (`hallway.nav`, read and written by `common/nav.js`), so the choice is the
+  same on both sides of its doors (`src/vr/move.ts`). On a screen, drag to look
   around, double-click to look closer, and click. It is built with three.js from the same layout
   as the breadboard view (`src/vr/`), at 1.5x real size. It also shows sandbox circuits:
   `vr.html#c1.…` (the code from a share link, or the sandbox's **View in VR**) or
@@ -54,8 +54,12 @@ video by video.
   corridor whose doors lead to other places. Its link (`vr.html?from=hallway&back=…`) puts
   **← Hallway** on the page's bar and in the corner of the panel, back to that door, for the rest
   of the visit; what the door added is taken off the address. Walking in from the Hallway's VR,
-  a session that Quest Browser grants is taken at once, so the visitor stays in VR
-  (`src/vr/hallway.ts`). The Hallway's doorway shows the room through
+  a session that Quest Browser grants is taken at once, so the visitor stays in VR. A link from
+  another hall that names itself (`backname`) shows that name on the way back instead of its
+  host. This door contract is the one the places behind the Hallway's doors share:
+  [AriaMoKr/common](https://github.com/AriaMoKr/common)'s `door.js` and `nav.js`, a dependency at a
+  tag, with breadboard's own part (its door id, the doorway kept for the tab) in
+  `src/vr/hallway.ts`. The Hallway's doorway shows the room through
   `public/hallway-preview.jpg`, the view from eye height 1.2 m behind the start, framed as the
   Hallway hangs a door's picture (`npm run preview-image` renders it again after the room
   changes). The visitor arrives there, as far to the side and turned as they went through, and
@@ -72,7 +76,8 @@ video by video.
   it sees the others who are here as a head with a visor, their hands in VR, a ring on the floor
   and their name, and the status says how many are here and elsewhere (in the Hallway, or behind
   another of its doors). A visitor who comes through the Hallway's door in a session stays in it,
-  and the way back carries it on (`src/vr/together.ts`).
+  and the way back carries it on (`src/vr/together.ts`; the avatars are the layer's own, as on
+  the other sites).
   [![The VR view's room seen from just inside its door: the computer on a table, its control panel behind it](public/hallway-preview.jpg)](https://ariamokr.github.io/breadboard/vr.html)
 * **Chapter labs** (`#/lab/<id>`): each of the 44 videos maps to an interactive lab
   that rebuilds what that video builds. Examples: the 555 timer modes, SR/D latches,

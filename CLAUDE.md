@@ -15,8 +15,12 @@ sources each part follows.
 
 Published at https://ariamokr.github.io/breadboard/ from `main` of AriaMoKr/breadboard by
 `.github/workflows/pages.yml`. The VR view (`vr.html`) is behind a door of the Hallway
-(https://ariamokr.github.io/hallway/, AriaMoKr/hallway, a checkout at `../hallway`), whose README
-("Going in", "Linking back", "The view from your door") is the contract between them.
+(https://ariamokr.github.io/hallway/, AriaMoKr/hallway, a checkout at `../hallway`). The contract
+between them is AriaMoKr/common (a checkout at `../common`): `common/door.js` and `common/nav.js`,
+and its README ("Going in", "Linking back", "The view from your door", "Moving in VR"); the shared
+session is the Hallway's README, "Together", and AriaMoKr/layersharedsession (`../layersharedsession`).
+Both are GitHub dependencies at a tag, with types of their own: to take a new version, move the
+tag in package.json and `npm install`.
 
 ## Commands
 
@@ -42,14 +46,14 @@ for that Node).
 - `src/breadboard/` (docs/BREADBOARD.md): geometry, the chip catalog, `Layout`, the SVG view and its `PanZoom`, the computer's module boards (`boards/*.board.ts`, auto-registered), sandbox links (`share.ts`) and the chip-level engine (`sim/`).
 - `src/labs/<group>/<id>.lab.ts`: a lab each, registered by file name (docs/LABS.md); `src/app/chapters.ts` maps the videos to them.
 - `src/app/`: the pages behind the `#/…` routes (`app.ts`): the computer, the breadboard view, the sandbox, the labs. `src/ui/`: framework-free widgets.
-- `src/vr/` (`vr.html`): `main.ts` (renderer, the rig the camera and controllers ride on, room, panel, input, VR entry and `sessiongranted`), `model.ts` (a `Layout` in three.js), `exhibits.ts` (what stands on the table, picked by the `#hash`), `panel.ts`, `carry.ts` (the grips), `hallway.ts` (pure: the Hallway's door link, the way back, its views.json), `door.ts` (the doorway back), `portal.ts` (the Hallway's doorway shader), `move.ts` (pure: walking, turning and jumping in VR, as the Hallway does), `nav.ts` (the Hallway's `hallway.nav` setting), `fade.ts`, and `together.ts` (the Hallway's shared session, AriaMoKr/layersharedsession, a GitHub dependency pinned to the commit the Hallway uses; typed in `layersharedsession.d.ts`).
+- `src/vr/` (`vr.html`): `main.ts` (renderer, the rig the camera and controllers ride on, room, panel, input, VR entry and `sessiongranted`), `model.ts` (a `Layout` in three.js), `exhibits.ts` (what stands on the table, picked by the `#hash`), `panel.ts`, `carry.ts` (the grips), `hallway.ts` (pure: this door's id and the doorway back as kept for the tab; the rest of the door contract is `common/door.js`), `door.ts` (the doorway back), `portal.ts` (the Hallway's doorway shader), `move.ts` (pure: walking, turning and jumping in VR, as the Hallway does; the choice is `common/nav.js`), `fade.ts`, and `together.ts` (the shared session, layersharedsession's `session.js`, with its `avatars.js` drawing the others).
 - `scripts/`: the build steps (`sw-dist.mjs`, `zip-dist.mjs`), the checks (`check-browser.mjs`, `check-input.mjs`, `verify.mjs`) and the pictures (`make-preview.mjs`, `make-icons.mjs`); `lib/chrome.mjs` drives headless Chrome over DevTools.
 
 ## Conventions
 
 - Ben's designs as he builds them: chip for chip, with his reference designators, component values and microcode. Check behaviour against `docs/research/` and the videos, and note a new source there.
 - One JS and one CSS file per page (`inlineDynamicImports`), and relative URLs only (`base: './'`): the site lives under `/breadboard/`, and a wget mirror, the zip and the offline cache each get all of it. The link-preview tags are the exception: absolute, naming the GitHub Pages copy (`tests/link-preview.test.ts`).
-- The VR view keeps the Hallway's door contract (its README: "Going in", "Linking back", "The view from your door", "Moving about", "Together"), as vrlbry, music and outside do: follow a change there.
+- The VR view keeps the Hallway's door contract as vrlbry, music and outside do, through the shared packages rather than a copy: a change belongs in AriaMoKr/common or AriaMoKr/layersharedsession, then a new tag here.
 - `vr.html`'s `<meta name="description">` is also its `og:description` (tested) and, word for word, the subtitle of the Hallway's door to here (`public/js/environments.js` there): change them together.
 - `scripts/lib/chrome.mjs` writes each new Chrome profile's `Local State` before launching it, so Windows sees no failed logon: keep that. Outside (AriaMoKr/outside, `../outside`) has a copy as `tools/lib/chrome.mjs` that differs only in comments: a fix to one belongs in the other.
 - Scripted testing: the VR view exposes `window.breadboardVR` (`machine`, `exhibit`, `way`, `visit`, `door`, `rig`, `camera`, `xrDevice`, `nav`, `together`, `screenPoint`, `panelLabels`, `panelPoint`, `doorPoint`, `look`, `preview`), and `vr.html?debug` logs what the controllers do and the frame timing. On the dev server `vr.html?xr=emulate` installs IWER (a Quest 3): XR frames need the browser pane's tab in front (`tabs_select`), Enter VR needs a real click, `xrDevice.position` moves the headset and `xrDevice.controllers.left.updateAxes('thumbstick', x, y)` pushes a stick (`check-browser.mjs` does all of it on the dev server). The 2D app exposes nothing: drive it through the DOM, as `check-browser.mjs` does. `.claude/launch.json` has `breadboard-dev` (5173), `breadboard-dist` (`vite preview` of `dist/`, 4173) and `breadboard-quest` (127.0.0.1:5174). A shared session needs two pages: open the same `vr.html?room=…` in two tabs (each tab is its own visitor); the checks leave it out, since it needs the public relays.

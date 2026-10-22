@@ -444,12 +444,21 @@ try {
   });
 
   await check('VR view: a door of the Hallway leads in, and its way back out', async () => {
-    // A door's link (the Hallway's README, "Going in"), its way back a page of this site, so the
-    // click on it can be followed without leaving: "← Hallway" on the bar and the panel, the doorway
-    // back in the room (src/vr/door.ts; with no views.json here it shows its name), what the door
-    // added off the address, a session granted on arrival asked for at once (src/vr/hallway.ts).
+    // A door's link (common's README, "Going in"): "← Hallway" on the bar and the panel, the doorway
+    // back in the room (src/vr/door.ts), what the door added off the address, a session granted on
+    // arrival asked for at once. Its way back: on this machine a page of this site, which common's
+    // door.js counts as the Hallway between two dev servers (the doorway, finding no views.json
+    // there, shows its name). Checking a deployed copy, only the Hallway's own page is the
+    // Hallway: the way back is the real one (its view of the door shows through the doorway), and
+    // going there is answered here with a stand-in page, so its own app doesn't run in the check.
     const before = errors.length;
-    const back = `${base}#/more`;
+    const back = url ? 'https://ariamokr.github.io/hallway/?from=breadboard' : `${base}#/more`;
+    if (url) {
+      page.on('Fetch.requestPaused', (p) =>
+        page.send('Fetch.fulfillRequest', { requestId: p.requestId, responseCode: 200, responseHeaders: [{ name: 'Content-Type', value: 'text/html' }], body: Buffer.from('<!doctype html><title>Hallway</title><link rel="icon" href="data:,">').toString('base64') }),
+      );
+      await page.send('Fetch.enable', { patterns: [{ urlPattern: 'https://ariamokr.github.io/hallway/*', resourceType: 'Document' }] });
+    }
     await page.goto(`${base}vr.html?from=hallway&back=${encodeURIComponent(back)}&dx=0.12&yaw=-8&pitch=-3&dw=1.1&dh=2.25&glow=d8543f`, 3000);
     const r = await page.evaluate(`(async () => {
       const a = document.querySelector('.vr-bar a.vr-hallway');
@@ -487,9 +496,8 @@ try {
     await page.goto(`${base}vr.html`, 3000);
     const none = await page.evaluate(`({ way: breadboardVR.way, link: !!document.querySelector('.vr-hallway'), panel: breadboardVR.panelLabels(), door: !!breadboardVR.door })`);
     assert(!none.way && !none.link && !none.panel.includes('← Hallway') && !none.door, `through no door, yet ${JSON.stringify(none)}`);
-    // The doorway asks for the Hallway's views.json next to the way back: here this site, which
-    // has none, so the opening shows its name. A static host answers 404, which Chrome logs.
-    const errs = errors.slice(before).filter((e) => !/404.*\/views\/views\.json/.test(e));
+    if (url) await page.send('Fetch.disable');
+    const errs = errors.slice(before);
     assert(!errs.length, errs.join('\n'));
     return `"← Hallway" on the bar and the panel and a doorway back, the address cleaned, ${r.asked ? 'a granted session asked for, ' : ''}kept on reload, taken by clicks on the panel and the doorway; none through no door`;
   });

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { ViewParams } from './hallway';
+import type { ViewParams } from 'common/door.js';
 
 /**
  * A doorway's material: a flat quad in the opening that shows a room behind it, made from one

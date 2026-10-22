@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { viewParams } from './hallway';
+import { viewParams } from 'common/door.js';
 import { openingGeometry, placePortal, portalMaterial, setView, type PortalMaterial } from './portal';
 
 /**

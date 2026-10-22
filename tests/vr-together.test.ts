@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { roomFromUrl } from 'layersharedsession/room.js';
 import { APP_ID, sessionStatus } from '../src/vr/together';
-import { leaveUrl, wayBack, withoutVisit } from '../src/vr/hallway';
+import { leaveUrl, wayBack, withoutVisit } from 'common/door.js';
+import { BREADBOARD_ID } from '../src/vr/hallway';
 
 const standing = { online: true, joined: true, relays: 2, slow: false, here: 0, away: 0 };
 
@@ -27,7 +28,7 @@ describe('the shared session', () => {
     const kept = `https://ariamokr.github.io${withoutVisit(link)}`;
     expect(roomFromUrl(kept)).toBe('k3vd-q8hn');
     // the way back carries the room, as it is now
-    const way = wayBack(new URL(link).search, 'https://ariamokr.github.io')!;
+    const way = wayBack(new URL(link).search, BREADBOARD_ID, { origin: 'https://ariamokr.github.io', always: false })!;
     expect(roomFromUrl(leaveUrl(way, 'k3vd-q8hn'))).toBe('k3vd-q8hn');
     expect(roomFromUrl(leaveUrl(way, null))).toBeNull(); // left the session here: out of it there too
   });

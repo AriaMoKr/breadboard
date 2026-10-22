@@ -1,34 +1,9 @@
 import { describe, expect, it } from 'vitest';
+// (The VR movement choice, hallway.nav, is AriaMoKr/common's nav.js, tested there.)
 import { AimStick, SNAP, TurnStick, clampWalk, headYaw, standable, turnedAbout, walkDelta, wrapAngle, type Rect } from '../src/vr/move';
-import { NAV_DEFAULTS, NAV_KEY, loadNav, normalizeNav, saveNav } from '../src/vr/nav';
 
 const ROOM: Rect = { x0: -6, x1: 6, z0: -6, z1: 6 };
 const TABLE: Rect = { x0: -0.7, x1: 0.7, z0: -1.4, z1: -0.1 };
-
-/** A Storage in memory, as localStorage would be. */
-function memory(): Storage {
-  const m = new Map<string, string>();
-  return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => void m.set(k, String(v)), removeItem: (k) => void m.delete(k), clear: () => m.clear(), key: () => null, get length() { return m.size; } };
-}
-
-describe('how the visitor moves in VR (the Hallway’s hallway.nav)', () => {
-  it('reads what the Hallway stored, filling in the defaults', () => {
-    expect(normalizeNav({ move: 'teleport', turn: 'smooth' })).toEqual({ move: 'teleport', turn: 'smooth' });
-    expect(normalizeNav({ move: 'fly' })).toEqual(NAV_DEFAULTS);
-    expect(normalizeNav(null)).toEqual({ move: 'smooth', turn: 'snap' });
-  });
-
-  it('is kept under the Hallway’s key, so both sides of its doors share it', () => {
-    const s = memory();
-    expect(loadNav(s)).toEqual(NAV_DEFAULTS);
-    saveNav(s, { move: 'teleport', turn: 'snap' });
-    expect(JSON.parse(s.getItem(NAV_KEY)!)).toEqual({ move: 'teleport', turn: 'snap' });
-    expect(NAV_KEY).toBe('hallway.nav');
-    s.setItem(NAV_KEY, 'not json');
-    expect(loadNav(s)).toEqual(NAV_DEFAULTS);
-    expect(loadNav(null)).toEqual(NAV_DEFAULTS); // storage blocked
-  });
-});
 
 describe('moving about the room', () => {
   it('walks the way the head faces, the stick’s forward being up', () => {
