@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { viewParams } from 'common/door.js';
-import { openingGeometry, placePortal, portalMaterial, setView, type PortalMaterial } from './portal';
+import { openingGeometry, placePortal, portalMaterial, setView, type PortalMaterial } from 'common/portal.js';
 
 /**
  * The doorway back to where the visitor came from (the Hallway): a free-standing doorframe in the
@@ -102,7 +102,7 @@ export function buildDoorway({ width, height, z, glow, name, anisotropy }: { wid
   group.add(sign);
 
   const fallback = fallbackTexture(name, glow);
-  const portal = new THREE.Mesh(openingGeometry(width, height), portalMaterial(fallback, width, height, PICTURE, glow));
+  const portal = new THREE.Mesh(openingGeometry(width, height), portalMaterial({ ...PICTURE, map: fallback, width, height, color: glow }));
   portal.name = 'portal';
   portal.position.z = depth / 2 - 0.02;
   group.add(portal);

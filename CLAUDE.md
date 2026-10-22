@@ -16,8 +16,8 @@ sources each part follows.
 Published at https://ariamokr.github.io/breadboard/ from `main` of AriaMoKr/breadboard by
 `.github/workflows/pages.yml`. The VR view (`vr.html`) is behind a door of the Hallway
 (https://ariamokr.github.io/hallway/, AriaMoKr/hallway, a checkout at `../hallway`). The contract
-between them is AriaMoKr/common (a checkout at `../common`): `common/door.js` and `common/nav.js`,
-and its README ("Going in", "Linking back", "The view from your door", "Moving in VR"); the shared
+between them is AriaMoKr/common (a checkout at `../common`): `common/door.js` and `common/nav.js`
+(with the Hallway's `portal.js` and `fade.js`), and its README ("Going in", "Linking back", "The view from your door", "Moving in VR"); the shared
 session is the Hallway's README, "Together", and AriaMoKr/layersharedsession (`../layersharedsession`).
 Both are GitHub dependencies at a tag, with types of their own: to take a new version, move the
 tag in package.json and `npm install`.
@@ -46,7 +46,7 @@ for that Node).
 - `src/breadboard/` (docs/BREADBOARD.md): geometry, the chip catalog, `Layout`, the SVG view and its `PanZoom`, the computer's module boards (`boards/*.board.ts`, auto-registered), sandbox links (`share.ts`) and the chip-level engine (`sim/`).
 - `src/labs/<group>/<id>.lab.ts`: a lab each, registered by file name (docs/LABS.md); `src/app/chapters.ts` maps the videos to them.
 - `src/app/`: the pages behind the `#/…` routes (`app.ts`): the computer, the breadboard view, the sandbox, the labs. `src/ui/`: framework-free widgets.
-- `src/vr/` (`vr.html`): `main.ts` (renderer, the rig the camera and controllers ride on, room, panel, input, VR entry and `sessiongranted`), `model.ts` (a `Layout` in three.js), `exhibits.ts` (what stands on the table, picked by the `#hash`), `panel.ts`, `carry.ts` (the grips), `hallway.ts` (pure: this door's id and the doorway back as kept for the tab; the rest of the door contract is `common/door.js`), `door.ts` (the doorway back), `portal.ts` (the Hallway's doorway shader), `move.ts` (pure: walking, turning and jumping in VR, as the Hallway does; the choice is `common/nav.js`), `fade.ts`, and `together.ts` (the shared session, layersharedsession's `session.js`, with its `avatars.js` drawing the others).
+- `src/vr/` (`vr.html`): `main.ts` (renderer, the rig the camera and controllers ride on, room, panel, input, VR entry and `sessiongranted`), `model.ts` (a `Layout` in three.js), `exhibits.ts` (what stands on the table, picked by the `#hash`), `panel.ts`, `carry.ts` (the grips), `hallway.ts` (pure: this door's id and the doorway back as kept for the tab; the rest of the door contract is `common/door.js`), `door.ts` (the doorway back, hung with `common/portal.js`, the Hallway's doorway shader), `move.ts` (pure: walking, turning and jumping in VR, as the Hallway does; the choice is `common/nav.js`, the blink `common/fade.js`), and `together.ts` (the shared session, layersharedsession's `session.js`, with its `avatars.js` drawing the others).
 - `scripts/`: the build steps (`sw-dist.mjs`, `zip-dist.mjs`), the checks (`check-browser.mjs`, `check-input.mjs`, `verify.mjs`) and the pictures (`make-preview.mjs`, `make-icons.mjs`); `lib/chrome.mjs` drives headless Chrome over DevTools.
 
 ## Conventions

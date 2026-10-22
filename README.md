@@ -65,7 +65,7 @@ video by video.
   changes). The visitor arrives there, as far to the side and turned as they went through, and
   behind them stands the door back: a doorway glowing in the door's colour, with the Hallway seen
   through it as the Hallway publishes the view from its door to here (its `views/views.json`,
-  hung with the Hallway's own doorway shader: `src/vr/door.ts`, `src/vr/portal.ts`). Pointing at
+  hung with the Hallway's own doorway shader, common's `portal.js`: `src/vr/door.ts`). Pointing at
   it, clicking it or stepping back through it leads back. On a screen the view starts where the
   doorway showed the room from, then glides to the table.
   **Together**: **Start session** on the room's panel (or, on a screen, **Start shared session**

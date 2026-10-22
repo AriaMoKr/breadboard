@@ -6,7 +6,7 @@ import { buildLabel } from '../build-info';
 import { Carry, Twist } from './carry';
 import { EXAMPLE_IDS, circuitExhibit, computerExhibit, exampleExhibit, exhibitHash, parseExhibitHash, type Exhibit, type ExhibitChoice, type Hold } from './exhibits';
 import { buildDoorway } from './door';
-import { Fade } from './fade';
+import { Fade } from 'common/fade.js';
 import { hallwayViews, leaveUrl, readVisit, wayBack, withoutVisit } from 'common/door.js';
 import { loadNav, saveNav, type Nav } from 'common/nav.js';
 import { BREADBOARD_ID, DOOR, doorOf, keptDoor } from './hallway';
