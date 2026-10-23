@@ -1,6 +1,6 @@
 import type { Level } from '../../logic/circuit';
 import { Led, type LedColor } from '../../ui/components';
-import { h, s, setClass, setText } from '../../ui/dom';
+import { h, headCell, s, setClass, setText } from '../../ui/dom';
 import type { Schematic } from '../../ui/schematic';
 
 /**
@@ -40,7 +40,7 @@ const MO_CSS = `
 .mo-lab .mo-badge.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 50%, var(--border)); }
 .mo-lab .mo-badge.warn { color: var(--accent-2); border-color: color-mix(in srgb, var(--accent-2) 50%, var(--border)); }
 .mo-lab .mo-badge.bad { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 50%, var(--border)); }
-.mo-lab .mo-badge.on { color: white; background: var(--led-blue); border-color: var(--led-blue); }
+.mo-lab .mo-badge.on { color: var(--on-blue); background: var(--led-blue); border-color: var(--led-blue); }
 .mo-lab .mo-big { font-family: var(--mono); font-size: 1.15rem; }
 .mo-lab .mo-col { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .mo-lab .mo-label { color: var(--fg-dim); font-size: 0.8rem; min-width: 64px; }
@@ -96,7 +96,7 @@ export interface Table {
 
 /** A `.truth-table` (wrapped in a horizontal scroller) whose rows can be highlighted. */
 export function makeTable(headers: (string | Node)[], rows: (string | number | Node)[][], opts: { class?: string; caption?: string } = {}): Table {
-  const head = headers.map((x) => h('th', null, x));
+  const head = headers.map((x) => headCell(x));
   const cells: HTMLTableCellElement[][] = [];
   const trs = rows.map((r) => {
     const tds = r.map((x) => h('td', null, typeof x === 'number' ? String(x) : x));
@@ -168,7 +168,7 @@ const HEXDUMP_CSS = `
 .mo-lab .hexdump th { color: var(--fg-faint); font-weight: 500; padding: 1px 3px; }
 .mo-lab .hexdump td { padding: 1px 3px; color: var(--fg-dim); }
 .mo-lab .hexdump td.set { color: var(--fg); }
-.mo-lab .hexdump td.cur { background: var(--accent-2); color: #111; border-radius: 3px; }
+.mo-lab .hexdump td.cur { background: #f59e0b; color: #111; border-radius: 3px; } /* the amber of both themes: dark text reads on it */
 .mo-lab .hexdump td.flash { background: color-mix(in srgb, var(--led-red) 40%, transparent); }
 `;
 
@@ -178,13 +178,13 @@ export function makeHexDump(blank = 0xff): { el: HTMLElement; css: string; updat
   const cells: HTMLTableCellElement[] = [];
   const heads: HTMLTableCellElement[] = [];
   for (let r = 0; r < 16; r++) {
-    const th = h('th', null, '');
+    const th = h('th', null, ''); // the row's address, set by update
     heads.push(th);
     const tds = Array.from({ length: 16 }, () => h('td', null, ''));
     cells.push(...tds);
     body.appendChild(h('tr', null, th, tds));
   }
-  const table = h('table', { class: 'hexdump' }, h('thead', null, h('tr', null, h('th'), Array.from({ length: 16 }, (_, i) => h('th', null, i.toString(16))))), body);
+  const table = h('table', { class: 'hexdump' }, h('thead', null, h('tr', null, h('th', null, h('span', { class: 'sr-only' }, 'address')), Array.from({ length: 16 }, (_, i) => h('th', null, i.toString(16))))), body);
   return {
     el: h('div', { class: 'table-scroll' }, table),
     css: HEXDUMP_CSS,

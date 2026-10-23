@@ -118,6 +118,11 @@ export function growOnly(el: HTMLElement): void {
 }
 
 /** Collects cleanup callbacks; call `dispose()` once. */
+/** A table header cell. An empty one (a column of notes) is named "note" for screen readers. */
+export function headCell(x: string | Node): HTMLTableCellElement {
+  return h('th', null, x === '' ? h('span', { class: 'sr-only' }, 'note') : x);
+}
+
 export class Disposer {
   private fns: (() => void)[] = [];
   add(fn: (() => void) | void | undefined | null) {

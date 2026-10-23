@@ -284,7 +284,7 @@ export class MicrostepTrace {
     this.el = h(
       'div',
       { class: 'ustep-trace' },
-      h('div', { class: 'row' }, h('h4', null, opts.title ?? 'Micro-step trace'), this.info),
+      h('div', { class: 'row' }, h('h3', { class: 'sub-head' }, opts.title ?? 'Micro-step trace'), this.info),
       h('div', { class: 'table-scroll' }, h('table', { class: 'microcode ustep-table' }, h('thead', null, h('tr', null, head.map((x) => h('th', null, x)))), this.body)),
     );
     this.d.add(
@@ -345,7 +345,7 @@ export class MicrostepTrace {
 const EXERCISE_CSS = `
 .cu-ex .cu-switches { display: flex; flex-wrap: wrap; gap: 5px; }
 .cu-ex .cu-switches button.sig { cursor: pointer; font-size: 0.8rem; padding: 4px 8px; background: var(--panel-2); min-width: 40px; }
-.cu-ex .cu-switches button.sig.on { background: var(--led-blue); color: #fff; }
+.cu-ex .cu-switches button.sig.on { background: var(--led-blue); color: var(--on-blue); }
 @media (pointer: coarse) { .cu-ex .cu-switches button.sig { padding: 8px 10px; } }
 .cu-ex .cu-prog { display: flex; flex-wrap: wrap; gap: 6px; }
 .cu-ex .cu-prog span { font-family: var(--mono); font-size: 0.78rem; border: 1px solid var(--border); border-radius: 6px; padding: 2px 7px; color: var(--fg-dim); }

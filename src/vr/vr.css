@@ -11,7 +11,9 @@ html, body { margin: 0; height: 100%; background: #111318; color: #e6e8ee; font-
 .vr-hint { color: #9aa3b2; font-size: 0.85rem; pointer-events: none; }
 .vr-status { position: fixed; left: 16px; bottom: 64px; z-index: 2; margin: 0; color: #9aa3b2; font: 0.8rem ui-monospace, Consolas, monospace; }
 @media (max-width: 600px) { .vr-hint { display: none; } }
-.vr-build { margin-left: auto; color: #6b7385; font: 0.72rem ui-monospace, Consolas, monospace; }
+/* keyboard focus: one ring on the page (three.js's VRButton sets outline: none on itself, hence !important) */
+:focus-visible, #VRButton:focus-visible { outline: 2px solid #8ab8ff !important; outline-offset: 2px; }
+.vr-build { margin-left: auto; color: #8c92a0; font: 0.72rem ui-monospace, Consolas, monospace; }
 /* the shared session (together.ts): Start, and in one its status, Copy invite link and Leave */
 .vr-together { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 6px 8px; margin-left: auto; font-size: 0.8rem; }
 .vr-together ~ .vr-build { margin-left: 0; }

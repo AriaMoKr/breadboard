@@ -12,7 +12,7 @@ import { defineLab } from '../types';
 const CSS = `
 .mi-lab .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
 .mi-lab .seg button { font: inherit; font-weight: 600; background: var(--panel-2); color: var(--fg-dim); border: 0; padding: 6px 16px; cursor: pointer; }
-.mi-lab .seg button.active { background: var(--accent); color: #fff; }
+.mi-lab .seg button.active { background: color-mix(in srgb, var(--accent) 73%, black); color: #fff; }
 .mi-lab table.microcode tr.new-instr th { color: var(--accent-2); font-weight: 700; }
 .mi-lab table.microcode tr.focus td:not(.fetch) { box-shadow: inset 0 0 0 2px var(--accent-2); }
 .mi-lab .steps td, .mi-lab .steps th { text-align: left; }
@@ -75,7 +75,7 @@ export default defineLab({
       const b = h('button', { type: 'button', onClick: () => choose(k) }, k);
       return { k, b };
     });
-    const seg = h('div', { class: 'seg', role: 'tablist' }, segBtns.map((x) => x.b));
+    const seg = h('div', { class: 'seg', role: 'group', 'aria-label': 'Instruction' }, segBtns.map((x) => x.b));
     const summary = h('p', { class: 'note' });
     const stepsBody = h('tbody');
     const extra = h('div', { class: 'lab-stack', style: 'gap:8px' });
@@ -113,7 +113,10 @@ export default defineLab({
 
     const choose = (k: NewInstr) => {
       cur = k;
-      segBtns.forEach((x) => setClass(x.b, 'active', x.k === k));
+      segBtns.forEach((x) => {
+        setClass(x.b, 'active', x.k === k);
+        x.b.setAttribute('aria-pressed', String(x.k === k));
+      });
       const op = INSTRUCTION_BY_MNEMONIC.get(k)!.opcode;
       setText(summary, TEXT[k].summary);
       stepsBody.replaceChildren(

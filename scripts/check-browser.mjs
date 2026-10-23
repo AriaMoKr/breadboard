@@ -2,11 +2,13 @@
 // every page renders without errors, phones get no sideways scrolling and fingertip-sized
 // controls, the sticky toolbar, parts drawer and tap-to-zoom work, the two computer pages share
 // one machine, sandbox links round-trip, the breadboard view keeps its frame rate, and the VR
-// view builds the computer, runs it and answers the mouse on its boards' switches and buttons.
+// view builds the computer, runs it and answers the mouse on its boards' switches and buttons,
+// and axe-core finds no accessibility problem (WCAG 2.2 AA and its best practices) on any page.
 // With --dist it checks the built site instead (run `npm run build` first), plus the download
 // link, install support and offline use; with --url <address> it checks a deployed copy the same
 // way, such as https://example.com/breadboard/. Needs Node 22+ and an installed Chrome, Edge or
 // Chromium.
+import { readFileSync } from 'node:fs';
 import { createServer, preview } from 'vite';
 import { launchChrome, sleep } from './lib/chrome.mjs';
 
@@ -560,6 +562,44 @@ try {
       assert(!errs.length, errs.join('\n'));
       return `at the door turned ${arrived.yaw}°, walked to the table (z ${walked.z}), snapped to ${turned.yaw}°, jumped ${Math.hypot(jumped.x - turned.x, jumped.z - turned.z).toFixed(1)} m, out through the doorway`;
     });
+
+  await check('accessibility: axe-core finds nothing on any page, in either theme, nor in the VR view', async () => {
+    // Deque's axe-core (a devDependency, put into each page), with the rules of WCAG 2.2 AA and
+    // its best practices: contrast, target sizes, names, roles, headings, landmarks. Each page is
+    // checked dark and light (prefers-color-scheme, switched without a reload).
+    const axe = readFileSync(new URL('../node_modules/axe-core/axe.min.js', import.meta.url), 'utf8');
+    const tags = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice'];
+    const run = `axe.run(document, { runOnly: { type: 'tag', values: ${JSON.stringify(tags)} }, resultTypes: ['violations'] }).then((r) => r.violations.flatMap((v) => v.nodes.map((n) => v.id + ' ' + n.target.join(' '))))`;
+    const scheme = (value) => page.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value }] });
+    // No transitions: a colour caught fading (a signal badge lighting up, the theme switching)
+    // would be judged at a halfway shade nobody reads.
+    const still = `document.head.append(Object.assign(document.createElement('style'), { textContent: '*, *::before, *::after { transition: none !important; animation: none !important; }' }))`;
+    const problems = [];
+    const both = async (where) => {
+      for (const value of ['dark', 'light']) {
+        await scheme(value);
+        await sleep(60);
+        for (const p of await page.evaluate(run)) problems.push(`${where} (${value}): ${p}`);
+      }
+    };
+    await page.goto(base, 2000);
+    await page.evaluate(axe);
+    await page.evaluate(still);
+    for (const route of routes) {
+      await page.evaluate(`location.hash = ${JSON.stringify(route)}`);
+      await sleep(600);
+      await both(route);
+    }
+    await page.evaluate('sessionStorage.clear()');
+    await page.goto(`${base}vr.html`, 3000);
+    await page.evaluate(axe);
+    await page.evaluate(still);
+    await both('vr.html');
+    await page.send('Emulation.setEmulatedMedia', { features: [] });
+    const shown = problems.slice(0, 25);
+    assert(!problems.length, shown.join('\n') + (problems.length > shown.length ? `\n… and ${problems.length - shown.length} more` : ''));
+    return `${routes.length} pages and the VR view, each dark and light`;
+  });
 
   // ---- phone --------------------------------------------------------------------------
   console.log('Phone (375 x 812, touch)');

@@ -8,7 +8,7 @@ import type { Transfer } from '../../sim/computer';
 import type { Machine } from '../../sim/machine';
 import { SIGNAL_BITS, SIGNAL_INFO, type Signal } from '../../sim/signals';
 import { Toggle } from '../../ui/components';
-import { Disposer, animate, h, setClass, setText } from '../../ui/dom';
+import { Disposer, animate, h, headCell, setClass, setText } from '../../ui/dom';
 import type { GateHandle, P } from '../../ui/schematic';
 
 const DP_CSS = `
@@ -133,7 +133,7 @@ export function truthTable(headers: (string | Node)[], rows: (string | number)[]
     'table',
     { class: `truth-table ${opts.compact ? 'compact' : ''}` },
     opts.caption ? h('caption', { class: 'small dim', style: 'caption-side: bottom; text-align: left; padding-top: 4px' }, opts.caption) : null,
-    h('thead', null, h('tr', null, headers.map((x) => h('th', null, x)))),
+    h('thead', null, h('tr', null, headers.map((x) => headCell(x)))),
     h('tbody', null, trs),
   );
   return {
@@ -221,6 +221,7 @@ export class BitRow {
       const on = ((this.value >> (this.opts.bits - 1 - i)) & 1) === 1;
       setClass(b, 'on', on);
       setText(b, on ? '1' : '0');
+      b.setAttribute('aria-label', `bit ${this.opts.bits - 1 - i}: ${on ? '1' : '0'}`);
     });
   }
 }

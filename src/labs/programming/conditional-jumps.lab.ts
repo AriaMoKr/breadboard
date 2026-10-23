@@ -13,7 +13,7 @@ const CSS = `
 .cj-lab .quads { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .cj-lab .quad { border: 1px solid var(--border); border-radius: 8px; padding: 6px; background: var(--panel-2); }
 .cj-lab .quad.active { border-color: var(--accent-2); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-2) 45%, transparent); }
-.cj-lab .quad h5 { margin: 0 0 4px; font-family: var(--mono); font-size: 0.74rem; display: flex; justify-content: space-between; gap: 4px; flex-wrap: wrap; }
+.cj-lab .quad h3 { margin: 0 0 4px; font-weight: 600; font-family: var(--mono); font-size: 0.74rem; display: flex; justify-content: space-between; gap: 4px; flex-wrap: wrap; }
 .cj-lab .quad svg { width: 100%; height: auto; display: block; }
 .cj-lab .quad rect { cursor: pointer; }
 @media (pointer: coarse) and (max-width: 600px) { .cj-lab .quads { grid-template-columns: minmax(0, 1fr); } } /* bigger cells for fingertips */
@@ -22,7 +22,7 @@ const CSS = `
 .cj-lab .quad rect.diff { stroke: var(--accent-2); stroke-width: 1.6; }
 .cj-lab .quad rect.cur { fill: var(--led-red); }
 .cj-lab .quad rect.sel { stroke: var(--fg); stroke-width: 1.6; }
-.cj-lab table td.curcol, .cj-lab table th.curcol { background: color-mix(in srgb, var(--accent-2) 20%, transparent); }
+.cj-lab table td.curcol, .cj-lab table th.curcol { background: color-mix(in srgb, var(--accent-2) 20%, transparent); color: var(--fg); }
 .cj-lab pre.sum { font-family: var(--mono); font-size: 0.82rem; margin: 0; padding: 6px 10px; background: var(--panel-2); border-radius: 8px; white-space: pre; overflow-x: auto; max-width: 100%; }
 .cj-lab .progs { display: flex; flex-wrap: wrap; gap: 6px; }
 `;
@@ -60,7 +60,7 @@ export default defineLab({
         rects.push(r);
         svg.appendChild(r);
       }
-      const el = h('div', { class: 'quad' }, h('h5', null, h('span', null, FLAG_COMBO_NAMES[q]), h('span', { class: 'dim' }, `0x${(q * 256).toString(16).padStart(3, '0')}–0x${(q * 256 + 255).toString(16).padStart(3, '0')}`)), svg);
+      const el = h('div', { class: 'quad' }, h('h3', null, h('span', null, FLAG_COMBO_NAMES[q]), h('span', { class: 'dim' }, `0x${(q * 256).toString(16).padStart(3, '0')}–0x${(q * 256 + 255).toString(16).padStart(3, '0')}`)), svg);
       return { el, rects };
     });
     let selected = -1;

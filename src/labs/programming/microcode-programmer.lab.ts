@@ -16,7 +16,7 @@ const CSS = `
 .mp-lab .hexdump .b.nz { color: var(--fg); }
 .mp-lab .hexdump .b.z { color: var(--fg-faint); }
 .mp-lab .hexdump .b.edited { outline: 1px solid var(--accent-2); }
-.mp-lab .hexdump .b.cur { background: var(--led-blue); color: #fff; }
+.mp-lab .hexdump .b.cur { background: var(--led-blue); color: var(--on-blue); }
 .mp-lab .hexdump .b.flash { animation: mplab-flash 2.4s ease-out; }
 .mp-lab .hexdump .b.sel { outline: 2px solid var(--accent); }
 @keyframes mplab-flash { 0%, 40% { background: var(--accent-2); color: #000; } 100% { background: transparent; } }

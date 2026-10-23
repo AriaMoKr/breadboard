@@ -240,7 +240,11 @@ export class DipSwitch {
     this.render();
   }
   private render() {
-    this.el.querySelectorAll('.dip').forEach((d, i) => setClass(d, 'on', ((this.value >> (this.opts.bits - 1 - i)) & 1) === 1));
+    this.el.querySelectorAll('.dip').forEach((d, i) => {
+      const on = ((this.value >> (this.opts.bits - 1 - i)) & 1) === 1;
+      setClass(d, 'on', on);
+      d.setAttribute('aria-pressed', String(on)); // a toggle: screen readers say on or off
+    });
   }
 }
 
@@ -350,7 +354,7 @@ export class SevenSegment {
     this.segs = shapes.map(([n, p]) => seg(p, n));
     const dp = s('circle', { cx: 57, cy: 94, r: 3.5, class: 'seg seg-dp' });
     this.segs.push(dp);
-    this.el = s('svg', { viewBox: '0 0 64 100', width: (H * 64) / 100, height: H, class: `sevenseg sevenseg-${opts.color ?? 'red'}`, role: 'img' }, this.segs);
+    this.el = s('svg', { viewBox: '0 0 64 100', width: (H * 64) / 100, height: H, class: `sevenseg sevenseg-${opts.color ?? 'red'}`, role: 'img', 'aria-label': segmentName(0) }, this.segs);
     this.set(0);
   }
   /**
@@ -362,15 +366,35 @@ export class SevenSegment {
     if (byte === this.value && brightness === undefined && !this.dimmed) return;
     this.value = byte;
     const bits = [0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01, 0x80];
+    let lit = 0;
     this.segs.forEach((el, i) => {
       const b = brightness === undefined ? 1 : typeof brightness === 'number' ? brightness : (brightness[i] ?? 1);
       const on = (byte & bits[i]) !== 0 && b > 0;
+      if (on) lit |= bits[i];
       setClass(el, 'on', on);
       const op = on && b < 1 ? String(Math.round(Math.max(0.05, b) * 1000) / 1000) : '';
       if (el.style.opacity !== op) el.style.opacity = op;
     });
+    const name = segmentName(lit);
+    if (this.el.getAttribute('aria-label') !== name) this.el.setAttribute('aria-label', name);
     this.dimmed = brightness !== undefined;
   }
+}
+
+/** The characters a 7-segment digit shows, by its lit segments (dp a b c d e f g, a = 0x40): both forms of 6, 7 and 9. */
+const SEGMENT_CHARS: Record<number, string> = {
+  0x7e: '0', 0x30: '1', 0x6d: '2', 0x79: '3', 0x33: '4', 0x5b: '5', 0x5f: '6', 0x1f: 'b', 0x70: '7', 0x72: '7', 0x7f: '8', 0x7b: '9', 0x73: '9',
+  0x77: 'A', 0x4e: 'C', 0x3d: 'd', 0x4f: 'E', 0x47: 'F', 0x37: 'H', 0x0e: 'L', 0x67: 'P', 0x3e: 'U', 0x01: 'minus',
+};
+
+/** A 7-segment digit's name for screen readers: the character it shows, else its lit segments. */
+export function segmentName(byte: number): string {
+  const dp = byte & 0x80 ? ' and its point' : '';
+  const ch = SEGMENT_CHARS[byte & 0x7f];
+  if ((byte & 0x7f) === 0) return dp ? '7-segment digit: only its point' : '7-segment digit: blank';
+  if (ch) return `7-segment digit: ${ch}${dp}`;
+  const names = 'abcdefg'.split('').filter((_, i) => byte & (0x40 >> i));
+  return `7-segment digit: segments ${names.join(' ')}${dp}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -390,7 +414,7 @@ export function panel(title: string, opts: PanelOptions = {}, ...children: (Node
   return h(
     'section',
     { class: `panel accent-${opts.accent ?? 'gray'} ${opts.class ?? ''}` },
-    h('header', { class: 'panel-head' }, h('h3', null, title), opts.subtitle ? h('span', { class: 'panel-sub' }, opts.subtitle) : null),
+    h('header', { class: 'panel-head' }, h('h2', null, title), opts.subtitle ? h('span', { class: 'panel-sub' }, opts.subtitle) : null),
     h('div', { class: 'panel-body' }, children.filter(Boolean) as Node[]),
     opts.chips ? h('footer', { class: 'panel-chips' }, opts.chips) : null,
   );

@@ -126,3 +126,4 @@
 .bb-link { fill: none; stroke-width: 0.3; stroke-linecap: round; opacity: 0.9; }
 .bb-link-outline { fill: none; stroke: rgba(0, 0, 0, 0.45); stroke-width: 0.42; stroke-linecap: round; }
 .bb-link-toggles { margin: 6px 0; }
+.sb-side-title { font-size: 0.95rem; margin: 0; }

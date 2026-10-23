@@ -58,6 +58,8 @@ export interface SchematicOptions {
   /** viewBox origin (default 0, 0); e.g. `x0: -20` leaves room for labels left of x = 0. */
   x0?: number;
   y0?: number;
+  /** Its name for screen readers (default "Circuit schematic"). */
+  label?: string;
 }
 
 /** State of a multi-bit bus line drawn with `Schematic.bus`. */
@@ -106,7 +108,7 @@ export class Schematic {
     this.layerTop = s('g', { class: 'sch-top' });
     this.el = s(
       'svg',
-      { viewBox: `${opts.x0 ?? 0} ${opts.y0 ?? 0} ${opts.width} ${opts.height}`, class: `schematic ${opts.class ?? ''}`, role: 'img', preserveAspectRatio: 'xMidYMid meet', style: `--sch-w: ${opts.width}` },
+      { viewBox: `${opts.x0 ?? 0} ${opts.y0 ?? 0} ${opts.width} ${opts.height}`, class: `schematic ${opts.class ?? ''}`, role: 'img', 'aria-label': opts.label ?? 'Circuit schematic', preserveAspectRatio: 'xMidYMid meet', style: `--sch-w: ${opts.width}` },
       this.layerBack,
       this.layerBus,
       this.layerWires,
@@ -130,6 +132,7 @@ export class Schematic {
   private bind(net: Net, el: Element) {
     this.bound.push({ net, el });
     el.classList.add(levelClass(net.value));
+    if (el.getAttribute('role') === 'button') el.setAttribute('aria-pressed', String(net.value === 1)); // a switch: on or off
   }
 
   /** Recolour every bound element from current net values. */
@@ -140,6 +143,7 @@ export class Schematic {
       if (b.last !== undefined) b.el.classList.remove(levelClass(b.last));
       else b.el.classList.remove('l0', 'l1', 'lz', 'lx');
       b.el.classList.add(levelClass(v));
+      if (b.el.getAttribute('role') === 'button') b.el.setAttribute('aria-pressed', String(v === 1));
       b.last = v;
     }
   }
@@ -389,6 +393,9 @@ export class Schematic {
   switch(net: Net, at: Pt, opts: { label?: string; onToggle?: (net: Net) => void; momentary?: boolean } = {}) {
     const p = P(at);
     const g = s('g', { class: `sch-switch ${opts.momentary ? 'momentary' : ''}`, transform: `translate(${p.x},${p.y})`, tabindex: 0, role: 'button', 'aria-label': opts.label ?? net.name });
+    // With a switch in it the schematic is no longer only a picture (whose insides a screen reader
+    // skips): a named group, so the switches can be found and used.
+    this.el.setAttribute('role', 'group');
     const box = s('rect', { x: -22, y: -10, width: 22, height: 20, rx: 4, class: 'switch-body' });
     const knob = s('circle', { cx: -11, cy: 0, r: 5, class: 'switch-knob' });
     // Invisible hit area, bigger than the switch so a fingertip finds it: wide (over the label)

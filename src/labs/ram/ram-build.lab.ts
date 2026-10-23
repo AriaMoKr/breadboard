@@ -315,7 +315,7 @@ export default defineLab({
             h('div', { class: 'legend' }, h('span', null, h('i', { style: 'background: var(--accent-2)' }), 'path in use'), h('span', null, h('i', { style: 'background: var(--fg-faint)' }), 'idle'), h('span', null, h('i', { style: 'background: var(--wire-1)' }), 'high'), h('span', null, h('i', { style: 'background: var(--wire-0)' }), 'low')),
             note('Thick lines carry 4 or 8 bits; dashed ones are not selected by the multiplexers. Thin lines are single control signals.'),
           ),
-          panel('What is happening', { accent: 'gray' }, status, h('h4', null, 'Program mode'), progSteps.el, h('h4', null, 'Run mode'), runSteps.el),
+          panel('What is happening', { accent: 'gray' }, status, h('h3', { class: 'sub-head' }, 'Program mode'), progSteps.el, h('h3', { class: 'sub-head' }, 'Run mode'), runSteps.el),
         ),
         h(
           'div',

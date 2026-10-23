@@ -58,6 +58,8 @@ try {
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.xr.enabled = true;
+// For screen readers the 3D view is one picture, named by what is on the table (setExhibit).
+renderer.domElement.setAttribute('role', 'img');
 host.appendChild(renderer.domElement);
 const vrButton = VRButton.createButton(renderer); // "Enter VR" on the page; the panel's VR button clicks it too
 document.body.appendChild(vrButton);
@@ -383,6 +385,7 @@ function setExhibit(next: Exhibit, c: ExhibitChoice) {
 
   history.replaceState(null, '', location.pathname + location.search + exhibitHash(c));
   document.title = c.kind === 'computer' ? TITLE : `${next.title} · ${TITLE}`;
+  renderer.domElement.setAttribute('aria-label', c.kind === 'computer' ? "Ben Eater's 8-bit computer on a table, in 3D, with its control panel behind it" : `${next.title}, a breadboard circuit on a table, in 3D, with its control panel behind it`);
   document.body.dataset.ready = JSON.stringify({ exhibit: c.kind === 'example' ? `example/${c.id}` : c.kind, ...model.counts });
   dirty = true;
 }

@@ -1,5 +1,5 @@
 import type { Circuit, Level, Net } from '../../logic/circuit';
-import { animate, h, setClass } from '../../ui/dom';
+import { animate, h, headCell, setClass } from '../../ui/dom';
 import type { Schematic } from '../../ui/schematic';
 
 /**
@@ -32,7 +32,7 @@ export interface TruthTable {
 
 export function truthTable(head: string[], rows: string[][]): TruthTable {
   const trs = rows.map((r) => h('tr', null, r.map((x) => h('td', null, x))));
-  const table = h('table', { class: 'truth-table' }, h('thead', null, h('tr', null, head.map((x) => h('th', null, x)))), h('tbody', null, trs));
+  const table = h('table', { class: 'truth-table' }, h('thead', null, h('tr', null, head.map((x) => headCell(x)))), h('tbody', null, trs));
   let cur = -2;
   return {
     el: h('div', { style: 'overflow-x:auto;max-width:100%' }, table),

@@ -75,7 +75,7 @@ export class ControlPanel {
       const wide = g.measureText(title).width;
       if (wide > room) g.font = `600 ${Math.floor((34 * room) / wide)}px system-ui, sans-serif`;
       g.fillText(title, 28, 52);
-      g.fillStyle = '#6b7385';
+      g.fillStyle = '#8c92a0';
       g.font = '400 17px ui-monospace, Consolas, monospace';
       g.textAlign = 'right';
       g.fillText(note, w - 24, h - 14);

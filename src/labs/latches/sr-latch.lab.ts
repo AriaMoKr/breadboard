@@ -1,6 +1,6 @@
 import { Circuit, Trace } from '../../logic/circuit';
 import { Button, Scope, Toggle, note, panel, row } from '../../ui/components';
-import { Disposer, animate, h, setClass, setText } from '../../ui/dom';
+import { Disposer, animate, h, headCell, setClass, setText } from '../../ui/dom';
 import { Schematic } from '../../ui/schematic';
 import { defineLab } from '../types';
 
@@ -68,7 +68,7 @@ export default defineLab({
       ['1', '1', '0*', 'invalid: Q = Q̅ = 0'],
     ];
     const trs = rows.map((r) => h('tr', null, r.map((x) => h('td', null, x))));
-    const table = h('table', { class: 'truth-table' }, h('thead', null, h('tr', null, ['S', 'R', 'Q', ''].map((x) => h('th', null, x)))), h('tbody', null, trs));
+    const table = h('table', { class: 'truth-table' }, h('thead', null, h('tr', null, ['S', 'R', 'Q', ''].map((x) => headCell(x)))), h('tbody', null, trs));
 
     const status = h('div', { class: 'callout' });
     const slowToggle = new Toggle({ label: 'Slow motion (one gate delay per step)', onChange: (v) => (slow = v) });

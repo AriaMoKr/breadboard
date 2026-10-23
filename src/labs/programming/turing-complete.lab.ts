@@ -17,7 +17,7 @@ const CSS = `
 .tc-lab .cell.blank { color: var(--fg-faint); }
 .tc-lab .seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
 .tc-lab .seg button { font: inherit; font-size: 0.82rem; font-weight: 600; background: var(--panel-2); color: var(--fg-dim); border: 0; padding: 6px 10px; cursor: pointer; }
-.tc-lab .seg button.active { background: var(--accent); color: #fff; }
+.tc-lab .seg button.active { background: color-mix(in srgb, var(--accent) 73%, black); color: #fff; }
 .tc-lab .spark { width: 100%; height: auto; display: block; background: var(--panel-2); border-radius: 8px; }
 .tc-lab .spark polyline { fill: none; stroke: var(--led-red); stroke-width: 2; }
 .tc-lab .spark .lim { stroke: var(--fg-faint); stroke-dasharray: 4 4; }

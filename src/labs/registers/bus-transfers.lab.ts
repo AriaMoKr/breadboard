@@ -91,7 +91,7 @@ export default defineLab({
     const log: { text: string; bad: boolean }[] = [];
 
     // ---- SVG ----
-    const svg = s('svg', { viewBox: `0 0 ${W} ${H}`, class: 'schematic bt-svg', role: 'img', 'aria-label': 'Bus with six modules', style: `--sch-w: ${W}` });
+    const svg = s('svg', { viewBox: `0 0 ${W} ${H}`, class: 'schematic bt-svg', role: 'group', 'aria-label': 'Bus with six modules', style: `--sch-w: ${W}` });
     svg.style.maxWidth = `${W + 60}px`;
     const gStubs = s('g');
     const gBus = s('g');

@@ -624,7 +624,7 @@ export function mountSandboxPage(root: HTMLElement): () => void {
   root.append(
     toolbar,
     h('div', { class: 'sb-layout' }, drawer, h('div', { class: 'sb-main' }, pz.el, status, partsEl)),
-    h('div', { class: 'sb-side' }, h('h4', null, 'Checks'), problemsEl),
+    h('div', { class: 'sb-side' }, h('h2', { class: 'sb-side-title' }, 'Checks'), problemsEl),
   );
   view.layerOverlay.appendChild(ghost);
   bindPointer();
@@ -698,6 +698,7 @@ export function mountSandboxPage(root: HTMLElement): () => void {
           pz.fit();
         }),
       );
+      exampleHost.querySelector('select')?.setAttribute('aria-label', 'Load an example');
     });
 
   return d.dispose;

@@ -50,7 +50,7 @@ export class MicrocodePanel {
       return tr;
     });
 
-    const head = h('tr', null, h('th', null, 'opcode'), h('th', null, ''), Array.from({ length: nSteps }, (_, i) => h('th', null, `T${i}`)));
+    const head = h('tr', null, h('th', null, 'opcode'), h('th', null, h('span', { class: 'sr-only' }, 'instruction')), Array.from({ length: nSteps }, (_, i) => h('th', null, `T${i}`)));
     const version = h('span', { class: 'dim small' });
 
     const update = () => {
@@ -71,7 +71,7 @@ export class MicrocodePanel {
     this.el = h(
       'div',
       { class: 'microcode-panel' },
-      h('div', { class: 'row' }, h('h4', null, 'Microcode'), version),
+      h('div', { class: 'row' }, h('h3', { class: 'sub-head' }, 'Microcode'), version),
       h('div', { class: 'table-scroll' }, h('table', { class: 'microcode' }, h('thead', null, head), h('tbody', null, body))),
       addrText,
     );

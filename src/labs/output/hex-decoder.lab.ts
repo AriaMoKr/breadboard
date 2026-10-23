@@ -171,7 +171,7 @@ export default defineLab({
             polToggle.el,
             note('Ben’s patterns: B and D come out lowercase (b, d) so they don’t look like 8 and 0.'),
           ),
-          panel('Segment logic', { accent: 'yellow', chips: '74LS04, 74LS08, 74LS32' }, logicHost, row(outBadge.el), logicCallout, formToggle.el, h('h4', null, 'Sum of minterms'), exprCanon, h('h4', null, 'Minimised'), exprMin, segCost),
+          panel('Segment logic', { accent: 'yellow', chips: '74LS04, 74LS08, 74LS32' }, logicHost, row(outBadge.el), logicCallout, formToggle.el, h('h3', { class: 'sub-head' }, 'Sum of minterms'), exprCanon, h('h3', { class: 'sub-head' }, 'Minimised'), exprMin, segCost),
         ),
         h(
           'div',

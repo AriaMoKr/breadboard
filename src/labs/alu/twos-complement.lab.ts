@@ -1,5 +1,5 @@
 import { Button, note, panel, row, select } from '../../ui/components';
-import { Disposer, animate, h, s, setClass, setText } from '../../ui/dom';
+import { Disposer, animate, h, headCell, s, setClass, setText } from '../../ui/dom';
 import { defineLab } from '../types';
 import { BitRow, labFrame } from '../registers/_shared';
 import { ENCODINGS, addBinary, bitOf, decode, encode, encodingRange, mask, negateTwos, signedAddDemo, toBin, toBinSpaced, twosWeights, type Encoding } from './_model';
@@ -310,7 +310,7 @@ export default defineLab({
     const ben = h(
       'table',
       { class: 'truth-table compact' },
-      h('thead', null, h('tr', null, ['−5 in 4 bits', 'pattern', ''].map((t) => h('th', null, t)))),
+      h('thead', null, h('tr', null, ['−5 in 4 bits', 'pattern', ''].map((t) => headCell(t)))),
       h(
         'tbody',
         null,

@@ -3,7 +3,7 @@ import { Circuit } from '../../logic/circuit';
 import { bin, hex } from '../../sim/assembler';
 import { Machine } from '../../sim/machine';
 import { Button, DipSwitch, LedBar, Scope, Slider, note, panel, row, select } from '../../ui/components';
-import { Disposer, animate, h, s, setText } from '../../ui/dom';
+import { Disposer, animate, h, headCell, s, setText } from '../../ui/dom';
 import { Schematic } from '../../ui/schematic';
 import { defineLab } from '../types';
 import {
@@ -343,14 +343,14 @@ export default defineLab({
             row(walk.el, zeros.el),
             row(wroteBar.el),
             row(readBar.el),
-            h('div', { class: 'table-scroll' }, h('table', { class: 'truth-table compact' }, h('thead', null, h('tr', null, h('th', null, 'wrote'), h('th', null, 'read back'), h('th', null, ''))), testTable)),
+            h('div', { class: 'table-scroll' }, h('table', { class: 'truth-table compact' }, h('thead', null, h('tr', null, h('th', null, 'wrote'), h('th', null, 'read back'), headCell(''))), testTable)),
           ),
           panel('Find the fault', { accent: 'orange' }, wiring, row(guessSel), row(check.el, reveal.el, fixBtn.el, newBoard.el), note('Ben’s fix: some connections were shifted by one pin. Unconnected (floating) TTL inputs read as 1, so writing all zeros is a quick way to spot an input that isn’t wired.')),
         ),
         panel(
           '3 · Test it on the computer',
           { accent: 'blue', subtitle: 'clock, bus, MAR and RAM with manual control signals' },
-          h('div', { class: 'lab-grid two' }, h('div', null, checklist.el), h('div', { class: 'mo-col' }, rbCallout, h('div', { class: 'table-scroll' }, h('table', { class: 'truth-table compact' }, h('thead', null, h('tr', null, h('th', null, 'address'), h('th', null, 'written'), h('th', null, 'read over the bus'), h('th', null, ''))), rbTable)))),
+          h('div', { class: 'lab-grid two' }, h('div', null, checklist.el), h('div', { class: 'mo-col' }, rbCallout, h('div', { class: 'table-scroll' }, h('table', { class: 'truth-table compact' }, h('thead', null, h('tr', null, h('th', null, 'address'), h('th', null, 'written'), h('th', null, 'read over the bus'), headCell(''))), rbTable)))),
           wbHost,
         ),
       ),

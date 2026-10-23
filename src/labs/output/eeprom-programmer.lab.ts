@@ -83,7 +83,7 @@ export default defineLab({
 
     // ---- code view ----
     const lineEls = CODE_LINES.map((l) => h('div', { class: l.id ? 'hl' : '' }, l.text || ' '));
-    const code = h('div', { class: 'code', role: 'region', 'aria-label': 'Arduino sketch' }, lineEls);
+    const code = h('div', { class: 'code', role: 'region', 'aria-label': 'Arduino sketch', tabindex: 0 }, lineEls);
     let curLineIdx = -1;
     const evNote = h('div', { class: 'mono small' });
     const explain = h('div', { class: 'callout' });

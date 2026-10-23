@@ -267,6 +267,7 @@ export class Kit {
     const g = s('g', { class: 'spdt clickable', role: 'button', tabindex: 0, 'aria-label': 'Mode switch' }, s('rect', { x: Math.min(a[0], c[0]) - 14, y: Math.min(a[1], c[1]) - 12, width: Math.abs(c[0] - a[0]) + 28, height: pivot[1] - Math.min(a[1], c[1]) + 22, fill: 'transparent', stroke: 'none' }), lever);
     for (const p of [pivot, a, c]) g.appendChild(s('circle', { cx: p[0], cy: p[1], r: 4, class: 'contact' }));
     this.over.appendChild(g);
+    this.over.closest('svg')?.setAttribute('role', 'group'); // holds a control: not only a picture
     return {
       el: g,
       /** pos: 0 = on A, 1 = on C, in between = travelling; `touch` = actually touching. */

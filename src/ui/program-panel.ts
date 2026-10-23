@@ -104,12 +104,16 @@ export class ProgramPanel {
       const tr = h('tr', null, marker, h('td', { class: 'mono dim' }, addr.toString(2).padStart(4, '0')), h('td', { class: 'mono dim' }, String(addr)), h('td', { class: 'bits' }, bits), dec, dis);
       return { tr, marker, bits, dec, dis };
     });
-    const table = h('table', { class: 'memory' }, h('thead', null, h('tr', null, h('th'), h('th', { colspan: 2 }, 'addr'), h('th', null, 'contents'), h('th', null, 'dec'), h('th', null, 'as instruction'))), h('tbody', null, rows.map((r) => r.tr)));
+    const table = h('table', { class: 'memory' }, h('thead', null, h('tr', null, h('th', null, h('span', { class: 'sr-only' }, 'PC and MAR')), h('th', { colspan: 2 }, 'addr'), h('th', null, 'contents'), h('th', null, 'dec'), h('th', null, 'as instruction'))), h('tbody', null, rows.map((r) => r.tr)));
 
     const update = () => {
       rows.forEach((r, addr) => {
         const v = c.ram[addr];
-        r.bits.forEach((b, i) => setClass(b, 'on', ((v >> (7 - i)) & 1) === 1));
+        r.bits.forEach((b, i) => {
+          const on = ((v >> (7 - i)) & 1) === 1;
+          setClass(b, 'on', on);
+          b.setAttribute('aria-pressed', String(on)); // a toggle: screen readers say on or off
+        });
         setText(r.dec, String(v));
         setText(r.dis, disassemble(v));
         const isPc = c.pc === addr, isMar = c.ramAddress === addr;
@@ -121,7 +125,7 @@ export class ProgramPanel {
     };
     this.d.add(m.onChange(update));
 
-    this.el = h('div', { class: 'program-panel' }, editor, h('div', { class: 'memory-wrap' }, h('h4', null, 'RAM ', h('span', { class: 'dim small' }, '▶ PC  ● MAR — click bits to edit')), table));
+    this.el = h('div', { class: 'program-panel' }, editor, h('div', { class: 'memory-wrap' }, h('h3', { class: 'sub-head' }, 'RAM ', h('span', { class: 'dim small' }, '▶ PC  ● MAR — click bits to edit')), table));
     if (!opts.memoryOnly && !(opts.keepLoaded && m.lastSource !== null)) {
       if (opts.initial && !PROGRAMS.some((p) => p.id === opts.initial)) this.setSource(opts.initial);
       else if (first) this.selectProgram(first.id);

@@ -36,7 +36,7 @@ class GlowDigit {
   constructor(height = 84) {
     const off = SHAPES.map(([, , p]) => s('polygon', { points: p, class: 'off' }));
     this.lit = SHAPES.map(([, , p]) => s('polygon', { points: p, class: 'lit', 'fill-opacity': 0 }));
-    this.el = s('svg', { viewBox: '0 0 64 100', width: (height * 64) / 100, height, class: 'glow7', role: 'img' }, off, this.lit);
+    this.el = s('svg', { viewBox: '0 0 64 100', width: (height * 64) / 100, height, class: 'glow7', 'aria-hidden': 'true' }, off, this.lit);
   }
   /** Segment byte (dp a b c d e f g) shown at brightness 0..1. */
   set(byte: number, brightness: number) {

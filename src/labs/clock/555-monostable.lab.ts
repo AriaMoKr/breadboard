@@ -80,6 +80,7 @@ export default defineLab({
     btn.el.setAttribute('role', 'button');
     btn.el.setAttribute('tabindex', '0');
     btn.el.setAttribute('aria-label', 'Step button');
+    sch.el.setAttribute('role', 'group'); // holds a control: not only a picture
 
     // ---- widgets ----
     const status = callout();

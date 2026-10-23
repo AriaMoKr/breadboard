@@ -4,7 +4,7 @@ import { PROGRAM_BY_ID } from '../../sim/programs';
 import { SIGNAL_BITS, SIGNAL_INFO, SIGNALS, formatControlWord, type ModuleId, type Signal } from '../../sim/signals';
 import { Led, note, panel } from '../../ui/components';
 import { ComputerView } from '../../ui/computer-view';
-import { Disposer, growOnly, h, setClass, setText } from '../../ui/dom';
+import { Disposer, growOnly, h, headCell, setClass, setText } from '../../ui/dom';
 import { defineLab } from '../types';
 import { describeTransfer } from './_models';
 import { highlightModules, machineToolbar, scopedStyle } from './_shared';
@@ -68,9 +68,10 @@ const CSS = `
 .cs-lab table.sigs tbody tr { cursor: pointer; }
 .cs-lab table.sigs tbody tr:hover td { background: var(--panel-2); }
 .cs-lab table.sigs tr.sel td { background: color-mix(in srgb, var(--accent-2) 16%, transparent); }
-.cs-lab table.sigs tr.future td { opacity: 0.55; }
+/* later steps: dimmer, but still readable (a faded colour, not opacity) */
+.cs-lab table.sigs tr.future td, .cs-lab table.sigs tr.future td * { color: var(--fg-faint); }
 .cs-lab .pin { font-family: var(--mono); font-size: 0.75rem; }
-.cs-lab .pin.lo { color: var(--wire-0); } .cs-lab .pin.hi { color: var(--wire-1); }
+.cs-lab .pin.lo { color: var(--wire-0-text); } .cs-lab .pin.hi { color: var(--wire-1-text); }
 `;
 
 export default defineLab({
@@ -159,7 +160,7 @@ export default defineLab({
     const wtable = h(
       'div',
       { class: 'table-scroll' },
-      h('table', { class: 'truth-table', style: 'text-align:left' }, h('thead', null, h('tr', null, ['', 'step', 'control word', 'what moves'].map((x) => h('th', null, x)))), h('tbody', null, wrows.map((r) => r.tr))),
+      h('table', { class: 'truth-table', style: 'text-align:left' }, h('thead', null, h('tr', null, ['', 'step', 'control word', 'what moves'].map((x) => headCell(x)))), h('tbody', null, wrows.map((r) => r.tr))),
     );
     const now = h('div', { class: 'callout' });
     growOnly(now); // changes with every clock edge; the clock's buttons are below it on phones

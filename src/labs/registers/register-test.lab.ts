@@ -73,7 +73,7 @@ export default defineLab({
       opBar.set(c.ir >> 4);
       argBar.set(c.ir & 15);
       irBusBar.set(c.ir & 15);
-      irBusBar.el.style.opacity = cw & IO ? '1' : '0.45';
+      setClass(irBusBar.el, 'idle', !(cw & IO)); // dimmed while IO is off (styles.css: .ledbar.idle)
       logEl.replaceChildren(...log.slice(-10).map((t) => h('li', null, t)));
       done.style.display = checklist.allDone ? '' : 'none';
       const ins: string[] = [];

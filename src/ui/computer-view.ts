@@ -205,7 +205,7 @@ export class ComputerView {
       setText(drivers, b.floating ? `${who} · ${b.floating === 0xff ? 'all lines float' : 'some lines float'} (read as 1)` : who);
       setClass(warn, 'show', b.contention);
     });
-    return h('section', { class: 'panel bus accent-red' }, h('header', { class: 'panel-head' }, h('h3', null, 'Bus')), h('div', { class: 'panel-body' }, bar.el, drivers, warn));
+    return h('section', { class: 'panel bus accent-red' }, h('header', { class: 'panel-head' }, h('h2', null, 'Bus')), h('div', { class: 'panel-body' }, bar.el, drivers, warn));
   }
 
   private pcModule() {
@@ -284,13 +284,33 @@ export class ComputerView {
     const digits = [0, 1, 2, 3].map(() => new SevenSegment({ height: 54 }));
     const signed = new Toggle({ label: '±', value: c.signedDisplay, title: "Show the output as two's complement", onChange: (v) => { c.signedDisplay = v; m.changed(); } });
     const val = h('span', { class: 'mono dim' });
+    // One picture for screen readers, named by the number it shows (not four digits' segments).
+    const display = h('div', { class: 'display4', role: 'img' }, digits.map((d) => d.el));
+    for (const d of digits) d.el.setAttribute('aria-hidden', 'true');
+    // For screen readers: what the display shows, and the clock halting, said politely and at most
+    // every 2 s (the latest value then), so a fast clock doesn't flood them.
+    const said = h('p', { class: 'sr-only', 'aria-live': 'polite' });
+    let shown = c.out, halted = c.halted, due = 0, timer = 0;
+    const say = () => {
+      timer = 0;
+      due = performance.now() + 2000;
+      const v = c.signedDisplay ? toSigned8(c.out) : c.out;
+      setText(said, c.halted ? `Halted. The output shows ${v}.` : `Output ${v}`);
+    };
+    this.d.add(() => clearTimeout(timer));
     this.on(() => {
       const segs = displaySegments(c.out, c.signedDisplay);
       digits.forEach((d, i) => d.set(segs[i]));
       signed.set(c.signedDisplay);
       setText(val, `${c.out.toString(2).padStart(8, '0')}${c.signedDisplay ? ` = ${toSigned8(c.out)}` : ''}`);
+      const name = `Output display: ${c.signedDisplay ? toSigned8(c.out) : c.out}`;
+      if (display.getAttribute('aria-label') !== name) display.setAttribute('aria-label', name);
+      if (c.out === shown && c.halted === halted) return;
+      shown = c.out;
+      halted = c.halted;
+      if (!timer) timer = setTimeout(say, Math.max(0, due - performance.now()));
     });
-    return panel('Output', { accent: 'red', chips: '74LS273, 28C16, 555, 74LS76, 74LS139' }, h('div', { class: 'display4' }, digits.map((d) => d.el)), row(signed.el, val), this.badges('out'));
+    return panel('Output', { accent: 'red', chips: '74LS273, 28C16, 555, 74LS76, 74LS139' }, display, row(signed.el, val), said, this.badges('out'));
   }
 
   private flagsModule() {

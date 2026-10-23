@@ -10,7 +10,7 @@
   --border: #2f3542;
   --fg: #e6e8ee;
   --fg-dim: #9aa3b5;
-  --fg-faint: #6b7385;
+  --fg-faint: #8c92a0; /* the dimmest text: 4.5:1 even on --panel-2 */
   --grid: #2a2f3b;
   --accent: #60a5fa;
   --accent-2: #f59e0b;
@@ -24,12 +24,16 @@
   --led-white: #f3f4f6;
   --led-orange: #ff8a1f;
   --led-off: #2a2d36;
+  --on-blue: #0b1220; /* text on a lit blue (--led-blue): white on it is too faint */
 
   /* wires (schematics) */
   --wire-1: #ff4d4d;
   --wire-0: #3a6ea5;
   --wire-z: #707888;
   --wire-x: #ffb020;
+  /* the levels' colours for text (a pin's level in a table): readable on the panels */
+  --wire-0-text: #81a2c5;
+  --wire-1-text: #ff6b6b;
 
   --radius: 10px;
   --topbar-h: 44px; /* sticky bars sit right under the top bar */
@@ -47,7 +51,14 @@
     --border: #d4d9e3;
     --fg: #1c2230;
     --fg-dim: #5a6478;
-    --fg-faint: #8a93a6;
+    --fg-faint: #626876;
+    /* darker for text on the light panels (links, warnings, ok) */
+    --accent: #2563c4;
+    --accent-2: #a35d00;
+    --danger: #c62828;
+    --ok: #217a3c;
+    --wire-0-text: #48638a;
+    --wire-1-text: #c43b3b;
     --grid: #dde2ea;
     --led-off: #d5d9e1;
     --wire-0: #6b8fc4;
@@ -66,10 +77,12 @@ body {
 a { color: var(--accent); }
 h1 { font-size: 1.7rem; margin: 0.2em 0 0.3em; letter-spacing: -0.01em; }
 h3, h4 { margin: 0; }
-h4 { font-size: 0.95rem; }
+h4, h3.sub-head { font-size: 0.95rem; }
 .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 .dim { color: var(--fg-dim); }
 .small { font-size: 0.82rem; }
+/* words for screen readers only (an empty table header's name, the live announcements) */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 code, pre { font-family: var(--mono); }
 
 /* ==========================================================================
@@ -145,8 +158,8 @@ pre.error { color: var(--danger); white-space: pre-wrap; }
 .btn:hover:not(:disabled) { background: color-mix(in srgb, var(--panel-2) 70%, var(--fg) 8%); }
 .btn:active:not(:disabled), .btn.pressed { transform: translateY(1px); background: var(--border); }
 .btn:disabled { opacity: 0.45; cursor: default; }
-.btn-primary { background: color-mix(in srgb, var(--accent) 80%, black); border-color: var(--accent); color: white; }
-.btn-primary:hover:not(:disabled) { background: var(--accent); }
+.btn-primary { background: color-mix(in srgb, var(--accent) 73%, black); border-color: var(--accent); color: white; }
+.btn-primary:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 66%, black); }
 .btn-danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, var(--border)); }
 .btn-ghost { background: transparent; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -173,9 +186,11 @@ pre.error { color: var(--danger); white-space: pre-wrap; }
 .has-error { border-color: var(--danger) !important; }
 
 .dipswitch { display: inline-flex; align-items: center; gap: 6px; }
-.dipswitch.dim { opacity: 0.4; }
-.dip-bank { display: inline-flex; gap: 2px; padding: 3px; background: #c0392b; border-radius: 4px; }
-.dip { width: 13px; height: 24px; border: 0; padding: 0; background: #f4f4f4; border-radius: 2px; position: relative; cursor: pointer; }
+.dipswitch.dim .dip-bank { opacity: 0.4; }
+.dipswitch.dim .ledbar-label { color: var(--fg-faint); }
+/* switches 24 px apart, so each has a 24 px target (WCAG 2.2, 2.5.8) */
+.dip-bank { display: inline-flex; gap: 6px; padding: 3px; background: #c0392b; border-radius: 4px; }
+.dip { width: 18px; height: 24px; border: 0; padding: 0; background: #f4f4f4; border-radius: 2px; position: relative; cursor: pointer; }
 .dip-knob { position: absolute; left: 2px; right: 2px; height: 9px; bottom: 2px; background: #333; border-radius: 1px; transition: bottom 0.1s; }
 .dip.on .dip-knob { bottom: 13px; }
 
@@ -191,6 +206,9 @@ pre.error { color: var(--danger); white-space: pre-wrap; }
 .led.x { background: var(--wire-x); box-shadow: 0 0 6px var(--wire-x); }
 .ledbar { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .ledbar-label { color: var(--fg-dim); font-size: 0.8rem; }
+/* a bar not in use: its LEDs dimmed, its words readable */
+.ledbar.idle .ledbar-leds { opacity: 0.45; }
+.ledbar.idle .ledbar-label, .ledbar.idle .readouts > * { color: var(--fg-faint); }
 .ledbar-leds { display: inline-flex; gap: 5px; align-items: flex-start; }
 .ledbar.vertical, .ledbar.vertical .ledbar-leds { flex-direction: column; }
 .led-cell { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; }
@@ -233,13 +251,13 @@ pre.error { color: var(--danger); white-space: pre-wrap; }
   background: linear-gradient(to bottom, color-mix(in srgb, var(--acc) 12%, var(--panel-2)), var(--panel-2));
   box-shadow: inset 0 2px 0 color-mix(in srgb, var(--acc) 65%, transparent);
 }
-.panel-head h3 { font-size: 0.86rem; letter-spacing: 0.02em; }
+.panel-head h2, .panel-head h3 { font-size: 0.86rem; letter-spacing: 0.02em; margin: 0; }
 .panel-sub { color: var(--fg-dim); font-size: 0.78rem; }
 .panel-body { padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
 .panel-chips { font-family: var(--mono); font-size: 0.66rem; color: var(--fg-faint); padding: 0 12px 7px; }
 .sig-row { display: flex; gap: 4px; flex-wrap: wrap; }
 .sig { font-family: var(--mono); font-size: 0.68rem; padding: 1px 6px; border-radius: 5px; border: 1px solid var(--border); color: var(--fg-faint); transition: all 0.05s; }
-.sig.on { background: var(--led-blue); border-color: var(--led-blue); color: white; box-shadow: 0 0 8px color-mix(in srgb, var(--led-blue) 60%, transparent); }
+.sig.on { background: var(--led-blue); border-color: var(--led-blue); color: var(--on-blue); box-shadow: 0 0 8px color-mix(in srgb, var(--led-blue) 60%, transparent); }
 .module.highlight { border-color: var(--accent-2); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-2) 40%, transparent), 0 6px 16px -10px rgba(0, 0, 0, 0.6); }
 
 /* Lab building blocks */
@@ -322,10 +340,12 @@ table.memory td { padding: 1px 4px; white-space: nowrap; }
 table.memory tr.pc { background: color-mix(in srgb, var(--led-green) 12%, transparent); }
 table.memory tr.mar td.mem-marker { color: var(--led-yellow); }
 .mem-marker { width: 26px; min-width: 26px; color: var(--led-green); font-size: 0.7rem; } /* a squeezed table would size it to its ▶ and ●, moving the bits as they come and go */
-.bits { display: flex; gap: 2px; }
-.bit { width: 11px; height: 11px; border-radius: 50%; border: 1px solid rgba(0, 0, 0, 0.3); background: var(--led-off); padding: 0; cursor: pointer; }
-.bit.on { background: var(--led-red); box-shadow: 0 0 4px var(--led-red); }
-.bit.hi.on { background: var(--led-blue); box-shadow: 0 0 4px var(--led-blue); }
+.bits { display: flex; gap: 0; }
+/* a 24 px target (WCAG 2.2, 2.5.8) round a 12 px LED, drawn by ::before */
+.bit { width: 24px; height: 24px; border: 0; background: none; padding: 0; cursor: pointer; display: grid; place-items: center; }
+.bit::before { content: ''; width: 12px; height: 12px; border-radius: 50%; border: 1px solid rgba(0, 0, 0, 0.3); background: var(--led-off); box-sizing: border-box; }
+.bit.on::before { background: var(--led-red); box-shadow: 0 0 4px var(--led-red); }
+.bit.hi.on::before { background: var(--led-blue); box-shadow: 0 0 4px var(--led-blue); }
 .bit.lo { margin-left: 0; }
 .bit.lo:nth-child(5) { margin-left: 4px; }
 
@@ -338,7 +358,7 @@ table.microcode thead th { color: var(--fg-dim); background: var(--panel-2); }
 table.microcode tbody th { color: var(--fg-dim); font-weight: 500; }
 table.microcode td.fetch { color: var(--fg-dim); }
 table.microcode tr.current th { color: var(--fg); }
-table.microcode td.current { background: var(--led-blue); color: white; }
+table.microcode td.current { background: var(--led-blue); color: var(--on-blue); }
 table.microcode tr.highlight th { color: var(--fg); background: color-mix(in srgb, var(--accent-2) 16%, transparent); }
 table.microcode tr.highlight th:first-child { box-shadow: inset 3px 0 0 var(--accent-2); }
 table.microcode td.uc-cell[tabindex] { cursor: text; }
@@ -456,7 +476,7 @@ table.microcode td.editing { position: relative; color: transparent; }
   .dip-knob { height: 15px; }
   .dip.on .dip-knob { bottom: 23px; }
   .bits { gap: 4px; }
-  .bit { width: 24px; height: 24px; }
+  .bit::before { width: 24px; height: 24px; }
   .bit.lo:nth-child(5) { margin-left: 8px; }
   /* Schematics shrink to fit the screen. Stop at 3/4 of their size, so labels stay readable and
      switches tappable, and let the panel scroll sideways. --sch-w is the drawing's own width. */

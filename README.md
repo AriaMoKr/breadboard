@@ -128,7 +128,10 @@ that every page renders without errors, that phones get no sideways scrolling an
 at least 24 px, the sticky toolbar, parts drawer and tap-to-zoom, the shared computer, placing,
 moving, deleting and stepping in the sandbox with real clicks, taps and drags, sandbox links, the
 breadboard view's frame rate, and that the VR view builds the computer in 3D, runs it, and
-leads back to the Hallway when a door of it led there.
+leads back to the Hallway when a door of it led there. It also runs Deque's
+[axe-core](https://github.com/dequelabs/axe-core) on every page and the VR view, in the dark and
+the light theme, with the rules of WCAG 2.2 AA and its best practices, and fails on anything it
+finds: text contrast, target sizes, names and roles, headings, landmarks.
 `npm run check:browser -- --dist`
 checks the built site instead (run `npm run build` first), plus the download link, install and
 offline use, and `-- --url <address>` checks a deployed copy the same way (such as

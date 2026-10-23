@@ -104,7 +104,7 @@ export function mountComputerWorkbench(root: HTMLElement, opts: ComputerWorkbenc
       list.replaceChildren(...log.slice(-64).map((v) => h('li', null, String(v))));
     };
     d.add(machine.onChange(upd));
-    tabPanels.output = h('div', { class: 'output-panel' }, h('h4', null, 'Output register history'), list);
+    tabPanels.output = h('div', { class: 'output-panel' }, h('h3', { class: 'sub-head' }, 'Output register history'), list);
   }
   const tabButtons = h('div', { class: 'tabs', role: 'tablist' });
   const tabBody = h('div', { class: 'tab-body' });
