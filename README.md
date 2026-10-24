@@ -39,7 +39,14 @@ video by video.
   room's own panel, left of the table, sets **Move** and **Turn**, kept in the browser as the
   Hallway keeps them (`hallway.nav`, read and written by `common/nav.js`), so the choice is the
   same on both sides of its doors (`src/vr/move.ts`). On a screen, drag to look
-  around, double-click to look closer, and click. It is built with three.js from the same layout
+  around, double-click to look closer, and click. A gamepad (Xbox, PlayStation or another
+  Bluetooth pad) works on a screen too, as in the Hallway (`common/gamepad.js`): it takes over as
+  soon as you use it, and moving or pressing the mouse hands control back. The right stick looks,
+  the left one walks the way you face (click it in to hurry), and the triggers lower and raise
+  you, from just above the table to 2.4 m. A dot in the middle of the view shows what A presses
+  (a switch, button or pot on the boards, a panel's button, or the doorway back) and grows when
+  it is on one; hold A on the pot and turn it with the right stick. B (or Back) flies back to the
+  table. Browsers show a page a gamepad only once one of its buttons has been pressed. It is built with three.js from the same layout
   as the breadboard view (`src/vr/`), at 1.5x real size. The wires between boards arc over them
   as in the breadboard view's **Wires between boards**: the bus (blue) at first, and the clock
   (white), control lines (purple) and data (yellow) when wanted. A panel right of the table and
@@ -137,8 +144,9 @@ MinGW-built Node in MSYS2's UCRT64 shell, so Vite 8 doesn't start there.
 that every page renders without errors, that phones get no sideways scrolling and controls of
 at least 24 px, the sticky toolbar, parts drawer and tap-to-zoom, the shared computer, placing,
 moving, deleting and stepping in the sandbox with real clicks, taps and drags, sandbox links, the
-breadboard view's frame rate, and that the VR view builds the computer in 3D, runs it, and
-leads back to the Hallway when a door of it led there. It also runs Deque's
+breadboard view's frame rate, and that the VR view builds the computer in 3D, runs it, works
+with a gamepad (a stand-in for `navigator.getGamepads`), and leads back to the Hallway when a door
+of it led there. It also runs Deque's
 [axe-core](https://github.com/dequelabs/axe-core) on every page and the VR view, in the dark and
 the light theme, with the rules of WCAG 2.2 AA and its best practices, and fails on anything it
 finds: text contrast, target sizes, names and roles, headings, landmarks. Under emulated high

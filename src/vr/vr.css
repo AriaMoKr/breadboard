@@ -36,3 +36,13 @@ html, body { margin: 0; height: 100%; background: #111318; color: #e6e8ee; font-
 .vr-together button:hover { background: #3b4456; }
 .vr-together button[hidden] { display: none; }
 .vr-together-status { color: #9aa3b2; }
+/* where a gamepad aims (main.ts), the middle of the view, as in the Hallway: larger and filled on
+   something A uses; in high contrast in the system's colours */
+.vr-aim { position: fixed; left: 50%; top: 50%; z-index: 1; box-sizing: border-box; width: 18px; height: 18px; margin: -9px 0 0 -9px; border: 2px solid rgba(255, 248, 235, 0.95); border-radius: 50%; box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.55), inset 0 0 0 2px rgba(0, 0, 0, 0.35); pointer-events: none; transition: transform 0.12s, background-color 0.12s; }
+.vr-aim[hidden] { display: none; }
+.vr-aim.on { transform: scale(1.35); background-color: rgba(255, 210, 122, 0.55); }
+.vr-aim.still { transition: none; }
+@media (forced-colors: active) {
+  .vr-aim { forced-color-adjust: none; border-color: CanvasText; box-shadow: 0 0 0 2px Canvas; }
+  .vr-aim.on { background-color: Highlight; }
+}

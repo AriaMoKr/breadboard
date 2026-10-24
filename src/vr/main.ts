@@ -8,13 +8,14 @@ import { EXAMPLE_IDS, circuitExhibit, computerExhibit, exampleExhibit, exhibitHa
 import { buildDoorway } from './door';
 import { ACCESS_KEY, Vignette, eyeLift, loadAccess, motionQuery, reduceMotion, saveAccess, watchMotion, type Access } from 'common/access.js';
 import { Fade } from 'common/fade.js';
+import { BUTTONS, firstPad, readPad } from 'common/gamepad.js';
 import { hallwayViews, leaveUrl, readVisit, wayBack, withoutVisit } from 'common/door.js';
 import { NAV_KEY, loadNav, saveNav, type Nav } from 'common/nav.js';
 import { h } from '../ui/dom';
 import { BREADBOARD_ID, DOOR, doorOf, keptDoor } from './hallway';
 import type { LinkKind } from '../breadboard/computer-layout';
 import { BOARD_T, buildComputerModel, disposeTree, type ComputerModel, type ControlHit } from './model';
-import { AimStick, TurnStick, XR_WALK, clampWalk, headYaw, standable, turnedAbout, walkDelta, wrapAngle, type Rect } from './move';
+import { AimStick, PAD, TurnStick, XR_WALK, aimDir, aimOf, clampStep, clampWalk, headYaw, padLook, padWalk, standable, turnedAbout, walkDelta, wrapAngle, type Rect } from './move';
 import { ControlPanel, Tooltip } from './panel';
 import { boardTexture, labelTexture } from './textures';
 import { Together } from './together';
@@ -28,8 +29,9 @@ import './vr.css';
  * the switches and buttons on the boards; the grip buttons pick the boards up (both grips: pull
  * apart to make them bigger); the sticks walk and turn, as in the Hallway (move.ts, common's
  * nav.js, and the room's panel left of the table). On a screen you orbit with the mouse or a
- * finger and click the panel and the boards. "Next ▸" on the panel goes through the computer and
- * the examples.
+ * finger and click the panel and the boards, or walk and look about with a gamepad and press A
+ * at what the dot in the middle is on. "Next ▸" on the panel goes through the computer and the
+ * examples.
  */
 
 const UNIT = 0.00254 * 1.5; // one breadboard pitch (0.1") in metres, at 1.5x real size
@@ -590,6 +592,7 @@ let press: { x: number; y: number; id: number; hold: Hold | null } | null = null
 host.addEventListener(
   'pointerdown',
   (e) => {
+    setPadActive(false); // the pointer has the view again
     if (press) {
       if (e.pointerType === 'touch' && e.pointerId !== press.id) return; // a second finger: pinch-zooming
       press.hold?.end(false); // a press whose release never came
@@ -605,6 +608,7 @@ host.addEventListener(
   true,
 );
 renderer.domElement.addEventListener('pointermove', (e) => {
+  if (e.movementX || e.movementY) setPadActive(false);
   if (press?.hold?.turn && e.pointerId === press.id) return press.hold.turn((press.y - e.clientY) / 150);
   if (e.pointerType === 'mouse' && !press) {
     const o = fromPointer(e);
@@ -660,6 +664,109 @@ if (arrival) {
   controls.target.copy(target);
   controls.update();
   fly = { from: [eye, target], to: homePose(), t: 0, ms: 1600, wait: 700 };
+}
+
+// ---- a gamepad on a screen (common's gamepad.js), as in the Hallway and vrlbry ----
+// It takes over when used, and the mouse (a move or a press) takes it back. While it has the view,
+// a dot in the middle shows what A uses (a switch, button or pot on the boards, a panel's button,
+// the doorway back), larger on one, and the bar's hint is the gamepad's. The right stick looks
+// (down to nearly straight down, up to level, as the orbit can follow), the left one walks the
+// way the view faces (clicked in, it hurries), the triggers lower and raise the eye (from just
+// above the table to 2.4 m); A presses what the dot is on, held while A is (a pot held so turns
+// with the right stick), and B or Back flies back to the home view. In VR the controllers come
+// through the XR session instead, so the pad is not read there.
+const hintEl = document.querySelector<HTMLElement>('.vr-hint');
+const mouseHint = hintEl?.textContent ?? '';
+const PAD_HINT = 'Gamepad: the right stick looks, the left stick walks (click it in to hurry), the triggers lower and raise you · A presses what the dot is on · B goes back to the table';
+const aimDot = h('div', { class: 'vr-aim', 'aria-hidden': 'true' });
+aimDot.hidden = true;
+host.after(aimDot);
+const EYE = { low: TABLE_TOP + 0.08, high: 2.4 };
+const PITCH = { low: THREE.MathUtils.degToRad(-80), high: controls.maxPolarAngle - Math.PI / 2 - 0.005 }; // high: just inside the orbit's limit
+const LT = BUTTONS.indexOf('lt'), RT = BUTTONS.indexOf('rt');
+let pads = 0; // connected: a browser shows a page a gamepad once one of its buttons is pressed
+let padActive = false;
+const padState = readPad({ axes: [], buttons: [] });
+let padUse = false;
+let padBack = false;
+/** A control held with A: what it does, its hit box (the dot stays on it), and how far the right stick has turned it (pots). */
+let padHold: { hold: Hold; object: THREE.Object3D; by: number } | null = null;
+const middle = new THREE.Vector2(0, 0);
+const ahead = new THREE.Vector3();
+addEventListener('gamepadconnected', () => pads++);
+addEventListener('gamepaddisconnected', () => {
+  pads = Math.max(0, pads - 1);
+  if (!pads) setPadActive(false);
+});
+function setPadActive(on: boolean) {
+  if (padActive === on) return;
+  padActive = on;
+  aimDot.hidden = !on;
+  if (hintEl) hintEl.textContent = on ? PAD_HINT : mouseHint;
+  renderer.domElement.style.cursor = '';
+  if (on) return;
+  padHold?.hold.end(false);
+  padHold = null;
+  hover(null);
+}
+/** Every frame on a screen, while a gamepad is connected: the sticks, the triggers, A and B. */
+function padFrame(dt: number) {
+  const pad = firstPad(navigator.getGamepads?.());
+  if (!pad) return setPadActive(false);
+  const s = readPad(pad, padState);
+  const raise = (pad.buttons[RT]?.value ?? 0) - (pad.buttons[LT]?.value ?? 0);
+  const rise = Math.abs(raise) > 0.1 ? raise : 0;
+  const moving = s.moveX !== 0 || s.moveY !== 0;
+  let looking = s.lookX !== 0 || s.lookY !== 0;
+  if (moving || looking || rise || (s.use && !padUse) || (s.back && !padBack)) setPadActive(true);
+  if (padActive) {
+    if (padHold?.hold.turn) {
+      // a pot held with A turns with the right stick (right: clockwise), and the view holds still
+      if (s.lookX) padHold.hold.turn((padHold.by += s.lookX * PAD.knob * dt));
+      looking = false;
+    }
+    if (moving || looking || rise) {
+      fly = null;
+      ahead.subVectors(controls.target, camera.position);
+      const dist = ahead.length();
+      let [yaw, pitch] = aimOf(ahead.x, ahead.y, ahead.z);
+      if (looking) [yaw, pitch] = padLook(yaw, pitch, s.lookX, s.lookY, dt, PITCH.low, PITCH.high);
+      const [dx, dz] = padWalk(s.moveX, s.moveY, yaw, (s.run ? PAD.run : PAD.walk) * dt);
+      const p = camera.position;
+      p.set(clampStep(p.x, dx, ROOM.x0, ROOM.x1), clampStep(p.y, rise * PAD.rise * dt, EYE.low, EYE.high), clampStep(p.z, dz, ROOM.z0, ROOM.z1));
+      controls.target.copy(p).addScaledVector(ahead.set(...aimDir(yaw, pitch)), dist);
+    }
+    // the buttons act once a press
+    if (s.use && !padUse) padPress();
+    else if (!s.use && padUse && padHold) {
+      padHold.hold.end(true);
+      padHold = null;
+    }
+    if (s.back && !padBack) fly = { from: [camera.position.clone(), controls.target.clone()], to: homePose(), t: 0, ms: 600, wait: 0 };
+  }
+  padUse = s.use;
+  padBack = s.back;
+}
+/** A: what the middle of the view is on, as a press there with the mouse would. */
+function padPress() {
+  camera.updateMatrixWorld();
+  raycaster.setFromCamera(middle, camera);
+  const o = pick()?.object ?? null;
+  const hit = hitOf(o);
+  const hold = hit && begin(hit);
+  if (hold) padHold = { hold, object: o!, by: 0 };
+  else if (isPanel(o)) panelOf(o)!.press(o!);
+  else if (isDoor(o)) go();
+}
+/** After the view has moved: what the dot is on (a held control stays it), larger on something A uses. */
+function padAim() {
+  camera.updateMatrixWorld();
+  raycaster.setFromCamera(middle, camera);
+  const o = padHold?.object ?? pick()?.object ?? null;
+  if (o !== hovered) hover(o);
+  else showTip(); // a pot's label follows it as it turns
+  aimDot.classList.toggle('on', !!o);
+  aimDot.classList.toggle('still', reduce);
 }
 
 // VR controllers: the trigger points and presses, the grip picks the boards up (both grips: pull
@@ -823,6 +930,7 @@ function lineUp() {
 }
 
 renderer.xr.addEventListener('sessionstart', () => {
+  setPadActive(false);
   fromButton = clicked;
   clicked = false;
   dirty = true;
@@ -922,8 +1030,10 @@ renderer.setAnimationLoop(() => {
     carry?.follow(holding);
     pointControllers();
   } else {
+    if (pads && !leaving) padFrame(dt);
     flyOn(now - last);
     controls.update();
+    if (padActive) padAim();
   }
   const gap = now - last;
   last = now;
@@ -964,6 +1074,10 @@ navigator.xr?.addEventListener('sessiongranted', takeGranted);
 // For the browser check (scripts/check-browser.mjs) and the console: what is on the table, the
 // computer's machine when that is it, and where on the screen a control is (the middle of its hit
 // box's top; DIP switches by bit) or a button of the panel.
+/** The button with this label on a panel (the exhibit's, the room's, the wires'), if one has it. */
+const panelButton = (label: string) => [panel, roomPanel, wiresPanel.group.visible ? wiresPanel : null].flatMap((p) => (p ? p.targets.filter((t) => p.labelOf(t) === label) : []))[0];
+/** The board control `part`'s hit box (DIP switches by bit). */
+const control = (part: string, bit?: number) => model?.hitTargets.find((t) => t.userData.part === part && (bit === undefined || t.userData.bit === bit));
 function onScreen(o: THREE.Object3D, point: (box: THREE.Box3) => THREE.Vector3) {
   scene.updateMatrixWorld(); // also before the first frame
   camera.updateMatrixWorld();
@@ -1016,13 +1130,28 @@ Object.assign(window, {
       return Object.fromEntries((model?.linkKinds ?? []).map((k) => [k, linksOn[k]]));
     },
     screenPoint(part: string, bit?: number) {
-      const o = model?.hitTargets.find((t) => t.userData.part === part && (bit === undefined || t.userData.bit === bit));
+      const o = control(part, bit);
       return o ? onScreen(o, (b) => b.getCenter(new THREE.Vector3()).setY(b.max.y)) : null;
     },
     /** Where on the screen the panel's button with this label is (its middle). */
     panelPoint(label: string) {
-      const o = [panel, roomPanel, wiresPanel.group.visible ? wiresPanel : null].flatMap((p) => (p ? p.targets.filter((t) => p.labelOf(t) === label) : []))[0];
+      const o = panelButton(label);
       return o ? onScreen(o, (b) => b.getCenter(new THREE.Vector3())) : null;
+    },
+    /** Turns the view to the middle of a panel's button (by label) or else a board control (by part, and bit), the eye staying put, as a gamepad's right stick would; false if there is none. */
+    face(what: string, bit?: number) {
+      const o = panelButton(what) ?? control(what, bit);
+      if (!o) return false;
+      fly = null;
+      scene.updateMatrixWorld();
+      new THREE.Box3().setFromObject(o).getCenter(controls.target);
+      controls.update();
+      return true;
+    },
+    /** A gamepad on a screen: whether it has the view, whether A holds a control, and what the dot is on (a panel's button by label, a control by part, 'doorway'), else null. */
+    get pad() {
+      const o = padActive ? hovered : null;
+      return { active: padActive, holding: !!padHold, on: !o ? null : isPanel(o) ? panelOf(o)!.labelOf(o) : isDoor(o) ? 'doorway' : (hitOf(o)?.part ?? null) };
     },
     /**
      * The room as the Hallway's doorway shows it, as a JPEG data URL, `width` x `width` / 2

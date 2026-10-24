@@ -3,7 +3,8 @@
  * same on both sides of a door: the left stick walks the way the head faces (move 'smooth') or,
  * pushed forward, aims that hand's ray at the floor for a jump on letting go (move 'teleport'); the
  * right stick turns 30° a push (turn 'snap') or while held (turn 'smooth'), about the head. The
- * trigger at the floor jumps there too. Pure: the numbers and the rules, for main.ts and the tests.
+ * trigger at the floor jumps there too. On a screen a gamepad walks and looks about (PAD, below).
+ * Pure: the numbers and the rules, for main.ts and the tests.
  */
 
 export const XR_WALK = 1.8; // metres per second at full stick
@@ -99,4 +100,42 @@ export class AimStick {
     }
     return this.aiming ? 'aim' : null;
   }
+}
+
+/**
+ * A gamepad on a screen (the VR view outside VR), as the Hallway and vrlbry take one: the left
+ * stick walks the way the view faces (clicked in, it hurries), the right one looks, the triggers
+ * lower and raise the eye. Metres per second at full tilt (slower than the Hallway's 1.9: the
+ * boards are close work), radians per second (vrlbry's), and for a pot held with A, how much of
+ * its travel the right stick turns it in a second.
+ */
+export const PAD = { walk: 1.2, run: 2.4, rise: 0.8, turn: 2.4, pitch: 1.6, knob: 0.5 };
+
+/** A view's yaw (0 facing -z, + to the left) and pitch (+ up), from the direction it looks in. */
+export function aimOf(dx: number, dy: number, dz: number): [number, number] {
+  return [Math.atan2(-dx, -dz), Math.atan2(dy, Math.hypot(dx, dz))];
+}
+
+/** The unit direction of a yaw and pitch (aimOf's inverse). */
+export function aimDir(yaw: number, pitch: number): [number, number, number] {
+  const c = Math.cos(pitch);
+  return [-Math.sin(yaw) * c, Math.sin(pitch), -Math.cos(yaw) * c];
+}
+
+/** `v` moved by `dv`, but not past `lo` or `hi`; one already beyond either (the mouse put it there) only goes no further out. */
+export function clampStep(v: number, dv: number, lo: number, hi: number): number {
+  const n = v + dv;
+  return dv < 0 ? Math.max(n, Math.min(lo, v)) : Math.min(n, Math.max(hi, v));
+}
+
+/** The right stick (x right, y down), a step of `dt` seconds: the view's yaw and pitch, the pitch kept within [lo, hi]. */
+export function padLook(yaw: number, pitch: number, x: number, y: number, dt: number, lo: number, hi: number): [number, number] {
+  return [wrapAngle(yaw - x * PAD.turn * dt), clampStep(pitch, -y * PAD.pitch * dt, lo, hi)];
+}
+
+/** The left stick (x right, y down): how far a step walks on the floor, the way a view of `yaw` faces, `step` metres at full tilt. */
+export function padWalk(x: number, y: number, yaw: number, step: number): [number, number] {
+  const sin = Math.sin(yaw), cos = Math.cos(yaw);
+  // forward is (-sin, -cos), right (cos, -sin); the stick pushed forward is y < 0
+  return [(sin * y + cos * x) * step, (cos * y - sin * x) * step];
 }

@@ -444,6 +444,89 @@ try {
     return `${n} wires in four kinds, the bus at first; Data on from the panel, Bus off from the menu; none for a sandbox circuit`;
   });
 
+  await check('VR view: a gamepad looks, walks, rises, presses what its dot is on, and hands back to the mouse', async () => {
+    // A stand-in pad (navigator.getGamepads, standard mapping) on a screen: the right stick looks,
+    // the left one walks, the right trigger rises, B flies home, A presses what the dot in the
+    // middle is on (aimed with breadboardVR.face, as the right stick would) and turns a pot held
+    // with the right stick; a real mouse move hands the view back.
+    const before = errors.length;
+    await page.goto(`${base}vr.html`, 3000);
+    await page.evaluate(`(() => {
+      const pad = { id: 'test pad', index: 0, connected: true, mapping: 'standard', timestamp: 0, axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, touched: false, value: 0 })) };
+      window.testPad = pad;
+      Object.defineProperty(navigator, 'getGamepads', { configurable: true, value: () => [pad, null, null, null] });
+      dispatchEvent(new Event('gamepadconnected'));
+    })()`);
+    const view = () => page.evaluate(`(() => { const c = breadboardVR.camera, d = c.getWorldDirection(c.position.clone()), dot = document.querySelector('.vr-aim'); return { eye: c.position.toArray(), yaw: Math.atan2(-d.x, -d.z), pad: breadboardVR.pad, dot: !dot.hidden && dot.classList.contains('on') ? 'on' : !dot.hidden ? 'shown' : 'hidden', hint: document.querySelector('.vr-hint').textContent }; })()`);
+    const state = () => page.evaluate(`(() => { const m = breadboardVR.machine; return { mode: m.mode, cycles: m.computer.cycles, hz: m.hz, data: breadboardVR.links.data }; })()`);
+    const axes = (a) => page.evaluate(`testPad.axes = ${JSON.stringify(a)}`);
+    const button = (i, v) => page.evaluate(`testPad.buttons[${i}] = { pressed: ${v > 0.5}, touched: ${v > 0}, value: ${v} }`);
+    const hold = async (set, ms) => {
+      await set(1);
+      await sleep(ms);
+      await set(0);
+      await sleep(150);
+    };
+    const v0 = await view();
+    assert(!v0.pad.active && v0.dot === 'hidden' && !v0.hint.startsWith('Gamepad'), `before the pad is used: ${JSON.stringify(v0)}`);
+    await hold((v) => axes([0, 0, v, 0]), 400); // the right stick, right
+    const v1 = await view();
+    assert(v1.pad.active && v1.dot !== 'hidden' && v1.hint.startsWith('Gamepad') && v1.yaw < v0.yaw - 0.5, `after the right stick: ${JSON.stringify(v1)}`);
+    await hold((v) => axes([0, -v, 0, 0]), 500); // the left stick, forward
+    const v2 = await view();
+    const [dx, dz] = [v2.eye[0] - v1.eye[0], v2.eye[2] - v1.eye[2]];
+    const ahead = -Math.sin(v1.yaw) * dx - Math.cos(v1.yaw) * dz;
+    assert(ahead > 0.3 && Math.hypot(dx, dz) < ahead * 1.05, `the left stick walked (${dx.toFixed(2)}, ${dz.toFixed(2)}) facing ${v1.yaw.toFixed(2)}`);
+    await hold((v) => button(7, v), 300); // the right trigger
+    const v3 = await view();
+    assert(v3.eye[1] > v2.eye[1] + 0.1, `the right trigger took the eye from ${v2.eye[1]} to ${v3.eye[1]} m`);
+    await hold((v) => button(1, v), 150); // B
+    await sleep(900);
+    const v4 = await view();
+    assert(Math.hypot(...v4.eye.map((x, i) => x - v0.eye[i])) < 0.01 && Math.abs(v4.yaw - v0.yaw) < 0.01, `B went to ${JSON.stringify(v4.eye)}, not home ${JSON.stringify(v0.eye)}`);
+    // A on the clock's switch, twice on its button, and held on its pot while the right stick turns it
+    const s0 = await state();
+    const aim = async (what) => {
+      assert(await page.evaluate(`breadboardVR.face(${JSON.stringify(what)})`), `no ${what}`);
+      await sleep(150);
+      const v = await view();
+      assert(v.pad.on === what && v.dot === 'on', `aimed at ${what}, the dot is on ${v.pad.on} (${v.dot})`);
+    };
+    await aim('clock/SW2');
+    await hold((v) => button(0, v), 150);
+    const manual = await state();
+    await aim('clock/SW1');
+    await hold((v) => button(0, v), 150);
+    await hold((v) => button(0, v), 150);
+    const s1 = await state();
+    assert(s0.mode === 'auto' && manual.mode === 'manual' && s1.cycles === manual.cycles + 2, `A on SW2 and twice on SW1: ${JSON.stringify(s0)} -> ${JSON.stringify(manual)} -> ${JSON.stringify(s1)}`);
+    await aim('clock/RV1');
+    const v5 = await view();
+    await button(0, 1);
+    await sleep(100);
+    await hold((v) => axes([0, 0, -v, 0]), 400);
+    const held = (await view()).pad.holding;
+    await button(0, 0);
+    await sleep(150);
+    const s2 = await state();
+    const v6 = await view();
+    assert(held && s2.hz !== s1.hz && Math.abs(v6.yaw - v5.yaw) < 1e-6, `A held on RV1 and the right stick: ${s1.hz} -> ${s2.hz} Hz, held ${held}, the view turned ${v6.yaw - v5.yaw}`);
+    // A on the wires panel's Data
+    await page.evaluate(`breadboardVR.look([0.55, 1.35, 0.15], [1.05, 1.15, -0.45])`);
+    await aim('Data: Off');
+    await hold((v) => button(0, v), 150);
+    const s3 = await state();
+    assert(s3.data, 'A on "Data: Off" left the data wires hidden');
+    // a real mouse move hands the view back
+    for (const x of [300, 320]) await page.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y: 300, button: 'none', buttons: 0 });
+    await sleep(150);
+    const v7 = await view();
+    assert(!v7.pad.active && v7.dot === 'hidden' && !v7.hint.startsWith('Gamepad'), `after the mouse moved: ${JSON.stringify(v7)}`);
+    const errs = errors.slice(before);
+    assert(!errs.length, errs.join('\n'));
+    return `looked ${(v0.yaw - v1.yaw).toFixed(2)} rad, walked ${ahead.toFixed(2)} m, rose ${(v3.eye[1] - v2.eye[1]).toFixed(2)} m, B home; A: SW2 to manual, SW1 x2 = 2 cycles, RV1 ${Math.round(s1.hz)} -> ${Math.round(s2.hz)} Hz, Data on; the mouse took it back`;
+  });
+
   await check('VR view: a sandbox circuit opens from the sandbox and runs, buttons and all', async () => {
     const before = errors.length;
     await page.goto(`${base}#/sandbox`);
