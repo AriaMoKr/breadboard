@@ -138,6 +138,8 @@ export class App {
       else if (route.kind !== 'lab') active = el.dataset.route === route.kind;
       else if (el.dataset.lab === route.id) active = route.video ? el.dataset.video === String(route.video) : true;
       el.classList.toggle('active', active);
+      if (active) el.setAttribute('aria-current', 'page');
+      else el.removeAttribute('aria-current');
       el.classList.toggle('in-lab', route.kind === 'lab' && el.dataset.lab === route.id);
     });
   }

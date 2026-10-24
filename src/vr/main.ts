@@ -342,6 +342,20 @@ accessBox.addEventListener('change', (e) => {
   else if (input.name === 'vr-seated') setAccess({ seated: input.checked });
 });
 sessionBox.before(accessBox);
+// Its menu opens under the button, right-aligned to it, but kept within the screen's 16 px margins
+// (a phone's bar wraps and puts the button on the left), and scrolls if the screen is short.
+const accessMenu = accessBox.querySelector<HTMLElement>('.vr-access-body')!;
+function placeAccessMenu() {
+  if (!accessBox.open) return;
+  accessMenu.style.left = '0px';
+  accessMenu.style.right = 'auto';
+  const box = accessBox.getBoundingClientRect(), menu = accessMenu.getBoundingClientRect();
+  const left = Math.max(16, Math.min(box.right - menu.width, innerWidth - 16 - menu.width));
+  accessMenu.style.left = `${left - box.left}px`;
+  accessMenu.style.maxHeight = `${Math.max(120, innerHeight - menu.top - 16)}px`;
+}
+accessBox.addEventListener('toggle', placeAccessMenu);
+addEventListener('resize', placeAccessMenu);
 function showAccess() {
   for (const input of accessBox.querySelectorAll('input')) {
     input.checked = input.name === 'vr-motion' ? input.value === access.motion : input.name === 'vr-vignette' ? access.vignette : access.seated;

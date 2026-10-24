@@ -112,7 +112,10 @@ export function mountComputerWorkbench(root: HTMLElement, opts: ComputerWorkbenc
   const showTab = (id: string) => {
     if (!tabPanels[id]) return;
     tabBody.replaceChildren(tabPanels[id]);
-    tabButtons.querySelectorAll('button').forEach((b) => b.classList.toggle('active', b.dataset.tab === id));
+    tabButtons.querySelectorAll('button').forEach((b) => {
+      b.classList.toggle('active', b.dataset.tab === id);
+      b.setAttribute('aria-selected', String(b.dataset.tab === id));
+    });
   };
   for (const id of Object.keys(tabPanels)) {
     const b = h('button', { type: 'button', role: 'tab', dataset: { tab: id }, onClick: () => showTab(id) }, labels[id]);

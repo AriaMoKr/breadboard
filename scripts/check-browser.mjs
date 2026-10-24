@@ -563,6 +563,50 @@ try {
       return `at the door turned ${arrived.yaw}°, walked to the table (z ${walked.z}), snapped to ${turned.yaw}°, jumped ${Math.hypot(jumped.x - turned.x, jumped.z - turned.z).toFixed(1)} m, out through the doorway`;
     });
 
+  await check('high contrast (forced colours): the LEDs, switches, toggles and lit signals keep their states, the open tab and the current page are marked', async () => {
+    // A contrast theme (Windows') replaces background colours, which is how the simulator draws its
+    // state: the hardware keeps its own colours there and the marks of state take Highlight (styles.css).
+    await page.send('Emulation.setEmulatedMedia', { features: [{ name: 'forced-colors', value: 'active' }, { name: 'prefers-color-scheme', value: 'dark' }] });
+    await page.goto(`${base}#/`, 300);
+    await page.send('Page.reload');
+    await sleep(2000);
+    const r = await page.evaluate(`(async () => {
+      const bg = (e, p) => (e ? getComputedStyle(e, p).backgroundColor : 'none');
+      const settle = () => new Promise((r) => setTimeout(r, 300)); // past the track's transition
+      const pair = (sel, p) => { const all = [...document.querySelectorAll(sel)]; return [bg(all.find((e) => e.classList.contains('on')), p), bg(all.find((e) => !e.classList.contains('on')), p)]; };
+      const toggle = document.querySelector('.toggle input'), track = toggle.nextElementSibling;
+      const was = toggle.checked;
+      toggle.checked = false;
+      await settle();
+      const off = bg(track), knob = bg(track.querySelector('.toggle-knob'));
+      toggle.checked = true;
+      await settle();
+      const on = bg(track);
+      toggle.checked = was;
+      const tab = (sel) => { const t = document.querySelector(sel); return getComputedStyle(t).borderBottomColor + ' ' + getComputedStyle(t).borderBottomWidth; };
+      return {
+        forced: matchMedia('(forced-colors: active)').matches,
+        led: pair('.led'), bit: pair('.bit', '::before'), sig: pair('.sig'),
+        dip: [bg(document.querySelector('.dip-bank')), bg(document.querySelector('.dip-knob'))],
+        toggle: [off, on, knob],
+        tab: [tab('.tabs [aria-selected=true]'), tab('.tabs [aria-selected=false]')],
+        current: getComputedStyle(document.querySelector('.sidebar [aria-current=page]')).outlineStyle,
+      };
+    })()`);
+    await page.send('Emulation.setEmulatedMedia', { features: [] });
+    assert(r.forced, 'forced colours not emulated');
+    const differ = (name, [a, b]) => assert(a !== b && a !== 'none' && b !== 'none', `${name}: on ${a}, off ${b}`);
+    differ('an LED', r.led);
+    differ('a memory bit', r.bit);
+    differ('a control signal', r.sig);
+    differ('a toggle (its track)', [r.toggle[1], r.toggle[0]]);
+    assert(r.toggle[2] !== r.toggle[0], `a toggle's knob is the colour of its track: ${r.toggle.join(', ')}`);
+    assert(r.dip[0] === 'rgb(192, 57, 43)' && r.dip[1] !== r.dip[0], `the DIP switches: ${r.dip.join(', ')}`);
+    differ('the open tab', r.tab);
+    assert(r.current === 'solid', `the current page is not outlined (${r.current})`);
+    return `LEDs ${r.led[0]} / ${r.led[1]}, a lit signal ${r.sig[0]}, the open tab ${r.tab[0]}`;
+  });
+
   await check('comfort settings: a choice made in the Hallway (hallway.access) holds, and less motion stills the page', async () => {
     // As the Hallway keeps them (common's access.js): less motion and seated chosen there. The 2D
     // page stops its own transitions but not the computer's LEDs; the VR view comes through the
@@ -784,6 +828,35 @@ try {
     assert(r.zoomed.run === r.before.run, 'the first tap flipped the switch');
     assert(r.after !== r.zoomed.run, 'the second tap did not flip the switch');
     return `${r.before.zoom.toFixed(1)} -> ${r.zoomed.zoom.toFixed(1)} px per hole, then the switch flips`;
+  });
+
+  await check('narrow phones: no page scrolls sideways at 320 px, and the VR view’s Comfort menu stays on screen', async () => {
+    // The narrowest phones in use (320 x 568), every page; and the Comfort menu opened on a phone
+    // upright and on its side (667 x 375), where the bar wraps and puts its button on the left.
+    await page.send('Emulation.setDeviceMetricsOverride', { width: 320, height: 568, deviceScaleFactor: 2, mobile: true });
+    await page.goto(`${base}#/`, 300);
+    await page.send('Page.reload');
+    await sleep(1500);
+    const problems = await visitAll(routes, `() => (document.documentElement.scrollWidth > innerWidth ? 'page is ' + document.documentElement.scrollWidth + ' px wide' : '')`);
+    const menus = [];
+    for (const [w, ht] of [[320, 568], [667, 375]]) {
+      await page.send('Emulation.setDeviceMetricsOverride', { width: w, height: ht, deviceScaleFactor: 2, mobile: true });
+      await page.goto(`${base}vr.html`, 2500);
+      const m = await page.evaluate(`(async () => {
+        const d = document.querySelector('.vr-access');
+        d.open = true;
+        await new Promise((r) => setTimeout(r, 200));
+        const rs = [d.querySelector('.vr-access-body'), ...d.querySelectorAll('input, legend')].map((e) => e.getBoundingClientRect());
+        return { left: Math.min(...rs.map((r) => r.left)), right: Math.max(...rs.map((r) => r.right)), top: Math.min(...rs.map((r) => r.top)), bottom: Math.max(...rs.map((r) => r.bottom)) };
+      })()`);
+      // within the screen's 16 px margins (half a pixel's rounding allowed)
+      if (m.left < 15.5 || m.right > w - 15.5 || m.bottom > ht) problems.push(`vr.html at ${w} x ${ht}: the Comfort menu runs to ${JSON.stringify(m)}`);
+      menus.push(`${w} x ${ht}: ${Math.round(m.left)}..${Math.round(m.right)}`);
+    }
+    await page.send('Emulation.setDeviceMetricsOverride', { width: 375, height: 812, deviceScaleFactor: 2, mobile: true });
+    await page.goto(base, 1500);
+    assert(!problems.length, problems.join('\n'));
+    return `${routes.length} pages; the Comfort menu at ${menus.join(', ')}`;
   });
 
   // ---- built site: install and offline ---------------------------------------------------

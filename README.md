@@ -138,7 +138,10 @@ breadboard view's frame rate, and that the VR view builds the computer in 3D, ru
 leads back to the Hallway when a door of it led there. It also runs Deque's
 [axe-core](https://github.com/dequelabs/axe-core) on every page and the VR view, in the dark and
 the light theme, with the rules of WCAG 2.2 AA and its best practices, and fails on anything it
-finds: text contrast, target sizes, names and roles, headings, landmarks.
+finds: text contrast, target sizes, names and roles, headings, landmarks. Under emulated high
+contrast (forced colours, as Windows' contrast themes) it checks that the LEDs, switches, toggles
+and lit signals still show their states and the open tab and current page are marked, and at
+320 px wide that no page scrolls sideways.
 `npm run check:browser -- --dist`
 checks the built site instead (run `npm run build` first), plus the download link, install and
 offline use, and `-- --url <address>` checks a deployed copy the same way (such as

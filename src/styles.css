@@ -179,7 +179,8 @@ pre.error { color: var(--danger); white-space: pre-wrap; }
 .slider input { width: 150px; accent-color: var(--accent); }
 .slider-label { color: var(--fg-dim); }
 .slider-value { font-family: var(--mono); font-size: 0.8rem; min-width: 70px; }
-.select { display: inline-flex; align-items: center; gap: 8px; font-size: 0.86rem; }
+.select { display: inline-flex; align-items: center; gap: 8px; font-size: 0.86rem; min-width: 0; max-width: 100%; }
+.select select { min-width: 0; max-width: 100%; } /* narrower than its widest option on a 320 px phone */
 .select select, .uc-input, textarea, input[type='text'], input[type='number'] {
   font: inherit; font-size: 0.88rem; background: var(--bg); color: var(--fg); border: 1px solid var(--border); border-radius: 7px; padding: 5px 8px;
 }
@@ -436,6 +437,26 @@ table.microcode td.editing { position: relative; color: transparent; }
 
 .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.78rem; color: var(--fg-dim); }
 .legend i { display: inline-block; width: 18px; height: 3px; vertical-align: middle; margin-right: 5px; border-radius: 2px; }
+
+/* ==========================================================================
+   High contrast (forced colours, such as Windows' contrast themes). The browser replaces
+   background colours, which is how the simulator draws its state. So the pictures of hardware
+   (LEDs, memory bits, DIP switches, the displays) keep their own colours, outlined in the theme's
+   text colour to show on any background, and the marks of state (a toggle on, a lit signal, the
+   current step, the open tab, the current page) take the theme's Highlight.
+   ========================================================================== */
+@media (forced-colors: active) {
+  .led, .bit, .dip-bank, .display4, .sevenseg { forced-color-adjust: none; }
+  .led { border-color: CanvasText; }
+  .bit::before { border-color: CanvasText; }
+  .toggle-track { forced-color-adjust: none; background: Canvas; border-color: ButtonText; }
+  .toggle-knob { background: ButtonText; }
+  .toggle input:checked + .toggle-track { background: Highlight; border-color: Highlight; }
+  .toggle input:checked + .toggle-track .toggle-knob { background: HighlightText; }
+  .sig.on, table.microcode td.current, .truth-table tr.current td { forced-color-adjust: none; background: Highlight; border-color: Highlight; color: HighlightText; box-shadow: none; }
+  .tabs button[aria-selected='true'] { forced-color-adjust: none; color: CanvasText; background: Canvas; border-bottom: 3px solid Highlight; }
+  .nav-videos a[aria-current='page'], .nav-computer[aria-current='page'] { forced-color-adjust: none; color: CanvasText; background: Canvas; outline: 2px solid Highlight; outline-offset: -2px; }
+}
 
 /* ==========================================================================
    Responsive

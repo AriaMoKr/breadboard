@@ -1,7 +1,8 @@
 html, body { margin: 0; height: 100%; background: #111318; color: #e6e8ee; font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; overflow: hidden; }
 #vr-root, #vr-root canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+/* over the status line and three.js's VR button (z-index 999), so the Comfort menu opens on top */
 .vr-bar {
-  position: fixed; top: 0; left: 0; right: 0; z-index: 2; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px;
+  position: fixed; top: 0; left: 0; right: 0; z-index: 1000; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px;
   padding: 10px 16px; background: linear-gradient(rgba(17, 19, 24, 0.92), rgba(17, 19, 24, 0)); pointer-events: none;
 }
 .vr-bar > * { pointer-events: auto; }
@@ -21,7 +22,7 @@ html, body { margin: 0; height: 100%; background: #111318; color: #e6e8ee; font-
 .vr-access > summary { display: inline-flex; align-items: center; min-height: 28px; padding: 3px 10px; color: #e6e8ee; background: #2a303c; border: 1px solid #3b4456; border-radius: 6px; cursor: pointer; list-style: none; }
 .vr-access > summary::-webkit-details-marker { display: none; }
 .vr-access > summary::after { content: '▾'; margin-left: 6px; color: #9aa3b2; }
-.vr-access-body { position: absolute; top: calc(100% + 6px); right: 0; z-index: 3; width: max-content; max-width: min(320px, calc(100vw - 32px)); display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; color: #e6e8ee; background: #1b1e25; border: 1px solid #3b4456; border-radius: 8px; }
+.vr-access-body { position: absolute; top: calc(100% + 6px); right: 0; z-index: 3; box-sizing: border-box; width: max-content; max-width: min(320px, calc(100vw - 32px)); overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; color: #e6e8ee; background: #1b1e25; border: 1px solid #3b4456; border-radius: 8px; }
 .vr-access fieldset { display: flex; flex-direction: column; gap: 2px; margin: 0 0 4px; padding: 0; border: 0; }
 .vr-access legend { margin-bottom: 4px; padding: 0; color: #b8bfcc; }
 .vr-access label { display: flex; align-items: center; gap: 8px; min-height: 24px; cursor: pointer; }
