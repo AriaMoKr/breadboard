@@ -12,6 +12,7 @@ import { hallwayViews, leaveUrl, readVisit, wayBack, withoutVisit } from 'common
 import { NAV_KEY, loadNav, saveNav, type Nav } from 'common/nav.js';
 import { h } from '../ui/dom';
 import { BREADBOARD_ID, DOOR, doorOf, keptDoor } from './hallway';
+import type { LinkKind } from '../breadboard/computer-layout';
 import { BOARD_T, buildComputerModel, disposeTree, type ComputerModel, type ControlHit } from './model';
 import { AimStick, TurnStick, XR_WALK, clampWalk, headYaw, standable, turnedAbout, walkDelta, wrapAngle, type Rect } from './move';
 import { ControlPanel, Tooltip } from './panel';
@@ -290,6 +291,26 @@ const roomPanel = new ControlPanel(
 roomPanel.group.position.set(-1.05, 1.2, -0.45);
 roomPanel.group.lookAt(0, 1.45, 0.4);
 scene.add(roomPanel.group);
+
+// The wires between the computer's modules (model.ts, from computer-layout's moduleLinks), by kind
+// as the breadboard view's "Wires between boards" shows them: the bus at first, the rest hidden.
+// A panel right of the table and the bar's Wires menu show and hide each kind; a sandbox circuit
+// has none, and neither shows then.
+const LINKS: [LinkKind, string, string][] = [['bus', 'Bus', 'Bus'], ['clock', 'Clock', 'Clock'], ['control', 'Control', 'Control lines'], ['data', 'Data', 'Data']];
+const linksOn: Record<LinkKind, boolean> = { bus: true, clock: false, control: false, data: false };
+function setLinks(kind: LinkKind, on: boolean) {
+  linksOn[kind] = on;
+  model?.showLinks(kind, on);
+  showWires();
+}
+const wiresPanel = new ControlPanel(
+  LINKS.map(([kind, label]) => ({ label: () => `${label}: ${linksOn[kind] ? 'On' : 'Off'}`, run: () => setLinks(kind, !linksOn[kind]) })),
+  'Wires between boards',
+);
+wiresPanel.group.position.set(1.05, 1.2, -0.45);
+wiresPanel.group.lookAt(0, 1.45, 0.4);
+wiresPanel.setStatus(['Bus blue, clock white,', 'control lines purple, data yellow']);
+scene.add(wiresPanel.group);
 /** The panel's status: in a session how it goes and its invitation, else what the sticks do. */
 function showRoom() {
   roomPanel.refresh();
@@ -325,11 +346,11 @@ bar?.querySelector('.vr-build')?.before(sessionBox);
 // group of three radio buttons for motion and two checkboxes, applied and kept as they change.
 const accessBox = h(
   'details',
-  { class: 'vr-access' },
+  { class: 'vr-menu vr-access' },
   h('summary', null, 'Comfort'),
   h(
     'div',
-    { class: 'vr-access-body' },
+    { class: 'vr-menu-body vr-access-body' },
     h('fieldset', null, h('legend', null, 'Motion'), MOTIONS.map(([value, , text]) => h('label', null, h('input', { type: 'radio', name: 'vr-motion', value }), text))),
     h('label', null, h('input', { type: 'checkbox', name: 'vr-vignette' }), 'Comfort vignette while the sticks move you in VR'),
     h('label', null, h('input', { type: 'checkbox', name: 'vr-seated' }), 'Seated: raise the view 0.45 m in VR'),
@@ -341,21 +362,48 @@ accessBox.addEventListener('change', (e) => {
   else if (input.name === 'vr-vignette') setAccess({ vignette: input.checked });
   else if (input.name === 'vr-seated') setAccess({ seated: input.checked });
 });
-sessionBox.before(accessBox);
-// Its menu opens under the button, right-aligned to it, but kept within the screen's 16 px margins
-// (a phone's bar wraps and puts the button on the left), and scrolls if the screen is short.
-const accessMenu = accessBox.querySelector<HTMLElement>('.vr-access-body')!;
-function placeAccessMenu() {
-  if (!accessBox.open) return;
-  accessMenu.style.left = '0px';
-  accessMenu.style.right = 'auto';
-  const box = accessBox.getBoundingClientRect(), menu = accessMenu.getBoundingClientRect();
-  const left = Math.max(16, Math.min(box.right - menu.width, innerWidth - 16 - menu.width));
-  accessMenu.style.left = `${left - box.left}px`;
-  accessMenu.style.maxHeight = `${Math.max(120, innerHeight - menu.top - 16)}px`;
+// The wires between boards on the page too: four checkboxes, as on the breadboard view.
+const wiresBox = h(
+  'details',
+  { class: 'vr-menu vr-wires' },
+  h('summary', null, 'Wires'),
+  h(
+    'div',
+    { class: 'vr-menu-body' },
+    h('fieldset', null, h('legend', null, 'Wires between boards'), LINKS.map(([kind, , text]) => h('label', null, h('input', { type: 'checkbox', name: 'vr-link', value: kind }), text))),
+  ),
+);
+wiresBox.addEventListener('change', (e) => {
+  const input = e.target as HTMLInputElement;
+  if (input.name === 'vr-link') setLinks(input.value as LinkKind, input.checked);
+});
+function showWires() {
+  for (const input of wiresBox.querySelectorAll('input')) input.checked = linksOn[input.value as LinkKind];
+  wiresPanel.refresh();
 }
-accessBox.addEventListener('toggle', placeAccessMenu);
-addEventListener('resize', placeAccessMenu);
+showWires();
+const menus = [wiresBox, accessBox];
+sessionBox.before(h('span', { class: 'vr-menus' }, menus));
+// A menu opens under its button, right-aligned to it, but kept within the screen's 16 px margins
+// (a phone's bar wraps and puts the buttons on the left), and scrolls if the screen is short. One
+// open at a time.
+function placeMenu(box: HTMLDetailsElement) {
+  if (!box.open) return;
+  const menu = box.querySelector<HTMLElement>('.vr-menu-body')!;
+  menu.style.left = '0px';
+  menu.style.right = 'auto';
+  const at = box.getBoundingClientRect(), size = menu.getBoundingClientRect();
+  const left = Math.max(16, Math.min(at.right - size.width, innerWidth - 16 - size.width));
+  menu.style.left = `${left - at.left}px`;
+  menu.style.maxHeight = `${Math.max(120, innerHeight - size.top - 16)}px`;
+}
+for (const box of menus) {
+  box.addEventListener('toggle', () => {
+    if (box.open) for (const other of menus) if (other !== box) other.open = false;
+    placeMenu(box);
+  });
+}
+addEventListener('resize', () => menus.forEach(placeMenu));
 function showAccess() {
   for (const input of accessBox.querySelectorAll('input')) {
     input.checked = input.name === 'vr-motion' ? input.value === access.motion : input.name === 'vr-vignette' ? access.vignette : access.seated;
@@ -441,7 +489,11 @@ function setExhibit(next: Exhibit, c: ExhibitChoice) {
   exhibit = next;
   choice = c;
   notice = '';
-  model = buildComputerModel(next.layout, { boardTexture: boardTex, label: labelTexture });
+  model = buildComputerModel(next.layout, { boardTexture: boardTex, label: labelTexture, links: next.links });
+  for (const kind of model.linkKinds) model.showLinks(kind, linksOn[kind]);
+  wiresPanel.group.visible = model.linkKinds.length > 0;
+  wiresBox.hidden = !wiresPanel.group.visible;
+  if (wiresBox.hidden) wiresBox.open = false;
   // 1.5x real size; small circuits bigger, to cover some of the table (up to 6x)
   home = Math.min(4 * UNIT, Math.max(UNIT, 0.62 / Math.max(model.size.w, model.size.d)));
   putBack();
@@ -465,7 +517,7 @@ function setExhibit(next: Exhibit, c: ExhibitChoice) {
   panel.group.position.set(0, TABLE_TOP + 0.3, TABLE_Z - 0.62);
   panel.group.rotation.x = -0.12;
   scene.add(panel.group);
-  targets = [...panel.targets, ...roomPanel.targets, ...model.hitTargets, ...(door ? [door.portal] : [])];
+  targets = [...panel.targets, ...roomPanel.targets, ...(wiresPanel.group.visible ? wiresPanel.targets : []), ...model.hitTargets, ...(door ? [door.portal] : [])];
   hover(null);
 
   history.replaceState(null, '', location.pathname + location.search + exhibitHash(c));
@@ -501,7 +553,7 @@ const raycaster = new THREE.Raycaster();
 const pick = (): THREE.Intersection | undefined => raycaster.intersectObjects(targets, false)[0];
 const hitOf = (o: THREE.Object3D | null | undefined): ControlHit | null => (o && model?.hitTargets.includes(o as THREE.Mesh) ? (o.userData as ControlHit) : null);
 /** The panel (the exhibit's, or the room's) whose button `o` is, or null. */
-const panelOf = (o: THREE.Object3D | null | undefined) => (o ? ([panel, roomPanel].find((p) => p?.targets.includes(o as THREE.Mesh)) ?? null) : null);
+const panelOf = (o: THREE.Object3D | null | undefined) => (o ? ([panel, roomPanel, wiresPanel].find((p) => p?.targets.includes(o as THREE.Mesh)) ?? null) : null);
 const isPanel = (o: THREE.Object3D | null | undefined) => !!panelOf(o);
 const isDoor = (o: THREE.Object3D | null | undefined) => !!door && o === door.portal;
 const begin = (hit: ControlHit): Hold | null => exhibit?.begin(hit) ?? null;
@@ -522,6 +574,7 @@ function hover(o: THREE.Object3D | null) {
   hovered = o;
   panel?.setHover(o);
   roomPanel.setHover(o);
+  wiresPanel.setHover(o);
   model?.setHover(o);
   showTip();
 }
@@ -699,7 +752,7 @@ function pointControllers() {
 }
 
 // ---- moving about in VR (move.ts; how, from nav) ----
-const solids = () => ([table, model?.root, panel?.group, roomPanel.group, door?.group] as (THREE.Object3D | undefined)[]).filter((o): o is THREE.Object3D => !!o);
+const solids = () => ([table, model?.root, panel?.group, roomPanel.group, wiresPanel.group, door?.group] as (THREE.Object3D | undefined)[]).filter((o): o is THREE.Object3D => !!o && o.visible);
 /** Where a controller's ray meets the floor, if a head can stand there and nothing is in the way; else null. */
 function floorTarget(ctrl: THREE.Object3D): THREE.Vector3 | null {
   raycaster.setFromXRController(ctrl as THREE.XRTargetRaySpace);
@@ -957,14 +1010,18 @@ Object.assign(window, {
       controls.update();
     },
     /** The panel's buttons, by label. */
-    panelLabels: () => [panel, roomPanel].flatMap((p) => (p ? p.targets.map((t) => p.labelOf(t)) : [])),
+    panelLabels: () => [panel, roomPanel, wiresPanel.group.visible ? wiresPanel : null].flatMap((p) => (p ? p.targets.map((t) => p.labelOf(t)) : [])),
+    /** Which kinds of wire between boards show (the computer; empty for a sandbox circuit). */
+    get links() {
+      return Object.fromEntries((model?.linkKinds ?? []).map((k) => [k, linksOn[k]]));
+    },
     screenPoint(part: string, bit?: number) {
       const o = model?.hitTargets.find((t) => t.userData.part === part && (bit === undefined || t.userData.bit === bit));
       return o ? onScreen(o, (b) => b.getCenter(new THREE.Vector3()).setY(b.max.y)) : null;
     },
     /** Where on the screen the panel's button with this label is (its middle). */
     panelPoint(label: string) {
-      const o = [panel, roomPanel].flatMap((p) => (p ? p.targets.filter((t) => p.labelOf(t) === label) : []))[0];
+      const o = [panel, roomPanel, wiresPanel.group.visible ? wiresPanel : null].flatMap((p) => (p ? p.targets.filter((t) => p.labelOf(t) === label) : []))[0];
       return o ? onScreen(o, (b) => b.getCenter(new THREE.Vector3())) : null;
     },
     /**

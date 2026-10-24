@@ -40,7 +40,10 @@ video by video.
   Hallway keeps them (`hallway.nav`, read and written by `common/nav.js`), so the choice is the
   same on both sides of its doors (`src/vr/move.ts`). On a screen, drag to look
   around, double-click to look closer, and click. It is built with three.js from the same layout
-  as the breadboard view (`src/vr/`), at 1.5x real size. It also shows sandbox circuits:
+  as the breadboard view (`src/vr/`), at 1.5x real size. The wires between boards arc over them
+  as in the breadboard view's **Wires between boards**: the bus (blue) at first, and the clock
+  (white), control lines (purple) and data (yellow) when wanted. A panel right of the table and
+  **Wires** on the page's bar show and hide each kind. It also shows sandbox circuits:
   `vr.html#c1.…` (the code from a share link, or the sandbox's **View in VR**) or
   `vr.html#example/<id>`, run by the sandbox's chip-level engine. **Next ▸** on the panel goes
   through the computer and the seven examples.

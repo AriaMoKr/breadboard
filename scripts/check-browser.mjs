@@ -411,6 +411,39 @@ try {
     return `SW3 switches, SW2 to manual, SW1 x2 = 2 cycles, RV1 ${s3.hz} -> ${Math.round(s4.hz)} Hz`;
   });
 
+  await check('VR view: the wires between boards show and hide by kind, on the panel and in the Wires menu', async () => {
+    // As the breadboard view's "Wires between boards": the bus at first, then a real click on the
+    // wires panel's Data, and on the Bus checkbox in the bar's Wires menu; a sandbox circuit has none.
+    const before = errors.length;
+    const click = async (at) => {
+      for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await page.send('Input.dispatchMouseEvent', { type, x: at.x, y: at.y, button: type === 'mouseMoved' ? 'none' : 'left', buttons: type === 'mousePressed' ? 1 : 0, clickCount: 1 });
+      await sleep(300);
+    };
+    const rectOf = (sel) => page.evaluate(`(() => { const r = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
+    const state = () => page.evaluate(`({ links: breadboardVR.links, panel: breadboardVR.panelLabels().filter((l) => /^(Bus|Clock|Control|Data):/.test(l)), menu: [...document.querySelectorAll('.vr-wires input')].filter((i) => i.checked).map((i) => i.value) })`);
+    await page.goto(`${base}vr.html`, 3000);
+    const s0 = await state();
+    const n = await page.evaluate('JSON.parse(document.body.dataset.ready).links');
+    assert(JSON.stringify(s0.links) === '{"bus":true,"clock":false,"control":false,"data":false}' && s0.menu.join() === 'bus' && n > 100, `at first: ${JSON.stringify(s0)}, ${n} wires`);
+    const at = await page.evaluate(`(breadboardVR.look([0.55, 1.35, 0.15], [1.05, 1.15, -0.45]), breadboardVR.panelPoint('Data: Off'))`);
+    assert(at, 'no "Data: Off" on the wires panel');
+    const under = await page.evaluate(`document.elementFromPoint(${at.x}, ${at.y})?.tagName`);
+    assert(under === 'CANVAS', `the wires panel's Data is under a ${under}`);
+    await click(at);
+    const s1 = await state();
+    assert(s1.links.data && s1.panel.includes('Data: On') && s1.menu.join() === 'bus,data', `after Data on the panel: ${JSON.stringify(s1)}`);
+    await click(await rectOf('.vr-wires > summary'));
+    await click(await rectOf('.vr-wires input[value=bus]'));
+    const s2 = await state();
+    assert(!s2.links.bus && s2.panel.includes('Bus: Off') && s2.menu.join() === 'data', `after Bus in the menu: ${JSON.stringify(s2)}`);
+    await page.goto(`${base}vr.html#example/counter`, 3000);
+    const none = await page.evaluate(`({ links: breadboardVR.links, hidden: document.querySelector('.vr-wires').hidden, panel: breadboardVR.panelLabels().some((l) => /^(Bus|Data):/.test(l)) })`);
+    assert(JSON.stringify(none.links) === '{}' && none.hidden && !none.panel, `a sandbox circuit: ${JSON.stringify(none)}`);
+    const errs = errors.slice(before);
+    assert(!errs.length, errs.join('\n'));
+    return `${n} wires in four kinds, the bus at first; Data on from the panel, Bus off from the menu; none for a sandbox circuit`;
+  });
+
   await check('VR view: a sandbox circuit opens from the sandbox and runs, buttons and all', async () => {
     const before = errors.length;
     await page.goto(`${base}#/sandbox`);
@@ -830,7 +863,7 @@ try {
     return `${r.before.zoom.toFixed(1)} -> ${r.zoomed.zoom.toFixed(1)} px per hole, then the switch flips`;
   });
 
-  await check('narrow phones: no page scrolls sideways at 320 px, and the VR view’s Comfort menu stays on screen', async () => {
+  await check('narrow phones: no page scrolls sideways at 320 px, and the VR view’s menus stay on screen', async () => {
     // The narrowest phones in use (320 x 568), every page; and the Comfort menu opened on a phone
     // upright and on its side (667 x 375), where the bar wraps and puts its button on the left.
     await page.send('Emulation.setDeviceMetricsOverride', { width: 320, height: 568, deviceScaleFactor: 2, mobile: true });
@@ -842,21 +875,25 @@ try {
     for (const [w, ht] of [[320, 568], [667, 375]]) {
       await page.send('Emulation.setDeviceMetricsOverride', { width: w, height: ht, deviceScaleFactor: 2, mobile: true });
       await page.goto(`${base}vr.html`, 2500);
-      const m = await page.evaluate(`(async () => {
-        const d = document.querySelector('.vr-access');
-        d.open = true;
-        await new Promise((r) => setTimeout(r, 200));
-        const rs = [d.querySelector('.vr-access-body'), ...d.querySelectorAll('input, legend')].map((e) => e.getBoundingClientRect());
-        return { left: Math.min(...rs.map((r) => r.left)), right: Math.max(...rs.map((r) => r.right)), top: Math.min(...rs.map((r) => r.top)), bottom: Math.max(...rs.map((r) => r.bottom)) };
-      })()`);
-      // within the screen's 16 px margins (half a pixel's rounding allowed)
-      if (m.left < 15.5 || m.right > w - 15.5 || m.bottom > ht) problems.push(`vr.html at ${w} x ${ht}: the Comfort menu runs to ${JSON.stringify(m)}`);
-      menus.push(`${w} x ${ht}: ${Math.round(m.left)}..${Math.round(m.right)}`);
+      for (const [sel, name] of [['.vr-access', 'Comfort'], ['.vr-wires', 'Wires']]) {
+        const m = await page.evaluate(`(async () => {
+          const d = document.querySelector('${sel}');
+          d.open = true;
+          await new Promise((r) => setTimeout(r, 200));
+          const rs = [d.querySelector('.vr-menu-body'), ...d.querySelectorAll('input, legend')].map((e) => e.getBoundingClientRect());
+          const m = { left: Math.min(...rs.map((r) => r.left)), right: Math.max(...rs.map((r) => r.right)), top: Math.min(...rs.map((r) => r.top)), bottom: Math.max(...rs.map((r) => r.bottom)) };
+          d.open = false;
+          return m;
+        })()`);
+        // within the screen's 16 px margins (half a pixel's rounding allowed)
+        if (m.left < 15.5 || m.right > w - 15.5 || m.bottom > ht) problems.push(`vr.html at ${w} x ${ht}: the ${name} menu runs to ${JSON.stringify(m)}`);
+        menus.push(`${name} at ${w} x ${ht}: ${Math.round(m.left)}..${Math.round(m.right)}`);
+      }
     }
     await page.send('Emulation.setDeviceMetricsOverride', { width: 375, height: 812, deviceScaleFactor: 2, mobile: true });
     await page.goto(base, 1500);
     assert(!problems.length, problems.join('\n'));
-    return `${routes.length} pages; the Comfort menu at ${menus.join(', ')}`;
+    return `${routes.length} pages; ${menus.join(', ')}`;
   });
 
   // ---- built site: install and offline ---------------------------------------------------

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CHIPS } from '../breadboard/catalog';
+import { LINK_COLORS, type LinkKind, type ModuleLink } from '../breadboard/computer-layout';
 import { BOARD_H, BOARD_W, ROW_Y, colX, dipRows, holeXY } from '../breadboard/geometry';
 import { layoutBounds, partPins, type BoardSpec, type Layout, type Part } from '../breadboard/layout';
 import { LED_COLORS, WIRE_COLORS } from '../breadboard/render';
@@ -26,6 +27,11 @@ export interface ModelOptions {
   boardTexture?: THREE.Texture;
   /** Text label texture (chip names, board titles); none without it. */
   label?: (text: string) => THREE.Texture;
+  /**
+   * The wires between the computer's modules (computer-layout's moduleLinks), given where a hole
+   * is: drawn as arcs over the boards, as jumper wires run, one mesh per kind (showLinks).
+   */
+  links?: (pos: (board: string, hole: string) => { x: number; y: number }) => ModuleLink[];
 }
 
 /** What a hit box stands for (its `userData`): a part, and for a DIP switch which switch. */
@@ -49,7 +55,11 @@ export interface ComputerModel {
   /** Show a part's state: slide 0 | 1, DIP bits (bit k-1 = switch k ON), pot 0..1, button 1 = pressed. */
   setControl(id: string, value: number): void;
   setHover(hit: THREE.Object3D | null): void;
-  counts: { boards: number; chips: number; leds: number; wires: number; seg7: number; meshes: number; controls: number };
+  /** The kinds of wire between modules it has, in the breadboard view's order (none for a sandbox circuit). */
+  linkKinds: LinkKind[];
+  /** Shows or hides the wires between modules of one kind. */
+  showLinks(kind: LinkKind, on: boolean): void;
+  counts: { boards: number; chips: number; leds: number; wires: number; links: number; seg7: number; meshes: number; controls: number };
 }
 
 const mat = (color: string, opts: THREE.MeshStandardMaterialParameters = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.65, ...opts });
@@ -116,7 +126,7 @@ export function buildComputerModel(layout: Layout, opts: ModelOptions = {}): Com
     pieces.set(key, list);
   };
   const boards = new Map(layout.boards.map((b) => [b.id, b]));
-  const counts = { boards: layout.boards.length, chips: 0, leds: 0, wires: 0, seg7: 0, meshes: 0, controls: 0 };
+  const counts = { boards: layout.boards.length, chips: 0, leds: 0, wires: 0, links: 0, seg7: 0, meshes: 0, controls: 0 };
 
   // interactive parts: their moving pieces (caps, knobs, levers, the pot's slot) and hit boxes,
   // one group per part, all under `controlsGroup`
@@ -336,6 +346,36 @@ export function buildComputerModel(layout: Layout, opts: ModelOptions = {}): Com
     inner.add(mesh);
   }
 
+  // ---- wires between modules: an arc from each hole up and over to the other, one mesh per kind ----
+  const linkMeshes = new Map<LinkKind, THREE.Mesh>();
+  if (opts.links) {
+    const holeAt = (board: string, hole: string) => {
+      const h = holeXY(hole);
+      return v(h.x, 0, h.y).applyMatrix4(boardMatrix(boards.get(board)!));
+    };
+    const byKind = new Map<LinkKind, THREE.BufferGeometry[]>();
+    for (const l of opts.links((board, hole) => { const p = holeAt(board, hole); return { x: p.x, y: p.z }; })) {
+      const a = holeAt(l.from.board, l.from.hole), z = holeAt(l.to.board, l.to.hole);
+      // higher the farther it goes, clear of the chips (1.7 high) even when short
+      const lift = Math.min(12, 3 + Math.hypot(z.x - a.x, z.z - a.z) * 0.12);
+      const curve = new THREE.CubicBezierCurve3(a.clone().setY(-0.4), a.clone().setY(lift), z.clone().setY(lift), z.clone().setY(-0.4));
+      const g = new THREE.TubeGeometry(curve, 20, 0.14, 5, false);
+      g.deleteAttribute('uv');
+      const list = byKind.get(l.kind) ?? [];
+      list.push(g);
+      byKind.set(l.kind, list);
+      counts.links++;
+    }
+    for (const kind of ['bus', 'clock', 'control', 'data'] as LinkKind[]) {
+      const list = byKind.get(kind);
+      if (!list) continue;
+      const mesh = new THREE.Mesh(mergeGeometries(list, false)!, mat(LINK_COLORS[kind], { roughness: 0.45 }));
+      mesh.name = `links-${kind}`;
+      inner.add(mesh);
+      linkMeshes.set(kind, mesh);
+    }
+  }
+
   // ---- LEDs: dome + additive glow, both instanced ----
   const domeGeo = new THREE.SphereGeometry(0.5, 14, 10);
   const domes = new THREE.InstancedMesh(domeGeo, new THREE.MeshBasicMaterial(), Math.max(1, leds.length));
@@ -382,6 +422,13 @@ export function buildComputerModel(layout: Layout, opts: ModelOptions = {}): Com
     counts,
     hitTargets,
     setControl: (id, value) => controls.get(id)?.(value),
+    linkKinds: [...linkMeshes.keys()],
+    showLinks(kind, on) {
+      const mesh = linkMeshes.get(kind);
+      if (!mesh) return;
+      mesh.visible = on;
+      mesh.layers.set(on ? 0 : 31); // hidden: not hit by a ray either (Raycaster doesn't skip invisible meshes)
+    },
     setHover(hit) {
       if (hovered) hovered.visible = false;
       hovered = hit && hitTargets.includes(hit as THREE.Mesh) ? hit : null;

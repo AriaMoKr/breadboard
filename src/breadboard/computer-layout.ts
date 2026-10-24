@@ -63,6 +63,9 @@ export function composeComputer(defs: Iterable<ModuleBoardDef>): ComposedScene {
 
 export type LinkKind = 'bus' | 'control' | 'clock' | 'data';
 
+/** The wires' colours, in the breadboard view and the VR view: the bus blue, control lines purple, the clock white, data yellow. */
+export const LINK_COLORS: Record<LinkKind, string> = { bus: '#2563d4', control: '#8146c9', clock: '#f4f4f2', data: '#e8c516' };
+
 export interface ModuleLink {
   name: string;
   kind: LinkKind;

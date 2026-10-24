@@ -1,6 +1,6 @@
 import { MODULE_BOARDS } from '../breadboard/boards';
 import { hzFromPot } from '../breadboard/boards/clock.board';
-import { composeComputer } from '../breadboard/computer-layout';
+import { composeComputer, moduleLinks, type ModuleLink } from '../breadboard/computer-layout';
 import { EXAMPLES } from '../breadboard/examples';
 import type { Layout } from '../breadboard/layout';
 import { BreadboardSim } from '../breadboard/sim/engine';
@@ -20,6 +20,8 @@ export interface Exhibit {
   layout: Layout;
   /** Its buttons on the control panel. */
   actions: PanelAction[];
+  /** The wires between its modules, given where a hole is (the computer; a sandbox circuit has none). */
+  links?: (pos: (board: string, hole: string) => { x: number; y: number }) => ModuleLink[];
   /** Advance by `ms` of real time; true if anything shown may have changed. */
   frame(ms: number): boolean;
   /** Show LEDs, displays, switch positions and pressed buttons on the model. */
@@ -108,6 +110,7 @@ export function computerExhibit(): Exhibit & { machine: Machine } {
   return {
     title: 'Breadboard 8-bit',
     layout: composed.layout,
+    links: (pos) => moduleLinks(composed, pos),
     machine,
     actions: [
       { label: () => (running() ? 'Stop' : 'Run'), run: () => (running() ? machine.stop() : machine.start()), primary: true },

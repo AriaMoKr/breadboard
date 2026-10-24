@@ -1,5 +1,5 @@
 import { MODULE_BOARDS } from '../breadboard/boards';
-import { composeComputer, moduleLinks, type LinkKind } from '../breadboard/computer-layout';
+import { LINK_COLORS, composeComputer, moduleLinks, type LinkKind } from '../breadboard/computer-layout';
 import { layoutBounds, type LiveControl } from '../breadboard/layout';
 import { LayoutView, type PartEvent } from '../breadboard/render';
 import { PanZoom } from '../breadboard/viewer';
@@ -46,7 +46,6 @@ export function mountBreadboardPage(root: HTMLElement, opts: { machine?: Machine
   // ---- wires between modules (drawn under the parts, over the boards) ----
   const linkLayer = s('g', { class: 'bb-links' });
   view.el.insertBefore(linkLayer, view.el.querySelector('.bb-parts'));
-  const LINK_COLORS: Record<LinkKind, string> = { bus: '#2563d4', control: '#8146c9', clock: '#f4f4f2', data: '#e8c516' };
   const linkGroups: Record<LinkKind, SVGGElement> = { bus: s('g'), control: s('g'), clock: s('g'), data: s('g') };
   for (const g of Object.values(linkGroups)) linkLayer.appendChild(g);
   for (const link of moduleLinks(scene, (b, hole) => view.holeScene(b, hole))) {
