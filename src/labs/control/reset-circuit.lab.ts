@@ -14,6 +14,9 @@ import { flashModules, machineToolbar, scopedStyle } from './_shared';
 const CSS = `
 .rst-lab .module.rst-clear { animation: rstlab-clear 1s ease-out; }
 .rst-lab .module.rst-kept { animation: rstlab-kept 1s ease-out; }
+/* less motion: the cards are outlined for the second instead of pulsing */
+.reduce-motion .rst-lab .module.rst-clear { animation: none; box-shadow: 0 0 0 3px var(--danger); border-color: var(--danger); }
+.reduce-motion .rst-lab .module.rst-kept { animation: none; box-shadow: 0 0 0 3px var(--ok); border-color: var(--ok); }
 @keyframes rstlab-clear { 0%, 30% { box-shadow: 0 0 0 3px var(--danger); border-color: var(--danger); } 100% { box-shadow: none; } }
 @keyframes rstlab-kept { 0%, 30% { box-shadow: 0 0 0 3px var(--ok); border-color: var(--ok); } 100% { box-shadow: none; } }
 .rst-lab .schematic .rst-part { fill: none; stroke: var(--fg-dim); stroke-width: 2; }

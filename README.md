@@ -78,6 +78,13 @@ video by video.
   another of its doors). A visitor who comes through the Hallway's door in a session stays in it,
   and the way back carries it on (`src/vr/together.ts`; the avatars are the layer's own, as on
   the other sites).
+  **Comfort**: the room's panel and **Comfort** on the page's bar set three accessibility
+  settings, kept in the browser as the Hallway keeps them (`hallway.access`, common's
+  `access.js`), so a choice made there holds here and the other way round. **Motion** follows
+  the system's reduced-motion setting, or is **Less** or **Full**: with less, the view jumps to
+  the table instead of gliding, the fades are blinks and the doorway's veil holds still. The
+  **vignette** (on by default) darkens the edge of the view while the sticks walk or turn you
+  smoothly in VR. **Seated** raises the view 0.45 m in VR, to about standing height.
   [![The VR view's room seen from just inside its door: the computer on a table, its control panel behind it](public/hallway-preview.jpg)](https://ariamokr.github.io/breadboard/vr.html)
 * **Chapter labs** (`#/lab/<id>`): each of the 44 videos maps to an interactive lab
   that rebuilds what that video builds. Examples: the 555 timer modes, SR/D latches,
@@ -150,6 +157,11 @@ pages whose route contains it, and `-- --url <address>` checks a deployed copy.
 `npm run verify` runs the unit tests, the build and the browser checks on the built site, in that
 order, stopping at the first failure. Run it before committing or pushing (it takes about two
 minutes).
+
+With less motion (the same setting, or the system's own), the simulator's pages stop their own
+slides, fades and pulses: buttons, switches' knobs, the sidebar on a phone, the breadboard view's
+zoom (`src/ui/motion.ts`). The computer's LEDs, displays, signals and wires change as before:
+they are what it shows.
 
 Keyboard on the computer page: **Space** = clock pulse, **I** = step one
 instruction, **R** = run/stop, **Backspace** = reset.

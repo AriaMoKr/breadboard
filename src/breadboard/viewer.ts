@@ -1,4 +1,5 @@
 import { h, media } from '../ui/dom';
+import { lessMotion } from '../ui/motion';
 
 export interface Rect {
   x: number;
@@ -205,6 +206,7 @@ export class PanZoom {
    * gestures use it); only the drawing catches up.
    */
   private animateTo(to: Rect, ms = 180) {
+    if (lessMotion()) return void this.setView(to); // less motion: there at once
     const from = { ...this.view };
     this.setView(to);
     this.paint(from);

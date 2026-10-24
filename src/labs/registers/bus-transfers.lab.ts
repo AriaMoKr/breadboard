@@ -53,6 +53,7 @@ const CSS = `
 .bt-svg .bt-sw rect.hit { fill: transparent; }
 .bt-svg .bt-sw rect.body { fill: #c0392b; }
 .bt-svg .bt-sw rect.knob { fill: #f4f4f4; transition: y 0.1s; }
+.reduce-motion .bt-svg .bt-sw rect.knob { transition: none; }
 .bt-svg .bt-sw:focus-visible rect.body { stroke: var(--accent); stroke-width: 2; }
 .bt-svg .bt-pill { cursor: pointer; }
 .bt-svg .bt-pill rect { fill: var(--panel-2); stroke: var(--fg-faint); stroke-width: 1.2; }

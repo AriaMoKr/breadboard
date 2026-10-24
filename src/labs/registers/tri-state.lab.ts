@@ -16,6 +16,7 @@ import { labFrame, levelLegend, runCircuit, truthTable } from './_shared';
 
 const CSS = `
 .ts-svg .tp-blade { stroke: var(--fg); stroke-width: 3; stroke-linecap: round; transition: all 0.12s; }
+.reduce-motion .ts-svg .tp-blade { transition: none; }
 .ts-svg .tp-contact { fill: var(--panel-2); stroke: var(--fg-dim); stroke-width: 1.5; }
 .ts-svg .tp-box { fill: none; stroke: var(--fg-faint); stroke-dasharray: 4 4; }
 .ts-svg .tp-label { fill: var(--fg); font: 600 12px var(--sans); }

@@ -43,6 +43,7 @@
 .bb-dip-body { fill: #c8302a; stroke: #8e1d18; stroke-width: 0.05; }
 .bb-dip-slot { fill: #8e1d18; }
 .bb-dip-knob { fill: #f4f4f2; transition: y 0.08s; }
+.reduce-motion .bb-dip-knob, .reduce-motion .bb-btn-cap, .reduce-motion .bb-slide-knob { transition: none; } /* less motion: the knobs jump */
 .bb-dip-on, .bb-dip-num { fill: #ffe9e7; }
 
 .bb-btn-body { fill: #2a2a2e; stroke: #000; stroke-width: 0.05; }

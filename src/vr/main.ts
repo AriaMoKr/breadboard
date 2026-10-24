@@ -6,9 +6,11 @@ import { buildLabel } from '../build-info';
 import { Carry, Twist } from './carry';
 import { EXAMPLE_IDS, circuitExhibit, computerExhibit, exampleExhibit, exhibitHash, parseExhibitHash, type Exhibit, type ExhibitChoice, type Hold } from './exhibits';
 import { buildDoorway } from './door';
+import { ACCESS_KEY, Vignette, eyeLift, loadAccess, motionQuery, reduceMotion, saveAccess, watchMotion, type Access } from 'common/access.js';
 import { Fade } from 'common/fade.js';
 import { hallwayViews, leaveUrl, readVisit, wayBack, withoutVisit } from 'common/door.js';
-import { loadNav, saveNav, type Nav } from 'common/nav.js';
+import { NAV_KEY, loadNav, saveNav, type Nav } from 'common/nav.js';
+import { h } from '../ui/dom';
 import { BREADBOARD_ID, DOOR, doorOf, keptDoor } from './hallway';
 import { BOARD_T, buildComputerModel, disposeTree, type ComputerModel, type ControlHit } from './model';
 import { AimStick, TurnStick, XR_WALK, clampWalk, headYaw, standable, turnedAbout, walkDelta, wrapAngle, type Rect } from './move';
@@ -113,7 +115,7 @@ function go() {
   // go at once (the fade gives the leaving message time to go out).
   const url = leaveUrl(way, together.room);
   together.pause();
-  if (inVR()) fade.to(1, 0.3, () => location.assign(url));
+  if (inVR()) fade.to(1, reduce ? 0.08 : 0.3, () => location.assign(url));
   else location.assign(url);
   clearTimeout(leaveTimer);
   leaveTimer = setTimeout(cameBack, 12000); // still here: the navigation was stopped or failed
@@ -122,11 +124,14 @@ function go() {
 function cameBack() {
   leaving = false;
   clearTimeout(leaveTimer);
-  fade.to(0, 0.6);
+  if (reduce) fade.set(0);
+  else fade.to(0, 0.6);
   together.resume();
 }
 addEventListener('pageshow', (e) => {
-  if (e.persisted) cameBack();
+  if (!e.persisted) return;
+  cameBack();
+  reloadSettings(); // changed in the Hallway meanwhile, perhaps
 });
 // Leaving another way (the bar's link, the address bar, closing the tab): out of the session too.
 addEventListener('pagehide', () => together.pause());
@@ -226,6 +231,42 @@ const store = (() => {
   }
 })();
 const nav: Nav = loadNav(store);
+// Accessibility settings (common's access.js), shared by the Hallway and the places behind its
+// doors under hallway.access as the movement choice is: less motion (the visitor's choice, else
+// the system's: the flight to the table jumps, the fades blink, the doorway's veil holds still),
+// a comfort vignette that closes in while the sticks move or turn smoothly in VR, and seated (the
+// view raised in VR). Set on the room's panel and in the bar's Comfort settings; another tab or
+// site changing them shows up here as a storage event.
+let access: Access = loadAccess(store);
+const motion = motionQuery();
+let reduce = reduceMotion(access, motion);
+const vignette = new Vignette(camera, access.vignette);
+const MOTIONS: [Access['motion'], string, string][] = [['system', 'System', 'Follow the system'], ['reduce', 'Less', 'Less motion'], ['full', 'Full', 'Full motion']];
+function setAccess(next: Partial<Access>) {
+  access = { ...access, ...next };
+  saveAccess(access, store); // false with storage blocked: it lasts this visit
+  applyAccess();
+}
+function applyAccess() {
+  reduce = reduceMotion(access, motion);
+  vignette.enabled = access.vignette;
+  liftRig();
+  showRoom();
+  showAccess();
+}
+/** In VR a seated visitor's view is raised (eyeLift); on a screen the rig stays on the floor. */
+function liftRig() {
+  rig.position.y = inVR() ? eyeLift(access) : 0;
+}
+function reloadSettings() {
+  access = loadAccess(store);
+  Object.assign(nav, loadNav(store));
+  applyAccess();
+}
+watchMotion(() => applyAccess(), motion);
+addEventListener('storage', (e) => {
+  if (e.key === ACCESS_KEY || e.key === NAV_KEY || e.key === null) reloadSettings();
+});
 // The shared session (together.ts): an address with ?room= (an invitation, or the Hallway's door
 // in a session) joins it, below; the room's panel and the page's bar start and leave one.
 const together = new Together({ scene, camera, renderer, hands: () => rays.map((r) => ({ controller: r.ctrl, source: r.source })) });
@@ -239,6 +280,9 @@ const roomPanel = new ControlPanel(
   [
     { label: () => `Move: ${nav.move === 'smooth' ? 'Smooth' : 'Teleport'}`, run: () => setNav({ move: nav.move === 'smooth' ? 'teleport' : 'smooth' }) },
     { label: () => `Turn: ${nav.turn === 'snap' ? 'Snap' : 'Smooth'}`, run: () => setNav({ turn: nav.turn === 'snap' ? 'smooth' : 'snap' }) },
+    { label: () => `Vignette: ${access.vignette ? 'On' : 'Off'}`, run: () => setAccess({ vignette: !access.vignette }) },
+    { label: () => `Seated: ${access.seated ? 'On' : 'Off'}`, run: () => setAccess({ seated: !access.seated }) },
+    { label: () => `Motion: ${MOTIONS.find((m) => m[0] === access.motion)![1]}`, run: () => setAccess({ motion: MOTIONS[(MOTIONS.findIndex((m) => m[0] === access.motion) + 1) % MOTIONS.length][0] }) },
     { label: () => (together.active ? 'Leave session' : 'Start session'), run: () => toggleSession() },
   ],
   'Moving about · Together',
@@ -277,6 +321,33 @@ copyButton.addEventListener('click', () => {
 });
 sessionBox.append(sessionState, copyButton, sessionButton);
 bar?.querySelector('.vr-build')?.before(sessionBox);
+// The same settings on the page, for a keyboard or a screen reader: a disclosure on the bar, with a
+// group of three radio buttons for motion and two checkboxes, applied and kept as they change.
+const accessBox = h(
+  'details',
+  { class: 'vr-access' },
+  h('summary', null, 'Comfort'),
+  h(
+    'div',
+    { class: 'vr-access-body' },
+    h('fieldset', null, h('legend', null, 'Motion'), MOTIONS.map(([value, , text]) => h('label', null, h('input', { type: 'radio', name: 'vr-motion', value }), text))),
+    h('label', null, h('input', { type: 'checkbox', name: 'vr-vignette' }), 'Comfort vignette while the sticks move you in VR'),
+    h('label', null, h('input', { type: 'checkbox', name: 'vr-seated' }), 'Seated: raise the view 0.45 m in VR'),
+  ),
+);
+accessBox.addEventListener('change', (e) => {
+  const input = e.target as HTMLInputElement;
+  if (input.name === 'vr-motion') setAccess({ motion: input.value as Access['motion'] });
+  else if (input.name === 'vr-vignette') setAccess({ vignette: input.checked });
+  else if (input.name === 'vr-seated') setAccess({ seated: input.checked });
+});
+sessionBox.before(accessBox);
+function showAccess() {
+  for (const input of accessBox.querySelectorAll('input')) {
+    input.checked = input.name === 'vr-motion' ? input.value === access.motion : input.name === 'vr-vignette' ? access.vignette : access.seated;
+  }
+}
+showAccess();
 function showSession() {
   showRoom();
   sessionButton.textContent = together.active ? 'Leave' : 'Start shared session';
@@ -503,8 +574,9 @@ renderer.domElement.addEventListener('dblclick', (e) => {
 });
 function flyOn(ms: number) {
   if (!fly) return;
+  if (reduce) fly.t = fly.wait = 0; // less motion: there at once (the next line's t reaches 1)
   if (fly.wait > 0) return void (fly.wait -= ms);
-  fly.t = Math.min(1, fly.t + ms / fly.ms);
+  fly.t = reduce ? 1 : Math.min(1, fly.t + ms / fly.ms);
   const k = 1 - (1 - fly.t) ** 3; // ease out
   camera.position.lerpVectors(fly.from[0], fly.to[0], k);
   controls.target.lerpVectors(fly.from[1], fly.to[1], k);
@@ -643,11 +715,15 @@ function moveHead(x: number, z: number, walk = true) {
 function teleport(x: number, z: number) {
   fade.to(1, 0.08, () => {
     moveHead(x, z, false);
-    fade.to(0, 0.2);
+    fade.to(0, reduce ? 0.08 : 0.2);
   });
 }
+/** How fast the sticks are moving (m/s) and smoothly turning (rad/s) the visitor now: the vignette's input. */
+let stickSpeed = 0;
+let stickTurn = 0;
 /** The sticks, every frame in VR: the right one turns, the left one walks or aims a jump. */
 function moveWithSticks(dt: number) {
+  stickSpeed = stickTurn = 0;
   for (const ray of rays) {
     const pad = ray.source?.gamepad;
     if (!pad || pad.axes.length < 2) continue;
@@ -656,6 +732,7 @@ function moveWithSticks(dt: number) {
     if (ray.source!.handedness === 'right') {
       const angle = turnStick.turn(ax, dt, nav.turn);
       if (angle) turnAboutHead(angle);
+      if (nav.turn === 'smooth' && dt > 0) stickTurn = Math.abs(angle) / dt; // a snap turn blinks no vignette
     } else if (nav.move === 'teleport') {
       if (ray.aim.update(ay) === 'jump' && ray.target) teleport(ray.target.x, ray.target.z);
     } else {
@@ -663,6 +740,7 @@ function moveWithSticks(dt: number) {
       const [dx, dz] = walkDelta(ax, ay, facing.x, facing.z, XR_WALK * dt);
       camera.getWorldPosition(head);
       if (dx || dz) moveHead(head.x + dx, head.z + dz);
+      if (dt > 0) stickSpeed = Math.hypot(dx, dz) / dt;
     }
   }
 }
@@ -683,6 +761,7 @@ renderer.xr.addEventListener('sessionstart', () => {
   dirty = true;
   rig.position.set(0, 0, 0);
   rig.rotation.set(0, 0, 0);
+  liftRig();
   entry = arrival ? { x: arrival.x, z: ARRIVE_Z, yaw: arrival.yaw } : { x: 0, z: 0, yaw: 0 };
   arrival = null;
   recenter = 2;
@@ -765,10 +844,12 @@ renderer.setAnimationLoop(() => {
   }
   if (door) {
     camera.getWorldPosition(head);
-    door.update(dt, head, isDoor(hovered));
+    door.update(dt, head, isDoor(hovered), reduce);
     if (inVR() && door.crossed(head)) go(); // walked or stepped back through it (on a screen the orbit may swing through it)
   }
   fade.update(dt);
+  if (!inVR() || leaving || recenter > 0) stickSpeed = stickTurn = 0;
+  vignette.update(dt, stickSpeed, stickTurn, inVR());
   together.update(now);
   if (inVR()) {
     carry?.follow(holding);
@@ -839,6 +920,14 @@ Object.assign(window, {
     rig,
     /** How the visitor moves in VR (common's nav.js), as the room's panel shows it. */
     nav,
+    /** The accessibility settings (common's access.js), whether motion is reduced now, and the vignette. */
+    get access() {
+      return access;
+    },
+    get reduce() {
+      return reduce;
+    },
+    vignette,
     /** The shared session (together.ts). */
     together,
     camera,

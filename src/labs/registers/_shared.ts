@@ -29,6 +29,7 @@ const DP_CSS = `
 .dp-bit { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; }
 .dp-bit.gap { margin-left: 6px; }
 .dp-bit button { width: 26px; height: 30px; border-radius: 6px; border: 1px solid var(--border); background: var(--panel-2); color: var(--fg-dim); font: 600 0.95rem var(--mono); cursor: pointer; padding: 0; transition: background 0.12s, color 0.12s, transform 0.12s; }
+.reduce-motion .dp-bit button { transition: none; }
 .dp-bit button:disabled { cursor: default; }
 .dp-bit button.on { background: color-mix(in srgb, var(--led-red) 75%, var(--panel)); border-color: var(--led-red); color: #fff; box-shadow: 0 0 8px color-mix(in srgb, var(--led-red) 50%, transparent); }
 .dp-bits.blue .dp-bit button.on { background: color-mix(in srgb, var(--led-blue) 75%, var(--panel)); border-color: var(--led-blue); box-shadow: 0 0 8px color-mix(in srgb, var(--led-blue) 50%, transparent); }

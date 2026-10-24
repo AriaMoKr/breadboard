@@ -15,6 +15,17 @@ html, body { margin: 0; height: 100%; background: #111318; color: #e6e8ee; font-
 :focus-visible, #VRButton:focus-visible { outline: 2px solid #8ab8ff !important; outline-offset: 2px; }
 .vr-build { margin-left: auto; color: #8c92a0; font: 0.72rem ui-monospace, Consolas, monospace; }
 /* the shared session (together.ts): Start, and in one its status, Copy invite link and Leave */
+/* the comfort settings (common's access.js): a disclosure on the bar, its settings dropping below it */
+.vr-access { position: relative; margin-left: auto; font-size: 0.8rem; }
+.vr-access ~ .vr-together { margin-left: 0; }
+.vr-access > summary { display: inline-flex; align-items: center; min-height: 28px; padding: 3px 10px; color: #e6e8ee; background: #2a303c; border: 1px solid #3b4456; border-radius: 6px; cursor: pointer; list-style: none; }
+.vr-access > summary::-webkit-details-marker { display: none; }
+.vr-access > summary::after { content: '▾'; margin-left: 6px; color: #9aa3b2; }
+.vr-access-body { position: absolute; top: calc(100% + 6px); right: 0; z-index: 3; width: max-content; max-width: min(320px, calc(100vw - 32px)); display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; color: #e6e8ee; background: #1b1e25; border: 1px solid #3b4456; border-radius: 8px; }
+.vr-access fieldset { display: flex; flex-direction: column; gap: 2px; margin: 0 0 4px; padding: 0; border: 0; }
+.vr-access legend { margin-bottom: 4px; padding: 0; color: #b8bfcc; }
+.vr-access label { display: flex; align-items: center; gap: 8px; min-height: 24px; cursor: pointer; }
+.vr-access input { width: 16px; height: 16px; margin: 0; accent-color: #8ab8ff; }
 .vr-together { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 6px 8px; margin-left: auto; font-size: 0.8rem; }
 .vr-together ~ .vr-build { margin-left: 0; }
 .vr-together button { font: inherit; min-height: 28px; color: #e6e8ee; background: #2a303c; border: 1px solid #3b4456; border-radius: 6px; padding: 3px 10px; cursor: pointer; }

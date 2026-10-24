@@ -563,6 +563,35 @@ try {
       return `at the door turned ${arrived.yaw}°, walked to the table (z ${walked.z}), snapped to ${turned.yaw}°, jumped ${Math.hypot(jumped.x - turned.x, jumped.z - turned.z).toFixed(1)} m, out through the doorway`;
     });
 
+  await check('comfort settings: a choice made in the Hallway (hallway.access) holds, and less motion stills the page', async () => {
+    // As the Hallway keeps them (common's access.js): less motion and seated chosen there. The 2D
+    // page stops its own transitions but not the computer's LEDs; the VR view comes through the
+    // door straight to the table (no glide), holds the doorway's veil, and shows the choice on its
+    // panel and in its Comfort settings. The choice is taken off again after.
+    const before = errors.length;
+    await page.evaluate(`localStorage.setItem('hallway.access', JSON.stringify({ motion: 'reduce', vignette: true, seated: true }))`);
+    await page.goto(`${base}#/`, 300);
+    await page.send('Page.reload'); // the page may only have changed its #hash: load it again, to read the setting
+    await sleep(2000);
+    const flat = await page.evaluate(`(() => { const t = (sel) => getComputedStyle(document.querySelector(sel)).transitionDuration; return { cls: document.documentElement.classList.contains('reduce-motion'), btn: t('.btn'), led: t('.led') }; })()`);
+    assert(flat.cls && flat.btn === '0s' && flat.led !== '0s', `the 2D page with less motion: ${JSON.stringify(flat)}`);
+    await page.evaluate('sessionStorage.clear()');
+    await page.goto(`${base}vr.html?from=hallway&back=${encodeURIComponent(`${base}#/more`)}&dx=0.2&yaw=10`, 500);
+    const where = `breadboardVR.camera.position.toArray().map((n) => +n.toFixed(2)).join()`;
+    const early = await page.evaluate(where);
+    const veil = await page.evaluate('breadboardVR.door.portal.material.uniforms.uTime.value');
+    await sleep(2800);
+    const late = await page.evaluate(where);
+    const vr = await page.evaluate(`({ veil: breadboardVR.door.portal.material.uniforms.uTime.value, panel: breadboardVR.panelLabels().filter((l) => /^(Motion|Seated|Vignette):/.test(l)), radio: document.querySelector('.vr-access input[name=vr-motion]:checked')?.value, seated: document.querySelector('.vr-access input[name=vr-seated]').checked })`);
+    await page.evaluate(`localStorage.removeItem('hallway.access')`);
+    assert(early === late, `the view glided from ${early} to ${late}`);
+    assert(veil === vr.veil, `the doorway's veil moved: uTime ${veil} -> ${vr.veil}`);
+    assert(vr.panel.join() === 'Vignette: On,Seated: On,Motion: Less' && vr.radio === 'reduce' && vr.seated, `the VR view shows ${JSON.stringify(vr)}`);
+    const errs = errors.slice(before);
+    assert(!errs.length, errs.join('\n'));
+    return 'the 2D page still but its LEDs, the VR view at the table at once with its veil held, the choice on its panel and in its settings';
+  });
+
   await check('accessibility: axe-core finds nothing on any page, in either theme, nor in the VR view', async () => {
     // Deque's axe-core (a devDependency, put into each page), with the rules of WCAG 2.2 AA and
     // its best practices: contrast, target sizes, names, roles, headings, landmarks. Each page is

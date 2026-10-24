@@ -428,6 +428,12 @@ table.microcode td.editing { position: relative; color: transparent; }
 .schematic .sch-probe.l1.probe-blue .probe-led { fill: var(--led-blue); filter: drop-shadow(0 0 4px var(--led-blue)); }
 .schematic .sch-probe.lx .probe-led { fill: var(--wire-x); }
 
+/* Less motion (ui/motion.ts: the visitor's choice under hallway.access, else the system's): the
+   page's own slides and fades stop. The simulation's own (LEDs, digits, signals, wires, buses) is
+   the content, and stays. */
+.reduce-motion .btn, .reduce-motion .toggle-track, .reduce-motion .toggle-knob, .reduce-motion .dip-knob,
+.reduce-motion .sidebar, .reduce-motion .schematic .switch-knob { transition: none; }
+
 .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.78rem; color: var(--fg-dim); }
 .legend i { display: inline-block; width: 18px; height: 3px; vertical-align: middle; margin-right: 5px; border-radius: 2px; }
 

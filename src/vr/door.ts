@@ -22,8 +22,8 @@ export interface Doorway {
   portal: THREE.Mesh<THREE.BufferGeometry, PortalMaterial>;
   /** Shows the Hallway's view of its door: true once it is up. */
   loadView(source: { views: string; id: string }): Promise<boolean>;
-  /** Per frame: the veil drifts, and the doorway brightens when pointed at or stood near. */
-  update(dt: number, head: THREE.Vector3, hover: boolean): void;
+  /** Per frame: the veil drifts (held `still`, for less motion), and the doorway brightens when pointed at or stood near. */
+  update(dt: number, head: THREE.Vector3, hover: boolean, still?: boolean): void;
   /** Whether the head (world position) has gone through the opening from the room since the last call that said so. */
   crossed(head: THREE.Vector3): boolean;
 }
@@ -131,11 +131,11 @@ export function buildDoorway({ width, height, z, glow, name, anisotropy }: { wid
         return false;
       }
     },
-    update(dt, head, hover) {
+    update(dt, head, hover, still = false) {
       const near = z - head.z < 1.8 && head.z < z && Math.abs(head.x) < 1.6;
       const target = hover ? 1 : near ? 0.45 : 0;
       glowing += (target - glowing) * (1 - Math.exp(-dt * 7));
-      time += dt;
+      if (!still) time += dt;
       portal.material.uniforms.uGlow.value = glowing;
       portal.material.uniforms.uTime.value = time;
     },
