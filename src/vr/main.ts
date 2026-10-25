@@ -18,7 +18,7 @@ import { BOARD_T, buildComputerModel, disposeTree, type ComputerModel, type Cont
 import { AimStick, PAD, TurnStick, XR_WALK, aimDir, aimOf, clampStep, clampWalk, headYaw, padLook, padWalk, standable, turnedAbout, walkDelta, wrapAngle, type Rect } from './move';
 import { ControlPanel, Tooltip } from './panel';
 import { boardTexture, labelTexture } from './textures';
-import { Together } from './together';
+import { startTogether, statusOf } from './together';
 import { roomFromUrl } from 'layersharedsession/room.js';
 import './vr.css';
 
@@ -117,7 +117,7 @@ function go() {
   // The link carries the shared session's room on; leaving it now lets the others see the visitor
   // go at once (the fade gives the leaving message time to go out).
   const url = leaveUrl(way, together.room);
-  together.pause();
+  void together.pause();
   if (inVR()) fade.to(1, reduce ? 0.08 : 0.3, () => location.assign(url));
   else location.assign(url);
   clearTimeout(leaveTimer);
@@ -137,7 +137,7 @@ addEventListener('pageshow', (e) => {
   reloadSettings(); // changed in the Hallway meanwhile, perhaps
 });
 // Leaving another way (the bar's link, the address bar, closing the tab): out of the session too.
-addEventListener('pagehide', () => together.pause());
+addEventListener('pagehide', () => void together.pause());
 const wayLink = way && Object.assign(document.createElement('a'), { className: 'vr-hallway', href: way.url, title: way.title, textContent: way.label });
 if (wayLink) document.querySelector('.vr-bar')?.prepend(wayLink);
 
@@ -254,6 +254,7 @@ function applyAccess() {
   reduce = reduceMotion(access, motion);
   vignette.enabled = access.vignette;
   liftRig();
+  together.reduceMotion = reduce; // a wave's notice without the avatar's bob
   showRoom();
   showAccess();
 }
@@ -270,9 +271,11 @@ watchMotion(() => applyAccess(), motion);
 addEventListener('storage', (e) => {
   if (e.key === ACCESS_KEY || e.key === NAV_KEY || e.key === null) reloadSettings();
 });
-// The shared session (together.ts): an address with ?room= (an invitation, or the Hallway's door
-// in a session) joins it, below; the room's panel and the page's bar start and leave one.
-const together = new Together({ scene, camera, renderer, hands: () => rays.map((r) => ({ controller: r.ctrl, source: r.source })) });
+// The shared session (layersharedsession's together.js, worded by together.ts): an address with
+// ?room= (an invitation, or the Hallway's door in a session) joins it, below; the room's panel and
+// the page's bar start and leave one.
+const together = startTogether({ scene, camera, renderer, hands: () => rays.map((r) => ({ controller: r.ctrl, source: r.source })), say: (text) => toast(text) });
+together.reduceMotion = reduce;
 function setNav(next: Partial<Nav>) {
   Object.assign(nav, next);
   saveNav(nav, store);
@@ -318,13 +321,13 @@ function showRoom() {
   roomPanel.refresh();
   roomPanel.setStatus(
     together.active
-      ? [`Together: ${together.status()}`, together.inviteLink.replace(/^https?:\/\//, '')]
+      ? [`Together: ${statusOf(together)}`, together.inviteLink.replace(/^https?:\/\//, '')]
       : [nav.move === 'smooth' ? 'Left stick: walk the way you face' : 'Left stick forward: aim; let go: jump', nav.turn === 'snap' ? 'Right stick: turn 30° a push' : 'Right stick: turn while held'],
   );
 }
 function toggleSession() {
   if (together.active) {
-    together.stop();
+    void together.stop();
     toast('You left the shared session');
   } else {
     together.start();
@@ -417,11 +420,10 @@ function showSession() {
   sessionButton.textContent = together.active ? 'Leave' : 'Start shared session';
   sessionButton.title = together.active ? 'Leave the shared session' : 'Share this room: others who open its link see you here, and in the Hallway';
   copyButton.hidden = !together.active;
-  sessionState.textContent = together.active ? `Together: ${together.status()}` : '';
+  sessionState.textContent = together.active ? `Together: ${statusOf(together)}` : '';
   if (wayLink && way) wayLink.href = leaveUrl(way, together.room);
 }
-together.onChange = showSession;
-together.onNotice = (text) => toast(text);
+together.on('change', showSession);
 showSession();
 /** Where a visitor coming through the door now stands and faces (yaw + to the left), or null. */
 let arrival = found ? { x: Math.min(jamb, Math.max(-jamb, visit.dx ?? 0)), yaw: visit.yaw ?? 0, pitch: visit.pitch ?? 0 } : null;
@@ -1109,7 +1111,7 @@ Object.assign(window, {
       return reduce;
     },
     vignette,
-    /** The shared session (together.ts). */
+    /** The shared session (layersharedsession's together.js). */
     together,
     camera,
     /** IWER's emulated headset (?xr=emulate on the dev server), else null. */

@@ -10,7 +10,7 @@
 // Chromium.
 import { readFileSync } from 'node:fs';
 import { createServer, preview } from 'vite';
-import { launchChrome, sleep } from './lib/chrome.mjs';
+import { launchChrome, sleep } from 'common/tools/chrome.mjs';
 
 const urlAt = process.argv.indexOf('--url');
 const url = urlAt > 0 ? process.argv[urlAt + 1]?.replace(/\/?$/, '/') : '';

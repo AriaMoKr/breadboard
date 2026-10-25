@@ -85,9 +85,10 @@ video by video.
   starts). Its address (`vr.html?room=…`) is the invitation (**Copy invite link**). Everyone in
   it sees the others who are here as a head with a visor, their hands in VR, a ring on the floor
   and their name, and the status says how many are here and elsewhere (in the Hallway, or behind
-  another of its doors). A visitor who comes through the Hallway's door in a session stays in it,
-  and the way back carries it on (`src/vr/together.ts`; the avatars are the layer's own, as on
-  the other sites).
+  another of its doors). A note says who joins, comes in, waves or leaves. A visitor who comes
+  through the Hallway's door in a session stays in it, and the way back carries it on (the layer's
+  `together.js` runs the session, as on the other sites, and `src/vr/together.ts` words it; the
+  avatars are the layer's own).
   **Comfort**: the room's panel and **Comfort** on the page's bar set three accessibility
   settings, kept in the browser as the Hallway keeps them (`hallway.access`, common's
   `access.js`), so a choice made there holds here and the other way round. **Motion** follows
@@ -157,7 +158,8 @@ and lit signals still show their states and the open tab and current page are ma
 checks the built site instead (run `npm run build` first), plus the download link, install and
 offline use, and `-- --url <address>` checks a deployed copy the same way (such as
 `https://example.com/breadboard/` after a deploy). It needs an installed Chrome, Edge or
-Chromium (or `CHROME_PATH`).
+Chromium (or `CHROME_PATH`). The scripts start it through common's `tools/chrome.mjs`, which
+gives each run a new profile that Windows logs no failed logon for.
 
 `npm run check:input` takes a few minutes, so `verify` leaves it out: run it after changing
 controls or layout. On every page, on a desktop with a mouse and on a phone with touch, it
@@ -202,8 +204,9 @@ The sidebar offers the zip ("Download for offline use") wherever it sits next to
 so not on the dev server or in a copy.
 
 On GitHub, `.github/workflows/pages.yml` publishes the site to GitHub Pages on every push to
-`main`. It runs the unit tests and `npm run build` on Linux, then deploys `dist/`, which comes out
-the same as a build on Windows. To turn it on, set the repository's **Settings → Pages → Build
+`main`, through the workflow the sites share (common's `pages.yml`, on Node 24). It runs the unit
+tests and `npm run build` on Linux, then deploys `dist/`, which comes out the same as a build on
+Windows. To turn it on, set the repository's **Settings → Pages → Build
 and deployment → Source** to **GitHub Actions** once. The site is then at
 `https://<user>.github.io/<repo>/`, and the Actions tab can also run the workflow by hand.
 

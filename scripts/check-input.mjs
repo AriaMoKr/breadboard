@@ -10,7 +10,7 @@
 // only the pages whose route has that text in it (--page microcode). SAMPLE=<n> tries n controls
 // of each kind on a page (default 3). Needs Node 22+ and Chrome, Edge or Chromium.
 import { createServer } from 'vite';
-import { launchChrome, sleep } from './lib/chrome.mjs';
+import { launchChrome, sleep } from 'common/tools/chrome.mjs';
 
 const urlAt = process.argv.indexOf('--url');
 const url = urlAt > 0 ? process.argv[urlAt + 1]?.replace(/\/?$/, '/') : '';

@@ -12,7 +12,7 @@ import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
-import { launchChrome, sleep } from './lib/chrome.mjs';
+import { launchChrome, sleep } from 'common/tools/chrome.mjs';
 
 const arg = (name, fallback) => {
   const i = process.argv.indexOf(name);

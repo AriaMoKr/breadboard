@@ -2,7 +2,7 @@
 // Run it again after changing the SVG; the PNGs are committed.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { launchChrome } from './lib/chrome.mjs';
+import { launchChrome } from 'common/tools/chrome.mjs';
 
 const dir = fileURLToPath(new URL('../public/icons/', import.meta.url));
 const svg = readFileSync(`${dir}icon.svg`, 'utf8');

@@ -58,8 +58,8 @@
     "vitest": "^5.0.5"
   },
   "dependencies": {
-    "common": "github:AriaMoKr/common#v0.4.0",
-    "layersharedsession": "github:AriaMoKr/layersharedsession#v0.2.0",
+    "common": "github:AriaMoKr/common#v0.5.0",
+    "layersharedsession": "github:AriaMoKr/layersharedsession#v0.3.0",
     "three": "^0.186.1",
     "trystero": "^0.26.0"
   }
