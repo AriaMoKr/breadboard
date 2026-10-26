@@ -50,11 +50,9 @@ const bar = document.querySelector<HTMLElement>('.vr-bar')!;
 // (common's tv.js, below), with no VR to enter, so XR is never asked for.
 const tv = tvMode();
 document.documentElement.classList.toggle('tv', tv);
-// The canvas's pixels per CSS pixel: the screen's, up to 2. The TV's page is 960 x 540 at 2; at
-// most TV_RATIO there, lowered until it holds 60 fps at 1080p with the clock running, as measured
-// on the TV with HallwayApp's tools/tv-check.mjs (not yet: 2 until then).
-const TV_RATIO = 2;
-const pixelRatio = () => Math.min(devicePixelRatio, tv ? TV_RATIO : 2);
+// The canvas's pixels per CSS pixel: the screen's, up to 2, on the TV as in the Hallway (the TV's
+// page is 960 x 540 at 2, so 1080p).
+const pixelRatio = () => Math.min(devicePixelRatio, 2);
 
 // On the dev server, vr.html?xr=emulate emulates a Quest 3 with Meta's IWER, before anything asks
 // navigator.xr (Chromium has a native one even without a headset, so it is replaced). A build
