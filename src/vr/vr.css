@@ -16,8 +16,8 @@ html, body { margin: 0; height: 100%; background: #111318; color: #e6e8ee; font-
 :focus-visible, #VRButton:focus-visible { outline: 2px solid #8ab8ff !important; outline-offset: 2px; }
 .vr-build { margin-left: auto; color: #8c92a0; font: 0.72rem ui-monospace, Consolas, monospace; }
 /* the shared session (together.ts): Start, and in one its status, Copy invite link and Leave */
-/* the bar's menus, disclosures whose contents drop below them: Wires (the wires between boards) and
-   Comfort (common's access.js) */
+/* the bar's menus, disclosures whose contents drop below them: Controls (the exhibit's panel), Wires
+   (the wires between boards) and Comfort (common's access.js) */
 .vr-menus { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 6px 8px; margin-left: auto; }
 .vr-menus ~ .vr-together { margin-left: 0; }
 .vr-menu { position: relative; font-size: 0.8rem; }
@@ -30,12 +30,19 @@ html, body { margin: 0; height: 100%; background: #111318; color: #e6e8ee; font-
 .vr-menu legend { margin-bottom: 4px; padding: 0; color: #b8bfcc; }
 .vr-menu label { display: flex; align-items: center; gap: 8px; min-height: 24px; cursor: pointer; }
 .vr-menu input { width: 16px; height: 16px; margin: 0; accent-color: #8ab8ff; }
+.vr-controls button { font: inherit; min-height: 28px; padding: 3px 10px; text-align: left; color: #e6e8ee; background: #2a303c; border: 1px solid #3b4456; border-radius: 6px; cursor: pointer; }
+.vr-controls button:hover { background: #3b4456; }
+.vr-controls button.primary { color: #fff; background: #2f6fdd; border-color: #2f6fdd; }
+.vr-controls button.primary:hover { background: #3f7fe0; }
 .vr-together { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 6px 8px; margin-left: auto; font-size: 0.8rem; }
 .vr-together ~ .vr-build { margin-left: 0; }
 .vr-together button { font: inherit; min-height: 28px; color: #e6e8ee; background: #2a303c; border: 1px solid #3b4456; border-radius: 6px; padding: 3px 10px; cursor: pointer; }
 .vr-together button:hover { background: #3b4456; }
 .vr-together button[hidden] { display: none; }
 .vr-together-status { color: #9aa3b2; }
+/* on the TV, the invitation to type on another device (there is nothing to copy it to) */
+.vr-invite { color: #e6e8ee; font-weight: 600; overflow-wrap: anywhere; }
+.vr-invite:empty { display: none; }
 /* where a gamepad aims (main.ts), the middle of the view, as in the Hallway: larger and filled on
    something A uses; in high contrast in the system's colours */
 .vr-aim { position: fixed; left: 50%; top: 50%; z-index: 1; box-sizing: border-box; width: 18px; height: 18px; margin: -9px 0 0 -9px; border: 2px solid rgba(255, 248, 235, 0.95); border-radius: 50%; box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.55), inset 0 0 0 2px rgba(0, 0, 0, 0.35); pointer-events: none; transition: transform 0.12s, background-color 0.12s; }
@@ -46,3 +53,33 @@ html, body { margin: 0; height: 100%; background: #111318; color: #e6e8ee; font-
   .vr-aim { forced-color-adjust: none; border-color: CanvasText; box-shadow: 0 0 0 2px Canvas; }
   .vr-aim.on { background-color: Highlight; }
 }
+
+/* The 10-foot view: the Hallway's TV app (main.ts, common's README, "The TV app"), 960 x 540 and
+   seen from across a room, as the Hallway's. Larger text and targets, focus rings that show from the
+   sofa on any background (a choice's ringed round its label), the TV's safe margins (48 px at the
+   sides, 27 at the top and bottom), and the hint at the foot of the screen, over the status. The
+   view itself holds the focus while walking, which the dot and the hint show rather than a ring
+   round the screen. */
+html.tv, html.tv body { font-size: 18px; }
+html.tv :focus-visible { outline: 4px solid #ffd98a !important; outline-offset: 3px; box-shadow: 0 0 0 9px rgba(0, 0, 0, 0.65); }
+html.tv #vr-root canvas:focus-visible { outline: none !important; box-shadow: none; }
+html.tv .vr-menu label:has(input:focus-visible) { outline: 4px solid #ffd98a; outline-offset: 4px; border-radius: 4px; }
+html.tv .vr-menu label input:focus-visible { outline-width: 2px !important; outline-offset: 1px; box-shadow: none; }
+html.tv .vr-bar { gap: 8px 18px; padding: 27px 48px 14px; }
+html.tv .vr-bar h1 { font-size: 20px; }
+html.tv .vr-menus, html.tv .vr-together { gap: 8px 12px; }
+html.tv .vr-menu, html.tv .vr-together { font-size: 17px; }
+html.tv .vr-menu > summary, html.tv .vr-together button { min-height: 36px; padding: 4px 14px; box-sizing: border-box; }
+html.tv .vr-menu-body { gap: 8px; padding: 12px 16px; max-width: min(420px, calc(100vw - 96px)); }
+html.tv .vr-menu fieldset { gap: 8px; }
+html.tv .vr-menu label { gap: 10px; min-height: 32px; }
+html.tv .vr-menu input { width: 20px; height: 20px; }
+html.tv .vr-controls button { min-height: 36px; padding: 4px 14px; }
+html.tv .vr-build { display: none; } /* on the panel too: the bar keeps to one line */
+html.tv .vr-hint {
+  position: fixed; left: 48px; right: 48px; bottom: 27px; box-sizing: border-box; width: fit-content; max-width: calc(100vw - 96px); margin: 0 auto;
+  padding: 8px 18px; color: #c4cad6; background: rgba(17, 19, 24, 0.88); border-radius: 18px; font-size: 16px; line-height: 1.4; text-align: center; white-space: pre-line;
+}
+html.tv .vr-status { left: 48px; bottom: 100px; max-width: calc(100vw - 96px); font-size: 16px; }
+html.tv .vr-status:not(:empty) { padding: 6px 12px; color: #c4cad6; background: rgba(17, 19, 24, 0.88); border-radius: 10px; }
+html.tv .vr-aim { width: 26px; height: 26px; margin: -13px 0 0 -13px; border-width: 3px; }

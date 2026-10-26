@@ -46,7 +46,16 @@ video by video.
   you, from just above the table to 2.4 m. A dot in the middle of the view shows what A presses
   (a switch, button or pot on the boards, a panel's button, or the doorway back) and grows when
   it is on one; hold A on the pot and turn it with the right stick. B (or Back) flies back to the
-  table. Browsers show a page a gamepad only once one of its buttons has been pressed. It is built with three.js from the same layout
+  table. Browsers show a page a gamepad only once one of its buttons has been pressed. The
+  panel's buttons are also on the page's bar, in **Controls**, for a keyboard or a screen reader.
+  In the Hallway's Android TV app ([HallwayApp](https://github.com/AriaMoKr/HallwayApp), or
+  `vr.html?tv=emulate` in any browser) the room is walked with the TV's remote (`common/tv.js`):
+  the arrows walk and turn, OK presses what the dot is on (OK on the pot holds it, left and right
+  turn it, OK again lets go), Menu goes to the bar and its menus (up and down from control to
+  control, OK to press, Back to walk again), and Back goes back to the table, then out to the
+  door in the Hallway. The TV's page is the 10-foot view, larger and with a focus ring that shows
+  from across the room, with no Enter VR, and a shared session's invitation shows as text to open
+  on another device. It is built with three.js from the same layout
   as the breadboard view (`src/vr/`), at 1.5x real size. The wires between boards arc over them
   as in the breadboard view's **Wires between boards**: the bus (blue) at first, and the clock
   (white), control lines (purple) and data (yellow) when wanted. A panel right of the table and
@@ -146,8 +155,9 @@ that every page renders without errors, that phones get no sideways scrolling an
 at least 24 px, the sticky toolbar, parts drawer and tap-to-zoom, the shared computer, placing,
 moving, deleting and stepping in the sandbox with real clicks, taps and drags, sandbox links, the
 breadboard view's frame rate, and that the VR view builds the computer in 3D, runs it, works
-with a gamepad (a stand-in for `navigator.getGamepads`), and leads back to the Hallway when a door
-of it led there. It also runs Deque's
+with a gamepad (a stand-in for `navigator.getGamepads`) and on a TV (`?tv=emulate`, with real key
+presses as the remote sends them, and through a door of the Hallway), and leads back to the
+Hallway when a door of it led there. It also runs Deque's
 [axe-core](https://github.com/dequelabs/axe-core) on every page and the VR view, in the dark and
 the light theme, with the rules of WCAG 2.2 AA and its best practices, and fails on anything it
 finds: text contrast, target sizes, names and roles, headings, landmarks. Under emulated high
@@ -157,7 +167,8 @@ and lit signals still show their states and the open tab and current page are ma
 `npm run check:browser -- --dist`
 checks the built site instead (run `npm run build` first), plus the download link, install and
 offline use, and `-- --url <address>` checks a deployed copy the same way (such as
-`https://example.com/breadboard/` after a deploy). It needs an installed Chrome, Edge or
+`https://example.com/breadboard/` after a deploy). `-- --only <text>` runs just the checks
+whose names have it. It needs an installed Chrome, Edge or
 Chromium (or `CHROME_PATH`). The scripts start it through common's `tools/chrome.mjs`, which
 gives each run a new profile that Windows logs no failed logon for.
 

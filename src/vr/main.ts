@@ -9,6 +9,7 @@ import { buildDoorway } from './door';
 import { ACCESS_KEY, Vignette, eyeLift, loadAccess, motionQuery, reduceMotion, saveAccess, watchMotion, type Access } from 'common/access.js';
 import { Fade } from 'common/fade.js';
 import { BUTTONS, firstPad, readPad } from 'common/gamepad.js';
+import { Remote, keyOf, tvMode } from 'common/tv.js';
 import { hallwayViews, leaveUrl, readVisit, wayBack, withoutVisit } from 'common/door.js';
 import { NAV_KEY, loadNav, saveNav, type Nav } from 'common/nav.js';
 import { h } from '../ui/dom';
@@ -16,7 +17,7 @@ import { BREADBOARD_ID, DOOR, doorOf, keptDoor } from './hallway';
 import type { LinkKind } from '../breadboard/computer-layout';
 import { BOARD_T, buildComputerModel, disposeTree, type ComputerModel, type ControlHit } from './model';
 import { AimStick, PAD, TurnStick, XR_WALK, aimDir, aimOf, clampStep, clampWalk, headYaw, padLook, padWalk, standable, turnedAbout, walkDelta, wrapAngle, type Rect } from './move';
-import { ControlPanel, Tooltip } from './panel';
+import { ControlPanel, Tooltip, type PanelAction } from './panel';
 import { boardTexture, labelTexture } from './textures';
 import { startTogether, statusOf } from './together';
 import { roomFromUrl } from 'layersharedsession/room.js';
@@ -30,8 +31,9 @@ import './vr.css';
  * apart to make them bigger); the sticks walk and turn, as in the Hallway (move.ts, common's
  * nav.js, and the room's panel left of the table). On a screen you orbit with the mouse or a
  * finger and click the panel and the boards, or walk and look about with a gamepad and press A
- * at what the dot in the middle is on. "Next ▸" on the panel goes through the computer and the
- * examples.
+ * at what the dot in the middle is on. In the Hallway's TV app the remote's arrows walk and turn,
+ * OK presses what the dot is on, and Menu goes to the page's bar, whose Controls menu has the
+ * panel's buttons. "Next ▸" on the panel goes through the computer and the examples.
  */
 
 const UNIT = 0.00254 * 1.5; // one breadboard pitch (0.1") in metres, at 1.5x real size
@@ -41,6 +43,18 @@ const TITLE = document.title;
 
 const host = document.getElementById('vr-root')!;
 const statusEl = document.getElementById('vr-status')!;
+const bar = document.querySelector<HTMLElement>('.vr-bar')!;
+
+// The Hallway's Android TV app (AriaMoKr/HallwayApp; common's README, "The TV app"), or
+// ?tv=emulate in any browser: the 10-foot page (html.tv in vr.css), walked with the TV's remote
+// (common's tv.js, below), with no VR to enter, so XR is never asked for.
+const tv = tvMode();
+document.documentElement.classList.toggle('tv', tv);
+// The canvas's pixels per CSS pixel: the screen's, up to 2. The TV's page is 960 x 540 at 2; at
+// most TV_RATIO there, lowered until it holds 60 fps at 1080p with the clock running, as measured
+// on the TV with HallwayApp's tools/tv-check.mjs (not yet: 2 until then).
+const TV_RATIO = 2;
+const pixelRatio = () => Math.min(devicePixelRatio, tv ? TV_RATIO : 2);
 
 // On the dev server, vr.html?xr=emulate emulates a Quest 3 with Meta's IWER, before anything asks
 // navigator.xr (Chromium has a native one even without a headset, so it is replaced). A build
@@ -60,14 +74,14 @@ try {
   statusEl.textContent = 'This browser cannot show 3D graphics (WebGL is off or unavailable).';
   throw new Error('no WebGL');
 }
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setPixelRatio(pixelRatio());
 renderer.setSize(innerWidth, innerHeight);
 renderer.xr.enabled = true;
 // For screen readers the 3D view is one picture, named by what is on the table (setExhibit).
 renderer.domElement.setAttribute('role', 'img');
 host.appendChild(renderer.domElement);
-const vrButton = VRButton.createButton(renderer); // "Enter VR" on the page; the panel's VR button clicks it too
-document.body.appendChild(vrButton);
+const vrButton = tv ? null : VRButton.createButton(renderer); // "Enter VR" on the page; the panel's VR button clicks it too
+if (vrButton) document.body.appendChild(vrButton);
 const inVR = () => renderer.xr.isPresenting;
 // three's button offers the browser a session when it is made (for the browser's own Enter VR,
 // navigator.xr.offerSession), and its Exit VR offers another. After a session the button started,
@@ -76,14 +90,16 @@ const inVR = () => renderer.xr.isPresenting;
 // A session taken from a grant (takeGranted, below) is this page's own too.
 let clicked = false;
 let fromButton = false;
-vrButton.addEventListener('click', () => (clicked = !inVR()));
-const exitVR = () => (fromButton ? void renderer.xr.getSession()?.end() : vrButton.click());
+vrButton?.addEventListener('click', () => (clicked = !inVR()));
+const exitVR = () => (fromButton || !vrButton ? void renderer.xr.getSession()?.end() : vrButton.click());
 let vrSupported = false;
-void navigator.xr?.isSessionSupported('immersive-vr').then((ok) => {
-  vrSupported = ok;
-  dirty = true;
-}, () => {});
-document.querySelector('.vr-bar')?.append(Object.assign(document.createElement('span'), { className: 'vr-build', title: 'The commit this was built from, and its date', textContent: buildLabel() }));
+if (!tv) {
+  void navigator.xr?.isSessionSupported('immersive-vr').then((ok) => {
+    vrSupported = ok;
+    dirty = true;
+  }, () => {});
+}
+bar.append(Object.assign(document.createElement('span'), { className: 'vr-build', title: 'The commit this was built from, and its date', textContent: buildLabel() }));
 
 // ---- the way back, when a door of the Hallway led here (common's door.js, hallway.ts, door.ts) ----
 // What the door added to the address is read once and taken off it. The way back and its doorway
@@ -139,7 +155,7 @@ addEventListener('pageshow', (e) => {
 // Leaving another way (the bar's link, the address bar, closing the tab): out of the session too.
 addEventListener('pagehide', () => void together.pause());
 const wayLink = way && Object.assign(document.createElement('a'), { className: 'vr-hallway', href: way.url, title: way.title, textContent: way.label });
-if (wayLink) document.querySelector('.vr-bar')?.prepend(wayLink);
+if (wayLink) bar.prepend(wayLink);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#111318');
@@ -331,22 +347,22 @@ function toggleSession() {
     toast('You left the shared session');
   } else {
     together.start();
-    toast(inVR() ? 'Shared session started: its link is on the room’s panel' : 'Shared session started: Copy invite link brings others in');
+    toast(inVR() ? 'Shared session started: its link is on the room’s panel' : tv ? 'Shared session started: its link is on the bar, to open on another device' : 'Shared session started: Copy invite link brings others in');
   }
 }
 // On a screen, the session on the page's bar: start it, and in one, how it goes, the invitation to
-// copy, and leaving it.
-const bar = document.querySelector('.vr-bar');
+// copy, and leaving it. On the TV there is nothing to copy it to: the link shows, to type elsewhere.
 const sessionBox = Object.assign(document.createElement('span'), { className: 'vr-together' });
 const sessionState = Object.assign(document.createElement('span'), { className: 'vr-together-status' });
 const sessionButton = Object.assign(document.createElement('button'), { type: 'button' });
 const copyButton = Object.assign(document.createElement('button'), { type: 'button', textContent: 'Copy invite link' });
+const inviteText = Object.assign(document.createElement('span'), { className: 'vr-invite' });
 sessionButton.addEventListener('click', toggleSession);
 copyButton.addEventListener('click', () => {
   navigator.clipboard.writeText(together.inviteLink).then(() => toast('Invite link copied'), () => toast(`Copy this link: ${together.inviteLink}`));
 });
-sessionBox.append(sessionState, copyButton, sessionButton);
-bar?.querySelector('.vr-build')?.before(sessionBox);
+sessionBox.append(sessionState, tv ? inviteText : copyButton, sessionButton);
+bar.querySelector('.vr-build')?.before(sessionBox);
 // The same settings on the page, for a keyboard or a screen reader: a disclosure on the bar, with a
 // group of three radio buttons for motion and two checkboxes, applied and kept as they change.
 const accessBox = h(
@@ -387,20 +403,44 @@ function showWires() {
   wiresPanel.refresh();
 }
 showWires();
-const menus = [wiresBox, accessBox];
+// The exhibit's panel on the page too, for a keyboard, a screen reader and the TV's remote: its
+// buttons, named as on the panel (setExhibit), but Enter VR, which is the page's own button.
+const controlsSet = h('fieldset');
+const controlsBox = h('details', { class: 'vr-menu vr-controls' }, h('summary', null, 'Controls'), h('div', { class: 'vr-menu-body' }, controlsSet));
+let controlButtons: [PanelAction, HTMLButtonElement][] = [];
+function setControls(title: string, actions: PanelAction[]) {
+  // Next ▸ pressed here: the focus stays on it (else on the button where it was), not lost from the menu
+  const was = controlButtons.find(([, b]) => b === document.activeElement);
+  const at = was ? controlButtons.indexOf(was) : -1;
+  controlButtons = actions.map((a) => [a, h('button', { type: 'button', class: a.primary ? 'primary' : undefined, onClick: () => (a.run(), (dirty = true)) })]);
+  controlsSet.replaceChildren(h('legend', null, title), ...controlButtons.map(([, b]) => b));
+  showControls();
+  if (was) (controlButtons.find(([, b]) => b.textContent === was[1].textContent) ?? controlButtons[Math.min(at, controlButtons.length - 1)])[1].focus();
+}
+/** The buttons' words as the panel's (Run or Stop, say), changed only when they change. */
+function showControls() {
+  for (const [a, b] of controlButtons) {
+    const text = a.label();
+    if (b.textContent !== text) b.textContent = text;
+    const off = a.disabled?.() ?? false;
+    if (b.disabled !== off) b.disabled = off;
+  }
+}
+const menus = [controlsBox, wiresBox, accessBox];
 sessionBox.before(h('span', { class: 'vr-menus' }, menus));
 // A menu opens under its button, right-aligned to it, but kept within the screen's 16 px margins
-// (a phone's bar wraps and puts the buttons on the left), and scrolls if the screen is short. One
-// open at a time.
+// (a phone's bar wraps and puts the buttons on the left; the TV's are its safe margins), and
+// scrolls if the screen is short. One open at a time.
+const EDGE = tv ? { x: 48, y: 27 } : { x: 16, y: 16 };
 function placeMenu(box: HTMLDetailsElement) {
   if (!box.open) return;
   const menu = box.querySelector<HTMLElement>('.vr-menu-body')!;
   menu.style.left = '0px';
   menu.style.right = 'auto';
   const at = box.getBoundingClientRect(), size = menu.getBoundingClientRect();
-  const left = Math.max(16, Math.min(at.right - size.width, innerWidth - 16 - size.width));
+  const left = Math.max(EDGE.x, Math.min(at.right - size.width, innerWidth - EDGE.x - size.width));
   menu.style.left = `${left - at.left}px`;
-  menu.style.maxHeight = `${Math.max(120, innerHeight - size.top - 16)}px`;
+  menu.style.maxHeight = `${Math.max(120, innerHeight - size.top - EDGE.y)}px`;
 }
 for (const box of menus) {
   box.addEventListener('toggle', () => {
@@ -421,6 +461,7 @@ function showSession() {
   sessionButton.title = together.active ? 'Leave the shared session' : 'Share this room: others who open its link see you here, and in the Hallway';
   copyButton.hidden = !together.active;
   sessionState.textContent = together.active ? `Together: ${statusOf(together)}` : '';
+  inviteText.textContent = together.active ? `Invite: ${together.inviteLink.replace(/^https?:\/\//, '')}` : '';
   if (wayLink && way) wayLink.href = leaveUrl(way, together.room);
 }
 together.on('change', showSession);
@@ -505,14 +546,20 @@ function setExhibit(next: Exhibit, c: ExhibitChoice) {
   carry = new Carry(model.root, 0.5 * home, 8 * home);
   carry.grip(holding);
 
+  // The panel's buttons, also in the bar's Controls menu
+  const actions: PanelAction[] = [
+    ...next.actions,
+    { label: () => 'Next ▸', run: () => void open(order[(indexOf(choice) + 1) % order.length]) },
+    { label: () => (inVR() ? 'Put back' : 'Fit view'), run: () => (putBack(), inVR() || homeView()) },
+  ];
+  setControls(next.title, actions);
   panel = new ControlPanel(
     [
-      ...next.actions,
-      { label: () => 'Next ▸', run: () => void open(order[(indexOf(choice) + 1) % order.length]) },
-      { label: () => (inVR() ? 'Put back' : 'Fit view'), run: () => (putBack(), inVR() || homeView()) },
+      ...actions,
       // In a headset, the way out without the system menu. A click on it counts as the user's
-      // gesture that a browser wants before it starts VR, so on a screen it enters VR.
-      { label: () => (inVR() ? 'Exit VR' : 'Enter VR'), run: () => (inVR() ? exitVR() : vrButton.click()), disabled: () => !inVR() && !vrSupported },
+      // gesture that a browser wants before it starts VR, so on a screen it enters VR. The TV has
+      // no VR.
+      ...(vrButton ? [{ label: () => (inVR() ? 'Exit VR' : 'Enter VR'), run: () => (inVR() ? exitVR() : vrButton.click()), disabled: () => !inVR() && !vrSupported }] : []),
     ],
     next.title,
     buildLabel(),
@@ -536,6 +583,7 @@ function sync() {
   exhibit.show(model);
   statusDue = true;
   panel.refresh();
+  showControls();
   showTip();
 }
 
@@ -668,7 +716,7 @@ if (arrival) {
   fly = { from: [eye, target], to: homePose(), t: 0, ms: 1600, wait: 700 };
 }
 
-// ---- a gamepad on a screen (common's gamepad.js), as in the Hallway and vrlbry ----
+// ---- a gamepad on a screen (common's gamepad.js), and a TV's remote (common's tv.js), as in the Hallway ----
 // It takes over when used, and the mouse (a move or a press) takes it back. While it has the view,
 // a dot in the middle shows what A uses (a switch, button or pot on the boards, a panel's button,
 // the doorway back), larger on one, and the bar's hint is the gamepad's. The right stick looks
@@ -677,9 +725,16 @@ if (arrival) {
 // above the table to 2.4 m); A presses what the dot is on, held while A is (a pot held so turns
 // with the right stick), and B or Back flies back to the home view. In VR the controllers come
 // through the XR session instead, so the pad is not read there.
+// In the TV app (or with ?tv=emulate) the view holds the focus while walking and the dot shows all
+// the while: the arrows do what the sticks do (up and down walk, left and right turn), OK is A (a
+// pot pressed so stays held, turned with left and right, until OK again or Back), and Back is the
+// room's step back (B's, there): a pot let go, else back to the home view, else the app's (back a
+// page, to the door in the Hallway). Menu goes to the bar (the remote's card), and back.
 const hintEl = document.querySelector<HTMLElement>('.vr-hint');
 const mouseHint = hintEl?.textContent ?? '';
 const PAD_HINT = 'Gamepad: the right stick looks, the left stick walks (click it in to hurry), the triggers lower and raise you · A presses what the dot is on · B goes back to the table';
+const TV_HINT = 'Arrows: walk and turn · OK: press what the dot is on · Menu: controls and settings · Back: to the table, then out\nWith TalkBack: channel up and down walk, rewind and fast-forward turn';
+const TV_CARD_HINT = 'Up, down: from control to control · left, right: a choice · OK: choose · Back: walk again';
 const aimDot = h('div', { class: 'vr-aim', 'aria-hidden': 'true' });
 aimDot.hidden = true;
 host.after(aimDot);
@@ -691,8 +746,8 @@ let padActive = false;
 const padState = readPad({ axes: [], buttons: [] });
 let padUse = false;
 let padBack = false;
-/** A control held with A: what it does, its hit box (the dot stays on it), and how far the right stick has turned it (pots). */
-let padHold: { hold: Hold; object: THREE.Object3D; by: number } | null = null;
+/** A control held with A or OK (key): what it does, its hit box (the dot stays on it), and how far it has been turned (pots). */
+let aimHold: { hold: Hold; object: THREE.Object3D; by: number; key: boolean } | null = null;
 const middle = new THREE.Vector2(0, 0);
 const ahead = new THREE.Vector3();
 addEventListener('gamepadconnected', () => pads++);
@@ -703,13 +758,20 @@ addEventListener('gamepaddisconnected', () => {
 function setPadActive(on: boolean) {
   if (padActive === on) return;
   padActive = on;
-  aimDot.hidden = !on;
-  if (hintEl) hintEl.textContent = on ? PAD_HINT : mouseHint;
   renderer.domElement.style.cursor = '';
-  if (on) return;
-  padHold?.hold.end(false);
-  padHold = null;
-  hover(null);
+  if (!on && aimHold && !aimHold.key) {
+    aimHold.hold.end(false);
+    aimHold = null;
+  }
+  showAim();
+}
+/** Whether the dot shows: a gamepad has the view, or the TV's remote walks. */
+const aiming = () => padActive || (!!remote && !remote.inCard);
+/** The dot, and the bar's hint for what has the view. */
+function showAim() {
+  aimDot.hidden = !aiming();
+  if (hintEl) hintEl.textContent = padActive ? PAD_HINT : remote ? (remote.inCard ? TV_CARD_HINT : TV_HINT) : mouseHint;
+  if (aimDot.hidden) hover(null);
 }
 /** Every frame on a screen, while a gamepad is connected: the sticks, the triggers, A and B. */
 function padFrame(dt: number) {
@@ -718,57 +780,136 @@ function padFrame(dt: number) {
   const s = readPad(pad, padState);
   const raise = (pad.buttons[RT]?.value ?? 0) - (pad.buttons[LT]?.value ?? 0);
   const rise = Math.abs(raise) > 0.1 ? raise : 0;
-  const moving = s.moveX !== 0 || s.moveY !== 0;
-  let looking = s.lookX !== 0 || s.lookY !== 0;
-  if (moving || looking || rise || (s.use && !padUse) || (s.back && !padBack)) setPadActive(true);
+  if (s.moveX || s.moveY || s.lookX || s.lookY || rise || (s.use && !padUse) || (s.back && !padBack)) setPadActive(true);
   if (padActive) {
-    if (padHold?.hold.turn) {
-      // a pot held with A turns with the right stick (right: clockwise), and the view holds still
-      if (s.lookX) padHold.hold.turn((padHold.by += s.lookX * PAD.knob * dt));
-      looking = false;
-    }
-    if (moving || looking || rise) {
-      fly = null;
-      ahead.subVectors(controls.target, camera.position);
-      const dist = ahead.length();
-      let [yaw, pitch] = aimOf(ahead.x, ahead.y, ahead.z);
-      if (looking) [yaw, pitch] = padLook(yaw, pitch, s.lookX, s.lookY, dt, PITCH.low, PITCH.high);
-      const [dx, dz] = padWalk(s.moveX, s.moveY, yaw, (s.run ? PAD.run : PAD.walk) * dt);
-      const p = camera.position;
-      p.set(clampStep(p.x, dx, ROOM.x0, ROOM.x1), clampStep(p.y, rise * PAD.rise * dt, EYE.low, EYE.high), clampStep(p.z, dz, ROOM.z0, ROOM.z1));
-      controls.target.copy(p).addScaledVector(ahead.set(...aimDir(yaw, pitch)), dist);
-    }
+    drive(s.moveX, s.moveY, s.lookX, s.lookY, rise, s.run, dt);
     // the buttons act once a press
-    if (s.use && !padUse) padPress();
-    else if (!s.use && padUse && padHold) {
-      padHold.hold.end(true);
-      padHold = null;
+    if (s.use && !padUse) aimPress(false);
+    else if (!s.use && padUse && aimHold && !aimHold.key) letGo();
+    if (s.back && !padBack) {
+      if (remote) remote.padBack(); // on the TV as its Back
+      else flyHome();
     }
-    if (s.back && !padBack) fly = { from: [camera.position.clone(), controls.target.clone()], to: homePose(), t: 0, ms: 600, wait: 0 };
   }
   padUse = s.use;
   padBack = s.back;
 }
-/** A: what the middle of the view is on, as a press there with the mouse would. */
-function padPress() {
+/**
+ * Walks, looks and rises on a screen as a gamepad's sticks ask (and the remote's arrows), each from
+ * -1 to 1, `rise` the triggers. A pot held at the dot turns with lookX instead (right: clockwise),
+ * and the view holds still.
+ */
+function drive(moveX: number, moveY: number, lookX: number, lookY: number, rise: number, run: boolean, dt: number) {
+  if (aimHold?.hold.turn) {
+    if (lookX) aimHold.hold.turn((aimHold.by += lookX * PAD.knob * dt));
+    lookX = lookY = 0;
+  }
+  const looking = lookX !== 0 || lookY !== 0;
+  if (!moveX && !moveY && !looking && !rise) return;
+  fly = null;
+  ahead.subVectors(controls.target, camera.position);
+  const dist = ahead.length();
+  let [yaw, pitch] = aimOf(ahead.x, ahead.y, ahead.z);
+  if (looking) [yaw, pitch] = padLook(yaw, pitch, lookX, lookY, dt, PITCH.low, PITCH.high);
+  const [dx, dz] = padWalk(moveX, moveY, yaw, (run ? PAD.run : PAD.walk) * dt);
+  const p = camera.position;
+  p.set(clampStep(p.x, dx, ROOM.x0, ROOM.x1), clampStep(p.y, rise * PAD.rise * dt, EYE.low, EYE.high), clampStep(p.z, dz, ROOM.z0, ROOM.z1));
+  controls.target.copy(p).addScaledVector(ahead.set(...aimDir(yaw, pitch)), dist);
+}
+/** A or OK (key): what the middle of the view is on, as a press there with the mouse would. */
+function aimPress(key: boolean) {
+  aimHold?.hold.end(false);
+  aimHold = null;
   camera.updateMatrixWorld();
   raycaster.setFromCamera(middle, camera);
   const o = pick()?.object ?? null;
   const hit = hitOf(o);
   const hold = hit && begin(hit);
-  if (hold) padHold = { hold, object: o!, by: 0 };
+  if (hold) aimHold = { hold, object: o!, by: 0, key };
   else if (isPanel(o)) panelOf(o)!.press(o!);
   else if (isDoor(o)) go();
 }
+/** The control held at the dot let go of, as a release there. */
+function letGo() {
+  aimHold?.hold.end(true);
+  aimHold = null;
+}
 /** After the view has moved: what the dot is on (a held control stays it), larger on something A uses. */
-function padAim() {
+function pointAim() {
   camera.updateMatrixWorld();
   raycaster.setFromCamera(middle, camera);
-  const o = padHold?.object ?? pick()?.object ?? null;
+  const o = aimHold?.object ?? pick()?.object ?? null;
   if (o !== hovered) hover(o);
   else showTip(); // a pot's label follows it as it turns
   aimDot.classList.toggle('on', !!o);
   aimDot.classList.toggle('still', reduce);
+}
+const flyHome = () => (fly = { from: [camera.position.clone(), controls.target.clone()], to: homePose(), t: 0, ms: 600, wait: 0 });
+/** Whether the view is at the home view, or on its way there. */
+function atHome() {
+  const [eye, target] = homePose();
+  const [e, t] = fly ? fly.to : [camera.position, controls.target];
+  return e.distanceTo(eye) < 0.01 && t.distanceTo(target) < 0.01;
+}
+/** Back while walking, on the TV: a held pot let go, else back to the home view; false when there (the app's, then). */
+function stepBack() {
+  if (aimHold) return letGo(), true;
+  if (atHome()) return false;
+  flyHome();
+  return true;
+}
+// The remote's arrows held while walking (keyOf's names), and the remote: over the bar, the card.
+// Walking, the arrows are the room's, kept from the WebView's spatial navigation (preventDefault);
+// in the card the remote takes them first.
+const ARROWS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+const arrows = new Set<string>();
+const tapped = new Set<string>(); // let go of before a frame saw them: a frame's step still
+const remote = tv ? new Remote({ root: bar, view: renderer.domElement, use: okAtAim, step: stepBack }) : null;
+// Walking again, the bar's menus fold away from the view; Menu then comes back to the button of the
+// one left from (the remote comes back to the control last left, when it still shows).
+let inBar: Element | null = null;
+let menuLeft: HTMLDetailsElement | null = null;
+if (remote) {
+  bar.addEventListener('focusin', (e) => (inBar = e.target as Element));
+  remote.onMode = (inCard) => {
+    arrows.clear();
+    tapped.clear();
+    if (aimHold?.key) letGo();
+    if (!inCard) {
+      menuLeft = menus.find((m) => m.open && m.contains(inBar)) ?? null;
+      for (const m of menus) m.open = false;
+    } else if (menuLeft) {
+      if (!menuLeft.hidden) menuLeft.querySelector('summary')!.focus();
+      menuLeft = null;
+    }
+    showAim();
+  };
+  remote.answerApp(tv);
+  renderer.domElement.setAttribute('aria-describedby', 'vr-hint');
+  addEventListener('keydown', (e) => {
+    if (e.ctrlKey || e.altKey || e.metaKey || remote.inCard || !ARROWS.includes(keyOf(e))) return;
+    e.preventDefault();
+    arrows.add(keyOf(e));
+    tapped.add(keyOf(e));
+  });
+  addEventListener('keyup', (e) => {
+    arrows.delete(keyOf(e));
+    if (e.key === 'Enter' && aimHold?.key && !aimHold.hold.turn) letGo(); // a button pressed while OK is, a switch flipped
+  });
+  addEventListener('blur', () => (arrows.clear(), tapped.clear()));
+}
+showAim();
+/** The remote's OK, walking: A at the dot. A pot so pressed stays held until OK again (or Back). */
+function okAtAim() {
+  if (aimHold?.key) return letGo();
+  aimPress(true);
+  if (aimHold?.hold.turn) toast('Left and right turn it · OK or Back lets go');
+}
+/** Every frame on the TV: the arrows held (or pressed since the last frame), as the sticks. */
+function arrowFrame(dt: number) {
+  const held = (k: string) => +(arrows.has(k) || tapped.has(k));
+  if (arrows.size || tapped.size) drive(0, held('ArrowDown') - held('ArrowUp'), held('ArrowRight') - held('ArrowLeft'), 0, 0, false, dt);
+  tapped.clear();
 }
 
 // VR controllers: the trigger points and presses, the grip picks the boards up (both grips: pull
@@ -1033,9 +1174,10 @@ renderer.setAnimationLoop(() => {
     pointControllers();
   } else {
     if (pads && !leaving) padFrame(dt);
+    if (remote && !leaving) arrowFrame(dt);
     flyOn(now - last);
     controls.update();
-    if (padActive) padAim();
+    if (aiming()) pointAim();
   }
   const gap = now - last;
   last = now;
@@ -1070,8 +1212,10 @@ function takeGranted() {
     },
   );
 }
-if (early.breadboardXrGranted) takeGranted();
-navigator.xr?.addEventListener('sessiongranted', takeGranted);
+if (!tv) {
+  if (early.breadboardXrGranted) takeGranted();
+  navigator.xr?.addEventListener('sessiongranted', takeGranted);
+}
 
 // For the browser check (scripts/check-browser.mjs) and the console: what is on the table, the
 // computer's machine when that is it, and where on the screen a control is (the middle of its hit
@@ -1150,11 +1294,14 @@ Object.assign(window, {
       controls.update();
       return true;
     },
-    /** A gamepad on a screen: whether it has the view, whether A holds a control, and what the dot is on (a panel's button by label, a control by part, 'doorway'), else null. */
+    /** A gamepad on a screen: whether it has the view, whether A (or OK) holds a control, and what the dot is on while it shows (a panel's button by label, a control by part, 'doorway'), else null. */
     get pad() {
-      const o = padActive ? hovered : null;
-      return { active: padActive, holding: !!padHold, on: !o ? null : isPanel(o) ? panelOf(o)!.labelOf(o) : isDoor(o) ? 'doorway' : (hitOf(o)?.part ?? null) };
+      const o = aiming() ? hovered : null;
+      return { active: padActive, holding: !!aimHold, on: !o ? null : isPanel(o) ? panelOf(o)!.labelOf(o) : isDoor(o) ? 'doorway' : (hitOf(o)?.part ?? null) };
     },
+    /** The TV's page (the TV app, or ?tv=emulate), and its remote (common's tv.js), else null. */
+    tv,
+    remote,
     /**
      * The room as the Hallway's doorway shows it, as a JPEG data URL, `width` x `width` / 2
      * (scripts/make-preview.mjs writes it to public/hallway-preview.jpg). The Hallway hangs a door's
@@ -1179,7 +1326,7 @@ Object.assign(window, {
       renderer.setSize(width, width / 2, false);
       renderer.render(scene, cam);
       const jpeg = renderer.domElement.toDataURL('image/jpeg', 0.85); // read before the page composites it
-      renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+      renderer.setPixelRatio(pixelRatio());
       fitScreen();
       return jpeg;
     },

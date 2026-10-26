@@ -3,11 +3,12 @@
 // controls, the sticky toolbar, parts drawer and tap-to-zoom work, the two computer pages share
 // one machine, sandbox links round-trip, the breadboard view keeps its frame rate, and the VR
 // view builds the computer, runs it and answers the mouse on its boards' switches and buttons,
-// and axe-core finds no accessibility problem (WCAG 2.2 AA and its best practices) on any page.
+// answers a gamepad and a TV's remote (?tv=emulate), and axe-core finds no accessibility problem
+// (WCAG 2.2 AA and its best practices) on any page.
 // With --dist it checks the built site instead (run `npm run build` first), plus the download
 // link, install support and offline use; with --url <address> it checks a deployed copy the same
-// way, such as https://example.com/breadboard/. Needs Node 22+ and an installed Chrome, Edge or
-// Chromium.
+// way, such as https://example.com/breadboard/. --only <text> runs just the checks whose names
+// have it. Needs Node 22+ and an installed Chrome, Edge or Chromium.
 import { readFileSync } from 'node:fs';
 import { createServer, preview } from 'vite';
 import { launchChrome, sleep } from 'common/tools/chrome.mjs';
@@ -19,8 +20,11 @@ if (urlAt > 0 && !/^https?:\/\//.test(url ?? '')) {
   process.exit(2);
 }
 const dist = process.argv.includes('--dist') || !!url;
+const onlyAt = process.argv.indexOf('--only');
+const only = onlyAt > 0 ? (process.argv[onlyAt + 1] ?? '') : '';
 const results = [];
 async function check(name, fn) {
+  if (only && !name.includes(only)) return;
   try {
     const detail = await fn();
     results.push(true);
@@ -527,6 +531,156 @@ try {
     return `looked ${(v0.yaw - v1.yaw).toFixed(2)} rad, walked ${ahead.toFixed(2)} m, rose ${(v3.eye[1] - v2.eye[1]).toFixed(2)} m, B home; A: SW2 to manual, SW1 x2 = 2 cycles, RV1 ${Math.round(s1.hz)} -> ${Math.round(s2.hz)} Hz, Data on; the mouse took it back`;
   });
 
+  // The Hallway's TV app's page (common's tv.js, README "The TV app"), in this browser with
+  // ?tv=emulate: 960 x 540 at a pixel ratio of 2, and real key presses as the remote sends them
+  // (WebView's keys come with an empty code). hallwayTV.back() and .menu() are what the app calls
+  // on Back and Menu; in the card (the bar) Escape stands in for Back.
+  const VK = { ArrowUp: 38, ArrowDown: 40, ArrowLeft: 37, ArrowRight: 39, Enter: 13, Escape: 27 };
+  /** The remote's key `key`, held `ms`: OK is Enter, which also types a return (a button's click). */
+  const remoteKey = async (key, ms = 60) => {
+    const k = { key, code: key === 'Escape' ? 'Escape' : '', windowsVirtualKeyCode: VK[key], nativeVirtualKeyCode: VK[key] };
+    await page.send('Input.dispatchKeyEvent', { type: 'keyDown', ...k, ...(key === 'Enter' ? { text: '\r', unmodifiedText: '\r' } : {}) });
+    await sleep(ms);
+    await page.send('Input.dispatchKeyEvent', { type: 'keyUp', ...k });
+    await sleep(150);
+  };
+  const tvView = () =>
+    page.evaluate(`(() => {
+      const c = breadboardVR.camera, d = c.getWorldDirection(c.position.clone()), dot = document.querySelector('.vr-aim'), a = document.activeElement;
+      const focus = a === document.querySelector('#vr-root canvas') ? 'view' : a === document.body ? 'none' : (a.type === 'checkbox' || a.type === 'radio' ? a.closest('label').textContent : a.textContent).trim();
+      return { eye: c.position.toArray(), yaw: Math.atan2(-d.x, -d.z), pad: breadboardVR.pad, card: breadboardVR.remote.inCard, focus, dot: !dot.hidden && dot.classList.contains('on') ? 'on' : !dot.hidden ? 'shown' : 'hidden', hint: document.querySelector('.vr-hint').textContent };
+    })()`);
+  const tvAim = async (what) => {
+    assert(await page.evaluate(`breadboardVR.face(${JSON.stringify(what)})`), `no ${what}`);
+    await sleep(150);
+    const v = await tvView();
+    assert(v.pad.on === what && v.dot === 'on', `aimed at ${what}, the dot is on ${v.pad.on} (${v.dot})`);
+  };
+  /** In the card: up or down (dir) from control to control until the focus is on `text`. */
+  const focusTo = async (text, dir = 'ArrowDown') => {
+    for (let i = 0; i < 16; i++) {
+      const v = await tvView();
+      if (v.focus === text) return;
+      await remoteKey(dir);
+    }
+    throw new Error(`${dir} never came to ${text} (at ${(await tvView()).focus})`);
+  };
+
+  await check('VR view on a TV (?tv=emulate): the remote walks and turns, OK presses what the dot is on, Back steps back, and Menu reaches every panel button', async () => {
+    const before = errors.length;
+    await page.send('Emulation.setDeviceMetricsOverride', { width: 960, height: 540, deviceScaleFactor: 2, mobile: false });
+    await page.goto(`${base}vr.html?tv=emulate`, 3000);
+    const state = () => page.evaluate(`(() => { const m = breadboardVR.machine; return { ...(m && { mode: m.mode, running: m.running, cycles: m.computer.cycles, step: m.computer.step, hz: m.hz }), program: breadboardVR.exhibit.status()[0], exhibit: JSON.parse(document.body.dataset.ready).exhibit, links: breadboardVR.links, access: breadboardVR.access, open: [...document.querySelectorAll('.vr-menu')].filter((d) => d.open).map((d) => d.querySelector('summary').textContent) }; })()`);
+    const page0 = await page.evaluate(`({ tv: document.documentElement.classList.contains('tv'), vrButton: !!document.getElementById('VRButton'), panel: breadboardVR.panelLabels(), app: typeof hallwayTV?.menu + ' ' + typeof hallwayTV?.back })`);
+    assert(page0.tv && !page0.vrButton && !page0.panel.some((l) => /VR$/.test(l)) && page0.app === 'function function', `the TV's page: ${JSON.stringify(page0)}`);
+    const v0 = await tvView();
+    assert(v0.focus === 'view' && !v0.card && v0.dot !== 'hidden' && v0.hint.startsWith('Arrows'), `walking at first: ${JSON.stringify(v0)}`);
+    // up walks, left turns
+    await remoteKey('ArrowUp', 500);
+    const v1 = await tvView();
+    const [dx, dz] = [v1.eye[0] - v0.eye[0], v1.eye[2] - v0.eye[2]];
+    const ahead = -Math.sin(v0.yaw) * dx - Math.cos(v0.yaw) * dz;
+    assert(ahead > 0.3 && Math.hypot(dx, dz) < ahead * 1.05, `up walked (${dx.toFixed(2)}, ${dz.toFixed(2)}) facing ${v0.yaw.toFixed(2)}`);
+    await remoteKey('ArrowLeft', 400);
+    const v2 = await tvView();
+    assert(v2.yaw > v1.yaw + 0.5, `left turned from ${v1.yaw.toFixed(2)} to ${v2.yaw.toFixed(2)}`);
+    // Back walking: home to the table, and there it is the app's (back a page)
+    const back1 = await page.evaluate('hallwayTV.back()');
+    await sleep(900);
+    const v3 = await tvView();
+    const back2 = await page.evaluate('hallwayTV.back()');
+    assert(back1 === true && Math.hypot(...v3.eye.map((x, i) => x - v0.eye[i])) < 0.01 && back2 === false, `Back: ${back1}, to ${JSON.stringify(v3.eye)} (home ${JSON.stringify(v0.eye)}), then ${back2}`);
+    // OK on the clock's switch, twice on its button, on its pot (held: right turns it, OK lets go), and on the panel's Run
+    const s0 = await state();
+    await tvAim('clock/SW2');
+    await remoteKey('Enter');
+    const manual = await state();
+    await tvAim('clock/SW1');
+    await remoteKey('Enter');
+    await remoteKey('Enter');
+    const s1 = await state();
+    assert(s0.mode === 'auto' && manual.mode === 'manual' && s1.cycles === manual.cycles + 2, `OK on SW2 and twice on SW1: ${JSON.stringify([s0.mode, manual.mode, manual.cycles, s1.cycles])}`);
+    await tvAim('clock/RV1');
+    const v4 = await tvView();
+    await remoteKey('Enter');
+    const held = (await tvView()).pad.holding;
+    await remoteKey('ArrowRight', 400);
+    const s2 = await state();
+    const v5 = await tvView();
+    await remoteKey('Enter');
+    const v6 = await tvView();
+    assert(held && s2.hz !== s1.hz && Math.abs(v5.yaw - v4.yaw) < 1e-6 && !v6.pad.holding, `OK on RV1 and right: ${s1.hz} -> ${s2.hz} Hz, held ${held} then ${v6.pad.holding}, the view turned ${v5.yaw - v4.yaw}`);
+    await tvAim('Run');
+    await remoteKey('Enter');
+    await sleep(600);
+    const s3 = await state();
+    assert(s3.running && s3.mode === 'auto' && s3.cycles > s2.cycles, `OK on the panel's Run: ${JSON.stringify(s3)}`);
+    // Menu: into the bar, the card; Controls has the panel's buttons, each pressed with OK
+    await page.evaluate('hallwayTV.menu()');
+    const c0 = await tvView();
+    assert(c0.card && c0.focus === '← Breadboard 8-bit' && c0.dot === 'hidden' && c0.hint.startsWith('Up, down'), `Menu: ${JSON.stringify(c0)}`);
+    await focusTo('Controls');
+    await remoteKey('Enter');
+    const labels = await page.evaluate(`[...document.querySelectorAll('.vr-controls button')].map((b) => b.textContent)`);
+    const panel = await page.evaluate(`breadboardVR.panelLabels().slice(0, ${labels.length})`);
+    assert(labels.join() === panel.join() && labels.join() === 'Stop,Pulse,Step,Reset,Slower,Faster,Program ▸,Next ▸,Fit view', `the Controls menu ${labels.join()}, the panel ${panel.join()}`);
+    const did = [];
+    const press = async (label, test) => {
+      await focusTo(label);
+      const a = await state();
+      await remoteKey('Enter');
+      const b = await state();
+      assert(test(a, b), `${label}: ${JSON.stringify(a)} -> ${JSON.stringify(b)}`);
+      did.push(label);
+    };
+    await press('Stop', (a, b) => a.running && !b.running);
+    assert((await tvView()).focus === 'Run', 'Stop did not become Run');
+    await press('Pulse', (a, b) => b.cycles === a.cycles + 1);
+    await press('Step', (a, b) => b.cycles > a.cycles && b.step === 0);
+    await press('Reset', (a, b) => a.cycles > 0 && b.cycles === 0);
+    await press('Slower', (a, b) => Math.abs(b.hz - a.hz / 2) < 1e-6);
+    await press('Faster', (a, b) => Math.abs(b.hz - a.hz * 2) < 1e-6);
+    await press('Program ▸', (a, b) => b.program !== a.program);
+    await focusTo('Fit view');
+    await page.evaluate('breadboardVR.look([0.5, 1.1, 0.3], [0.2, 0.9, -0.5])');
+    await press('Fit view', () => true);
+    const home = await tvView();
+    assert(Math.hypot(...home.eye.map((x, i) => x - v0.eye[i])) < 0.01, `Fit view went to ${JSON.stringify(home.eye)}`);
+    // the Wires and Comfort menus: a checkbox ticked with OK, a choice made with right and left
+    await focusTo('Wires');
+    await remoteKey('Enter');
+    await press('Bus', (a, b) => a.links.bus && !b.links.bus);
+    await press('Bus', (a, b) => !a.links.bus && b.links.bus);
+    await focusTo('Comfort');
+    await remoteKey('Enter');
+    await focusTo('Follow the system');
+    const m0 = await state();
+    await remoteKey('ArrowRight');
+    const m1 = await state();
+    await remoteKey('ArrowLeft');
+    const m2 = await state();
+    assert(m0.access.motion === 'system' && m1.access.motion === 'reduce' && m2.access.motion === 'system' && m1.open.join() === 'Comfort', `Motion with right and left: ${[m0, m1, m2].map((m) => m.access.motion + '/' + m.open.join())}`);
+    await press('Comfort vignette while the sticks move you in VR', (a, b) => b.access.vignette !== a.access.vignette);
+    await press('Comfort vignette while the sticks move you in VR', (a, b) => b.access.vignette !== a.access.vignette);
+    // Back (Escape here) walks again, the menu folded away; Menu comes back to its button
+    await remoteKey('Escape');
+    const w = await tvView();
+    const wOpen = (await state()).open;
+    await page.evaluate('hallwayTV.menu()');
+    const c1 = await tvView();
+    assert(w.focus === 'view' && !w.card && w.dot !== 'hidden' && !wOpen.length && c1.card && c1.focus === 'Comfort', `Back: ${w.focus}, open ${wOpen.join()}; Menu again: ${c1.focus}`);
+    // Next ▸ last: the next exhibit, the focus staying on it
+    await focusTo('Controls', 'ArrowUp');
+    await remoteKey('Enter');
+    await press('Next ▸', (a, b) => a.exhibit === 'computer' && b.exhibit.startsWith('example/'));
+    const n = await tvView();
+    assert(n.card && n.focus === 'Next ▸', `after Next ▸ the focus is on ${n.focus}`);
+    await page.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
+    const errs = errors.slice(before);
+    assert(!errs.length, errs.join('\n'));
+    return `walked ${ahead.toFixed(2)} m, turned ${(v2.yaw - v1.yaw).toFixed(2)} rad, Back home then the app's; OK: SW2 to manual, SW1 x2 = 2 cycles, RV1 ${Math.round(s1.hz)} -> ${Math.round(s2.hz)} Hz, Run; Menu: ${did.join(', ')}, and Motion with right and left`;
+  });
+
   await check('VR view: a sandbox circuit opens from the sandbox and runs, buttons and all', async () => {
     const before = errors.length;
     await page.goto(`${base}#/sandbox`);
@@ -618,6 +772,77 @@ try {
     const errs = errors.slice(before);
     assert(!errs.length, errs.join('\n'));
     return `"← Hallway" on the bar and the panel and a doorway back, the address cleaned, ${r.asked ? 'a granted session asked for, ' : ''}kept on reload, taken by clicks on the panel and the doorway; none through no door`;
+  });
+
+  await check('VR view on a TV, through a door of the Hallway: the way back on the bar, OK through the doorway, and Back from the table to the door', async () => {
+    // As the door's link brings the TV app in (with ?tv=emulate added here: the app's own user
+    // agent says it there), from a page standing for the Hallway; a gamepad's B is Back too, and
+    // at the table it goes back a page, as the app's Back does when hallwayTV.back() says false.
+    const before = errors.length;
+    const back = url ? 'https://ariamokr.github.io/hallway/?from=breadboard' : `${base}#/more`;
+    if (url) {
+      page.on('Fetch.requestPaused', (p) =>
+        page.send('Fetch.fulfillRequest', { requestId: p.requestId, responseCode: 200, responseHeaders: [{ name: 'Content-Type', value: 'text/html' }], body: Buffer.from('<!doctype html><title>Hallway</title><link rel="icon" href="data:,">').toString('base64') }),
+      );
+      await page.send('Fetch.enable', { patterns: [{ urlPattern: 'https://ariamokr.github.io/hallway/*', resourceType: 'Document' }] });
+    }
+    await page.send('Emulation.setDeviceMetricsOverride', { width: 960, height: 540, deviceScaleFactor: 2, mobile: false });
+    await page.evaluate('sessionStorage.clear()');
+    await page.goto(back, 1000);
+    await page.goto(`${base}vr.html?from=hallway&back=${encodeURIComponent(back)}&dx=0.12&yaw=-8&pitch=-3&dw=1.1&dh=2.25&glow=d8543f&tv=emulate`, 3500);
+    const r = await page.evaluate(`(async () => {
+      let asked = null; // the TV's page asks for no session, granted or not
+      if (navigator.xr) {
+        asked = [];
+        navigator.xr.requestSession = (mode) => (asked.push(mode), new Promise(() => {}));
+        navigator.xr.dispatchEvent(new Event('sessiongranted'));
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      return { search: location.search, tv: breadboardVR.tv, door: !!breadboardVR.door, panel: breadboardVR.panelLabels(), asked };
+    })()`);
+    assert(r.search === '?tv=emulate' && r.tv && r.door && r.panel.includes('← Hallway') && !r.asked?.length, `arriving: ${JSON.stringify(r)}`);
+    await page.evaluate('hallwayTV.menu()');
+    const c = await tvView();
+    await remoteKey('Escape');
+    assert(c.card && c.focus === '← Hallway' && (await tvView()).focus === 'view', `Menu: the first stop is ${c.focus}`);
+    // walk on, then B (a stand-in pad) home to the table and, there, back a page: to the door
+    const v0 = await tvView();
+    await remoteKey('ArrowUp', 300);
+    const v1 = await tvView();
+    assert(Math.hypot(v1.eye[0] - v0.eye[0], v1.eye[2] - v0.eye[2]) > 0.2, `up walked from ${JSON.stringify(v0.eye)} to ${JSON.stringify(v1.eye)}`);
+    await page.evaluate(`(() => {
+      const pad = { id: 'test pad', index: 0, connected: true, mapping: 'standard', timestamp: 0, axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, touched: false, value: 0 })) };
+      window.testPad = pad;
+      Object.defineProperty(navigator, 'getGamepads', { configurable: true, value: () => [pad, null, null, null] });
+      dispatchEvent(new Event('gamepadconnected'));
+    })()`);
+    const b = async () => {
+      await page.evaluate(`testPad.buttons[1] = { pressed: true, touched: true, value: 1 }`);
+      await sleep(150);
+      // gone back a page already, the pad with it: nothing to let go of
+      await page.evaluate(`window.testPad && (testPad.buttons[1] = { pressed: false, touched: false, value: 0 })`).catch(() => {});
+      await sleep(900);
+    };
+    await b();
+    const home = await page.evaluate(`({ href: location.href, eye: breadboardVR.camera.position.toArray(), canGoBack: navigation.canGoBack })`);
+    await b();
+    const went = await page.evaluate('location.href');
+    assert(home.href.includes('vr.html') && home.canGoBack && went === back, `B: ${JSON.stringify(home)}, then B went to ${went}`);
+    // OK on the doorway goes through it
+    await page.goto(`${base}vr.html?tv=emulate`, 3000);
+    await page.evaluate(`breadboardVR.look([0, 1.55, -0.5], [0, 1.25, 1.8])`);
+    await sleep(150);
+    const d = await tvView();
+    assert(d.pad.on === 'doorway', `looking at the doorway, the dot is on ${d.pad.on}`);
+    await remoteKey('Enter');
+    await sleep(1500);
+    const through = await page.evaluate('location.href');
+    assert(through === back, `OK on the doorway went to ${through}`);
+    if (url) await page.send('Fetch.disable');
+    await page.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
+    const errs = errors.slice(before);
+    assert(!errs.length, errs.join('\n'));
+    return `"← Hallway" the bar's first stop, no session asked for; walked, B home then back a page to the door; OK through the doorway`;
   });
 
   // IWER (vr.html?xr=emulate) is on the dev server only: a build leaves it out.
@@ -784,10 +1009,18 @@ try {
     await page.evaluate(axe);
     await page.evaluate(still);
     await both('vr.html');
+    await page.evaluate(`document.querySelector('.vr-controls').open = true`);
+    await both('vr.html, Controls open');
+    await page.goto(`${base}vr.html?tv=emulate`, 3000);
+    await page.evaluate(axe);
+    await page.evaluate(still);
+    await both('vr.html?tv=emulate');
+    await page.evaluate(`hallwayTV.menu(), document.querySelector('.vr-controls').open = true`);
+    await both('vr.html?tv=emulate, in the card');
     await page.send('Emulation.setEmulatedMedia', { features: [] });
     const shown = problems.slice(0, 25);
     assert(!problems.length, shown.join('\n') + (problems.length > shown.length ? `\n… and ${problems.length - shown.length} more` : ''));
-    return `${routes.length} pages and the VR view, each dark and light`;
+    return `${routes.length} pages and the VR view (its menus, and on a TV), each dark and light`;
   });
 
   // ---- phone --------------------------------------------------------------------------
@@ -947,8 +1180,8 @@ try {
   });
 
   await check('narrow phones: no page scrolls sideways at 320 px, and the VR view’s menus stay on screen', async () => {
-    // The narrowest phones in use (320 x 568), every page; and the Comfort menu opened on a phone
-    // upright and on its side (667 x 375), where the bar wraps and puts its button on the left.
+    // The narrowest phones in use (320 x 568), every page; and the VR view's menus opened on a phone
+    // upright and on its side (667 x 375), where the bar wraps and puts their buttons on the left.
     await page.send('Emulation.setDeviceMetricsOverride', { width: 320, height: 568, deviceScaleFactor: 2, mobile: true });
     await page.goto(`${base}#/`, 300);
     await page.send('Page.reload');
@@ -958,7 +1191,7 @@ try {
     for (const [w, ht] of [[320, 568], [667, 375]]) {
       await page.send('Emulation.setDeviceMetricsOverride', { width: w, height: ht, deviceScaleFactor: 2, mobile: true });
       await page.goto(`${base}vr.html`, 2500);
-      for (const [sel, name] of [['.vr-access', 'Comfort'], ['.vr-wires', 'Wires']]) {
+      for (const [sel, name] of [['.vr-controls', 'Controls'], ['.vr-access', 'Comfort'], ['.vr-wires', 'Wires']]) {
         const m = await page.evaluate(`(async () => {
           const d = document.querySelector('${sel}');
           d.open = true;
