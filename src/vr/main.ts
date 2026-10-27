@@ -4,7 +4,7 @@ import { VRButton } from 'three/addons/webxr/VRButton.js';
 import { decodeLayout } from '../breadboard/share';
 import { buildLabel } from '../build-info';
 import { Carry, Twist } from './carry';
-import { EXAMPLE_IDS, circuitExhibit, computerExhibit, exampleExhibit, exhibitHash, parseExhibitHash, type Exhibit, type ExhibitChoice, type Hold } from './exhibits';
+import { EXAMPLE_IDS, circuitExhibit, computerExhibit, exampleExhibit, exhibitHash, parseExhibitHash, type Exhibit, type ExhibitChoice, type Hold, type Pointer } from './exhibits';
 import { buildDoorway } from './door';
 import { ACCESS_KEY, Vignette, eyeLift, loadAccess, motionQuery, reduceMotion, saveAccess, watchMotion, type Access } from 'common/access.js';
 import { Fade } from 'common/fade.js';
@@ -16,7 +16,7 @@ import { h } from '../ui/dom';
 import { BREADBOARD_ID, DOOR, doorOf, keptDoor } from './hallway';
 import type { LinkKind } from '../breadboard/computer-layout';
 import { BOARD_T, buildComputerModel, disposeTree, type ComputerModel, type ControlHit } from './model';
-import { AimStick, PAD, TurnStick, XR_WALK, aimDir, aimOf, clampStep, clampWalk, headYaw, padLook, padWalk, standable, turnedAbout, walkDelta, wrapAngle, type Rect } from './move';
+import { AimStick, KEY, PAD, TurnStick, XR_WALK, aimDir, aimOf, clampStep, clampWalk, headYaw, keyTilt, padLook, padWalk, standable, turnedAbout, walkDelta, wrapAngle, type Rect } from './move';
 import { ControlPanel, Tooltip, type PanelAction } from './panel';
 import { boardTexture, labelTexture } from './textures';
 import { startTogether, statusOf } from './together';
@@ -53,6 +53,15 @@ document.documentElement.classList.toggle('tv', tv);
 // The canvas's pixels per CSS pixel: the screen's, up to 2, on the TV as in the Hallway (the TV's
 // page is 960 x 540 at 2, so 1080p).
 const pixelRatio = () => Math.min(devicePixelRatio, 2);
+// The view's size in CSS pixels: the window's. On the TV the room is shown below the bar (vr.css,
+// --vr-top; kept with the bar's height below, which a shared session's invitation can make two
+// rows), so the bar never sits over it: at the table, the panel's title is clear of the bar's.
+const viewSize = (): [number, number] => (tv ? [host.clientWidth, host.clientHeight] : [innerWidth, innerHeight]);
+if (tv) {
+  const below = () => document.documentElement.style.setProperty('--vr-top', `${bar.offsetHeight}px`);
+  below();
+  new ResizeObserver(() => (below(), fitScreen())).observe(bar);
+}
 
 // On the dev server, vr.html?xr=emulate emulates a Quest 3 with Meta's IWER, before anything asks
 // navigator.xr (Chromium has a native one even without a headset, so it is replaced). A build
@@ -73,7 +82,7 @@ try {
   throw new Error('no WebGL');
 }
 renderer.setPixelRatio(pixelRatio());
-renderer.setSize(innerWidth, innerHeight);
+renderer.setSize(...viewSize());
 renderer.xr.enabled = true;
 // For screen readers the 3D view is one picture, named by what is on the table (setExhibit).
 renderer.domElement.setAttribute('role', 'img');
@@ -157,7 +166,7 @@ if (wayLink) bar.prepend(wayLink);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#111318');
-const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.01, 50);
+const camera = new THREE.PerspectiveCamera(50, viewSize()[0] / viewSize()[1], 0.01, 50);
 // The camera and the controllers ride on a rig: in VR it is where the visitor stands in the room
 // and which way the room is turned for them. On a screen it stays at the origin.
 const rig = new THREE.Group();
@@ -175,16 +184,24 @@ controls.maxDistance = 4;
 controls.maxPolarAngle = Math.PI * 0.49; // stay above the floor
 /** A wider lens on tall (portrait) screens, so less of the table is cut off at the sides. */
 const fitLens = () => {
-  camera.aspect = innerWidth / innerHeight;
+  const [w, h] = viewSize();
+  camera.aspect = w / h;
   camera.fov = camera.aspect < 1 ? 66 : 50;
   camera.updateProjectionMatrix();
 };
+/**
+ * On the TV the view is below the bar, and the hint and the status cover its foot: home is 10%
+ * further back and 6.5 cm lower, so the panel's top is at the top of the view and the computer's
+ * display above the hint.
+ */
+const TV_HOME = { back: 1.1, down: 0.065 };
 /** The home view's eye and target, pulled back on narrow screens until the table fits across as on a 16:10 one. */
 function homePose(): [THREE.Vector3, THREE.Vector3] {
   fitLens();
   const want = Math.tan(THREE.MathUtils.degToRad(25)) * 1.6 * 0.85;
   const shown = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.aspect;
-  return [HOME.target.clone().addScaledVector(HOME.eye.clone().sub(HOME.target), Math.max(1, want / shown)), HOME.target.clone()];
+  const target = HOME.target.clone().setY(HOME.target.y - (tv ? TV_HOME.down : 0));
+  return [target.clone().addScaledVector(HOME.eye.clone().sub(HOME.target), Math.max(1, want / shown) * (tv ? TV_HOME.back : 1)), target];
 }
 function homeView() {
   const [eye, target] = homePose();
@@ -612,14 +629,25 @@ const tooltip = new Tooltip();
 scene.add(tooltip.sprite);
 let hovered: THREE.Object3D | null = null;
 const box = new THREE.Box3();
+const lift = new THREE.Vector3();
 function showTip() {
   const hit = hitOf(hovered);
   if (!hit || !exhibit) return tooltip.hide();
   box.setFromObject(hovered!);
   const at = box.getCenter(new THREE.Vector3()).setY(box.max.y + 0.004);
-  const ex = exhibit;
-  tooltip.show(ex.describe(hit, inVR()), at, hovered, () => ex.labels?.(hit, inVR()) ?? []);
+  if (aiming()) {
+    // over the dot rather than under it, and as tall on the screen near or far (TIP, CSS pixels)
+    const far = camera.position.distanceTo(at);
+    const px = (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * far) / viewSize()[1]; // metres a pixel, there
+    at.copy(camera.position).addScaledVector(camera.getWorldDirection(lift), far);
+    at.addScaledVector(lift.set(0, 1, 0).applyQuaternion(camera.quaternion), (REACH + 4) * px);
+    tooltip.size(TIP * px);
+  } else tooltip.size();
+  const ex = exhibit, by = pointer();
+  tooltip.show(ex.describe(hit, by), at, hovered, () => ex.labels?.(hit, by) ?? []);
 }
+/** What has the controls now, which a pot's label says how to turn. */
+const pointer = (): Pointer => (inVR() ? 'vr' : padActive ? 'pad' : remote ? 'remote' : 'screen');
 function hover(o: THREE.Object3D | null) {
   hovered = o;
   panel?.setHover(o);
@@ -717,17 +745,19 @@ if (arrival) {
 // ---- a gamepad on a screen (common's gamepad.js), and a TV's remote (common's tv.js), as in the Hallway ----
 // It takes over when used, and the mouse (a move or a press) takes it back. While it has the view,
 // a dot in the middle shows what A uses (a switch, button or pot on the boards, a panel's button,
-// the doorway back), larger on one, and the bar's hint is the gamepad's. The right stick looks
-// (down to nearly straight down, up to level, as the orbit can follow), the left one walks the
-// way the view faces (clicked in, it hurries), the triggers lower and raise the eye (from just
-// above the table to 2.4 m); A presses what the dot is on, held while A is (a pot held so turns
-// with the right stick), and B or Back flies back to the home view. In VR the controllers come
-// through the XR session instead, so the pad is not read there.
+// the doorway back), larger on one (or on the nearest one just beside it, lit as if it were on it:
+// aimed()), with a control's label over the dot, and the bar's hint is the gamepad's. The right
+// stick looks (down to nearly straight down, up to level, as the orbit can follow), the left one
+// walks the way the view faces (clicked in, it hurries), the triggers lower and raise the eye (from
+// just above the table to 2.4 m); A presses what the dot is on, held while A is (a pot held so
+// turns with the right stick), and B or Back flies back to the home view. In VR the controllers
+// come through the XR session instead, so the pad is not read there.
 // In the TV app (or with ?tv=emulate) the view holds the focus while walking and the dot shows all
-// the while: the arrows do what the sticks do (up and down walk, left and right turn), OK is A (a
-// pot pressed so stays held, turned with left and right, until OK again or Back), and Back is the
-// room's step back (B's, there): a pot let go, else back to the home view, else the app's (back a
-// page, to the door in the Hallway). Menu goes to the bar (the remote's card), and back.
+// the while: the arrows do what the sticks do (up and down walk, left and right turn; a tap a
+// little, a key held faster and faster: move.ts's KEY), OK is A (a pot pressed so stays held,
+// turned with left and right, until OK again or Back), and Back is the room's step back (B's,
+// there): a pot let go, else back to the home view, else the app's (back a page, to the door in
+// the Hallway). Menu goes to the bar (the remote's card), and back.
 const hintEl = document.querySelector<HTMLElement>('.vr-hint');
 const mouseHint = hintEl?.textContent ?? '';
 const PAD_HINT = 'Gamepad: the right stick looks, the left stick walks (click it in to hurry), the triggers lower and raise you · A presses what the dot is on · B goes back to the table';
@@ -770,6 +800,7 @@ function showAim() {
   aimDot.hidden = !aiming();
   if (hintEl) hintEl.textContent = padActive ? PAD_HINT : remote ? (remote.inCard ? TV_CARD_HINT : TV_HINT) : mouseHint;
   if (aimDot.hidden) hover(null);
+  else showTip(); // a pot's label: how the pad or the remote turns it
 }
 /** Every frame on a screen, while a gamepad is connected: the sticks, the triggers, A and B. */
 function padFrame(dt: number) {
@@ -793,9 +824,9 @@ function padFrame(dt: number) {
   padBack = s.back;
 }
 /**
- * Walks, looks and rises on a screen as a gamepad's sticks ask (and the remote's arrows), each from
- * -1 to 1, `rise` the triggers. A pot held at the dot turns with lookX instead (right: clockwise),
- * and the view holds still.
+ * Walks, looks and rises on a screen as a gamepad's sticks ask, each from -1 to 1 for `dt` seconds,
+ * `rise` the triggers (the remote's arrows: how far, in seconds at full tilt, with `dt` 1). A pot
+ * held at the dot turns with lookX instead (right: clockwise), and the view holds still.
  */
 function drive(moveX: number, moveY: number, lookX: number, lookY: number, rise: number, run: boolean, dt: number) {
   if (aimHold?.hold.turn) {
@@ -814,13 +845,50 @@ function drive(moveX: number, moveY: number, lookX: number, lookY: number, rise:
   p.set(clampStep(p.x, dx, ROOM.x0, ROOM.x1), clampStep(p.y, rise * PAD.rise * dt, EYE.low, EYE.high), clampStep(p.z, dz, ROOM.z0, ROOM.z1));
   controls.target.copy(p).addScaledVector(ahead.set(...aimDir(yaw, pitch)), dist);
 }
-/** A or OK (key): what the middle of the view is on, as a press there with the mouse would. */
+/**
+ * What the dot is on: what the middle of the view is on, else the nearest thing A uses within
+ * REACH of it (CSS pixels, a little more than the dot's radius in vr.css), when nothing is in front
+ * of that, so a small part (a switch, a pot) is easy to land on.
+ */
+const REACH = tv ? 18 : 13;
+/** How tall a control's label is over the dot (showTip), in CSS pixels. */
+const TIP = tv ? 30 : 24;
+const aimBox = new THREE.Box3();
+const corner = new THREE.Vector3();
+const toward = new THREE.Vector2();
+function aimed(): THREE.Object3D | null {
+  camera.updateMatrixWorld();
+  raycaster.setFromCamera(middle, camera);
+  const o = pick()?.object;
+  if (o) return o;
+  const [w, h] = viewSize();
+  const near: [number, THREE.Object3D][] = [];
+  for (const t of targets) {
+    // how far from the middle its box's outline on the screen is
+    aimBox.setFromObject(t);
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity, out = false;
+    for (let i = 0; i < 8 && !out; i++) {
+      corner.set(i & 1 ? aimBox.max.x : aimBox.min.x, i & 2 ? aimBox.max.y : aimBox.min.y, i & 4 ? aimBox.max.z : aimBox.min.z).project(camera);
+      out = Math.abs(corner.z) > 1; // behind the eye or past the far plane
+      x0 = Math.min(x0, (corner.x * w) / 2), x1 = Math.max(x1, (corner.x * w) / 2);
+      y0 = Math.min(y0, (corner.y * h) / 2), y1 = Math.max(y1, (corner.y * h) / 2);
+    }
+    const d = Math.hypot(Math.max(x0, -x1, 0), Math.max(y0, -y1, 0));
+    if (!out && d <= REACH) near.push([d, t]);
+  }
+  near.sort((a, b) => a[0] - b[0]);
+  for (const [, t] of near) {
+    aimBox.setFromObject(t).getCenter(corner).project(camera);
+    raycaster.setFromCamera(toward.set(corner.x, corner.y), camera);
+    if (pick()?.object === t) return t;
+  }
+  return null;
+}
+/** A or OK (key): what the dot is on, as a press there with the mouse would. */
 function aimPress(key: boolean) {
   aimHold?.hold.end(false);
   aimHold = null;
-  camera.updateMatrixWorld();
-  raycaster.setFromCamera(middle, camera);
-  const o = pick()?.object ?? null;
+  const o = aimed();
   const hit = hitOf(o);
   const hold = hit && begin(hit);
   if (hold) aimHold = { hold, object: o!, by: 0, key };
@@ -834,9 +902,7 @@ function letGo() {
 }
 /** After the view has moved: what the dot is on (a held control stays it), larger on something A uses. */
 function pointAim() {
-  camera.updateMatrixWorld();
-  raycaster.setFromCamera(middle, camera);
-  const o = aimHold?.object ?? pick()?.object ?? null;
+  const o = aimHold?.object ?? aimed();
   if (o !== hovered) hover(o);
   else showTip(); // a pot's label follows it as it turns
   aimDot.classList.toggle('on', !!o);
@@ -856,12 +922,13 @@ function stepBack() {
   flyHome();
   return true;
 }
-// The remote's arrows held while walking (keyOf's names), and the remote: over the bar, the card.
-// Walking, the arrows are the room's, kept from the WebView's spatial navigation (preventDefault);
-// in the card the remote takes them first.
+// The remote's arrows pressed while walking (keyOf's names), and the remote: over the bar, the
+// card. Walking, the arrows are the room's, kept from the WebView's spatial navigation
+// (preventDefault); in the card the remote takes them first. Each arrow: when it went down, when it
+// came up (its step still to take, if no frame has seen it since), and how far it has moved the
+// view so far (keyTilt: a tap a little, a key held faster and faster).
 const ARROWS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
-const arrows = new Set<string>();
-const tapped = new Set<string>(); // let go of before a frame saw them: a frame's step still
+const arrows = new Map<string, { down: number; up: number; moved: number }>();
 const remote = tv ? new Remote({ root: bar, view: renderer.domElement, use: okAtAim, step: stepBack }) : null;
 // Walking again, the bar's menus fold away from the view; Menu then comes back to the button of the
 // one left from (the remote comes back to the control last left, when it still shows).
@@ -871,7 +938,6 @@ if (remote) {
   bar.addEventListener('focusin', (e) => (inBar = e.target as Element));
   remote.onMode = (inCard) => {
     arrows.clear();
-    tapped.clear();
     if (aimHold?.key) letGo();
     if (!inCard) {
       menuLeft = menus.find((m) => m.open && m.contains(inBar)) ?? null;
@@ -887,14 +953,15 @@ if (remote) {
   addEventListener('keydown', (e) => {
     if (e.ctrlKey || e.altKey || e.metaKey || remote.inCard || !ARROWS.includes(keyOf(e))) return;
     e.preventDefault();
-    arrows.add(keyOf(e));
-    tapped.add(keyOf(e));
+    const a = arrows.get(keyOf(e));
+    if (!a || a.up) arrows.set(keyOf(e), { down: performance.now(), up: 0, moved: 0 }); // not the key's repeats
   });
   addEventListener('keyup', (e) => {
-    arrows.delete(keyOf(e));
+    const a = arrows.get(keyOf(e));
+    if (a && !a.up) a.up = performance.now();
     if (e.key === 'Enter' && aimHold?.key && !aimHold.hold.turn) letGo(); // a button pressed while OK is, a switch flipped
   });
-  addEventListener('blur', () => (arrows.clear(), tapped.clear()));
+  addEventListener('blur', () => arrows.clear());
 }
 showAim();
 /** The remote's OK, walking: A at the dot. A pot so pressed stays held until OK again (or Back). */
@@ -903,11 +970,20 @@ function okAtAim() {
   aimPress(true);
   if (aimHold?.hold.turn) toast('Left and right turn it · OK or Back lets go');
 }
-/** Every frame on the TV: the arrows held (or pressed since the last frame), as the sticks. */
-function arrowFrame(dt: number) {
-  const held = (k: string) => +(arrows.has(k) || tapped.has(k));
-  if (arrows.size || tapped.size) drive(0, held('ArrowDown') - held('ArrowUp'), held('ArrowRight') - held('ArrowLeft'), 0, 0, false, dt);
-  tapped.clear();
+/** Every frame on the TV: how far the arrows held (or pressed since the last frame) move the view now, as the sticks. */
+function arrowFrame(now: number) {
+  if (!arrows.size) return;
+  const by = (key: string, tap: number) => {
+    const a = arrows.get(key);
+    if (!a) return 0;
+    const moved = keyTilt(((a.up || now) - a.down) / 1000, tap);
+    const step = moved - a.moved;
+    a.moved = moved;
+    if (a.up) arrows.delete(key);
+    return step;
+  };
+  const turn = aimHold?.hold.turn ? KEY.knob : KEY.turn;
+  drive(0, by('ArrowDown', KEY.walk) - by('ArrowUp', KEY.walk), by('ArrowRight', turn) - by('ArrowLeft', turn), 0, 0, false, 1);
 }
 
 // VR controllers: the trigger points and presses, the grip picks the boards up (both grips: pull
@@ -1094,7 +1170,7 @@ function debugTwist(ctrl: THREE.Object3D, held: Held) {
   debugAt = performance.now();
   const e = new THREE.Euler().setFromQuaternion(ctrl.quaternion, 'YXZ');
   const deg = (r: number) => Math.round(THREE.MathUtils.radToDeg(r));
-  debugLog('twist', { turned: +held.twist.turned.toFixed(3), pitch: deg(e.x), yaw: deg(e.y), roll: deg(e.z), shows: exhibit?.describe(held.object.userData as ControlHit, true) });
+  debugLog('twist', { turned: +held.twist.turned.toFixed(3), pitch: deg(e.x), yaw: deg(e.y), roll: deg(e.z), shows: exhibit?.describe(held.object.userData as ControlHit, 'vr') });
 }
 // Once a second in VR: how evenly the frames came (slow: more than 1.5 frames apart), our CPU
 // time per frame (the simulation, pointing, handing the frame to WebGL), and how many times the
@@ -1145,7 +1221,7 @@ renderer.xr.addEventListener('sessionend', () => {
 function fitScreen() {
   if (renderer.xr.isPresenting) return; // the headset sets the size; done again when VR ends
   fitLens();
-  renderer.setSize(innerWidth, innerHeight);
+  renderer.setSize(...viewSize());
 }
 addEventListener('resize', fitScreen);
 addEventListener('hashchange', () => void open(parseExhibitHash(location.hash)));
@@ -1172,7 +1248,7 @@ renderer.setAnimationLoop(() => {
     pointControllers();
   } else {
     if (pads && !leaving) padFrame(dt);
-    if (remote && !leaving) arrowFrame(dt);
+    if (remote && !leaving) arrowFrame(now);
     flyOn(now - last);
     controls.update();
     if (aiming()) pointAim();
@@ -1276,6 +1352,17 @@ Object.assign(window, {
     screenPoint(part: string, bit?: number) {
       const o = control(part, bit);
       return o ? onScreen(o, (b) => b.getCenter(new THREE.Vector3()).setY(b.max.y)) : null;
+    },
+    /** Where on the screen the exhibit's panel is: the outline of its box, or null. */
+    panelBox() {
+      const g = panel?.group;
+      if (!g) return null;
+      const ps = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => onScreen(g, (b) => new THREE.Vector3(i & 1 ? b.max.x : b.min.x, i & 2 ? b.max.y : b.min.y, i & 4 ? b.max.z : b.min.z)));
+      return { left: Math.min(...ps.map((p) => p.x)), right: Math.max(...ps.map((p) => p.x)), top: Math.min(...ps.map((p) => p.y)), bottom: Math.max(...ps.map((p) => p.y)) };
+    },
+    /** What the label over a control says while it shows, else null. */
+    get tip() {
+      return tooltip.shown;
     },
     /** Where on the screen the panel's button with this label is (its middle). */
     panelPoint(label: string) {

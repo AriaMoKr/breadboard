@@ -58,8 +58,9 @@ html, body { margin: 0; height: 100%; background: #111318; color: #e6e8ee; font-
    seen from across a room, as the Hallway's. Larger text and targets, focus rings that show from the
    sofa on any background (a choice's ringed round its label), the TV's safe margins (48 px at the
    sides, 27 at the top and bottom), and the hint at the foot of the screen, over the status. The
-   view itself holds the focus while walking, which the dot and the hint show rather than a ring
-   round the screen. */
+   room is shown below the bar (--vr-top, its height, kept by main.ts), so the bar's title never
+   sits over the panel's, and the dot is in its middle. The view itself holds the focus while
+   walking, which the dot and the hint show rather than a ring round the screen. */
 html.tv, html.tv body { font-size: 18px; }
 html.tv :focus-visible { outline: 4px solid #ffd98a !important; outline-offset: 3px; box-shadow: 0 0 0 9px rgba(0, 0, 0, 0.65); }
 html.tv #vr-root canvas:focus-visible { outline: none !important; box-shadow: none; }
@@ -82,4 +83,5 @@ html.tv .vr-hint {
 }
 html.tv .vr-status { left: 48px; bottom: 100px; max-width: calc(100vw - 96px); font-size: 16px; }
 html.tv .vr-status:not(:empty) { padding: 6px 12px; color: #c4cad6; background: rgba(17, 19, 24, 0.88); border-radius: 10px; }
-html.tv .vr-aim { width: 26px; height: 26px; margin: -13px 0 0 -13px; border-width: 3px; }
+html.tv #vr-root, html.tv #vr-root canvas { top: var(--vr-top, 0px); height: auto; }
+html.tv .vr-aim { top: calc(50% + var(--vr-top, 0px) / 2); width: 26px; height: 26px; margin: -13px 0 0 -13px; border-width: 3px; }

@@ -111,6 +111,21 @@ export class AimStick {
  */
 export const PAD = { walk: 1.2, run: 2.4, rise: 0.8, turn: 2.4, pitch: 1.6, knob: 0.5 };
 
+/**
+ * A TV remote's arrows, which do what the sticks do (main.ts): a tap moves a little, so the dot
+ * can be put on a small part, and a key held goes on slowly, then faster, at full tilt (PAD's
+ * speeds) after `full` seconds, so the long way round is still quick. The taps, in seconds at full
+ * tilt: a turn of 1.5°, a step of 2 cm, and 2% of a held pot's travel.
+ */
+export const KEY = { full: 0.8, turn: (1.5 * Math.PI) / 180 / PAD.turn, walk: 0.02 / PAD.walk, knob: 0.02 / PAD.knob };
+
+/** How far a key held `t` seconds has moved, in seconds at full tilt: `tap` at once, then speeding up (as t²) to full tilt at KEY.full. */
+export function keyTilt(t: number, tap: number): number {
+  const f = KEY.full;
+  t = Math.max(0, t);
+  return tap + (t < f ? t ** 3 / (3 * f * f) : f / 3 + (t - f));
+}
+
 /** A view's yaw (0 facing -z, + to the left) and pitch (+ up), from the direction it looks in. */
 export function aimOf(dx: number, dy: number, dz: number): [number, number] {
   return [Math.atan2(-dx, -dz), Math.atan2(dy, Math.hypot(dx, dz))];

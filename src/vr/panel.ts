@@ -177,17 +177,22 @@ export class Tooltip {
   /** Redraws (each a texture upload), for the debug log. */
   draws = 0;
 
-  /** `height` in metres; the box fits the text (see `show`). */
-  constructor(height = 0.024) {
-    this.canvas.width = 1024;
+  /** `height` in metres; the box fits the text (see `show`), up to a pot's on the TV (exhibits.ts). */
+  constructor(private height = 0.024) {
+    this.canvas.width = 1536;
     this.canvas.height = 80;
     this.texture = new THREE.CanvasTexture(this.canvas);
     this.texture.colorSpace = THREE.SRGBColorSpace;
     this.sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.texture, depthTest: false, transparent: true }));
     this.sprite.center.set(0.5, 0); // anchored at its bottom centre
-    this.sprite.scale.set((height * this.canvas.width) / this.canvas.height, height, 1);
+    this.size();
     this.sprite.renderOrder = 10;
     this.sprite.visible = false;
+  }
+
+  /** How tall it is, in metres: `height`, else as made. */
+  size(height = this.height) {
+    this.sprite.scale.set((height * this.canvas.width) / this.canvas.height, height, 1);
   }
 
   /**
@@ -221,5 +226,10 @@ export class Tooltip {
 
   hide() {
     this.sprite.visible = false;
+  }
+
+  /** What it says while it shows, else null. */
+  get shown() {
+    return this.sprite.visible ? this.text : null;
   }
 }

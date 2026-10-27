@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 // (The VR movement choice, hallway.nav, is AriaMoKr/common's nav.js, tested there.)
-import { AimStick, PAD, SNAP, TurnStick, aimDir, aimOf, clampStep, clampWalk, headYaw, padLook, padWalk, standable, turnedAbout, walkDelta, wrapAngle, type Rect } from '../src/vr/move';
+import { AimStick, KEY, PAD, SNAP, TurnStick, aimDir, aimOf, clampStep, clampWalk, headYaw, keyTilt, padLook, padWalk, standable, turnedAbout, walkDelta, wrapAngle, type Rect } from '../src/vr/move';
 
 const ROOM: Rect = { x0: -6, x1: 6, z0: -6, z1: 6 };
 const TABLE: Rect = { x0: -0.7, x1: 0.7, z0: -1.4, z1: -0.1 };
@@ -88,5 +88,24 @@ describe('a gamepad on a screen', () => {
     expect(clampStep(1.5, 0.2, 0, 1.2)).toBe(1.5); // already above: no higher
     expect(clampStep(1.5, -0.2, 0, 1.2)).toBe(1.3); // but back down freely
     expect(clampStep(-0.3, -0.1, 0, 1.2)).toBe(-0.3);
+  });
+});
+
+describe('a TV remote’s arrows', () => {
+  const deg = (s: number) => (s * PAD.turn * 180) / Math.PI;
+  it('turns 1.5° a tap, walks 2 cm and turns a held pot 2% of its travel', () => {
+    expect(deg(keyTilt(0, KEY.turn))).toBeCloseTo(1.5);
+    expect(keyTilt(0, KEY.walk) * PAD.walk).toBeCloseTo(0.02);
+    expect(keyTilt(0, KEY.knob) * PAD.knob).toBeCloseTo(0.02);
+    expect(deg(keyTilt(0.15, KEY.turn))).toBeLessThan(2); // a quick press is still about a tap
+  });
+  it('goes on slowly while a key is held, then faster, at full tilt after KEY.full', () => {
+    const speed = (t: number) => (keyTilt(t + 0.001, 0) - keyTilt(t, 0)) / 0.001;
+    expect(speed(0.1)).toBeLessThan(0.05);
+    expect(speed(0.4)).toBeGreaterThan(speed(0.2));
+    expect(speed(KEY.full)).toBeCloseTo(1, 2);
+    expect(speed(3)).toBeCloseTo(1, 5);
+    expect(deg(keyTilt(1, KEY.turn))).toBeGreaterThan(45); // the long way round, still quick
+    expect(keyTilt(-0.01, KEY.turn)).toBe(KEY.turn); // a frame's clock just before the key's
   });
 });

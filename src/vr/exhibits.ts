@@ -30,14 +30,17 @@ export interface Exhibit {
   status(): string[];
   /** A pointer pressed on a control (a hit box of the model). */
   begin(hit: ControlHit): Hold | null;
-  /** What a control is and how it is set, for the label over it. */
-  describe(hit: ControlHit, inVR: boolean): string;
+  /** What a control is and how it is set, for the label over it (a pot's says how `by` turns it). */
+  describe(hit: ControlHit, by: Pointer): string;
   /**
    * The labels `describe` can give a control as it is set (a pot's values), so the label over it
    * starts as wide as the widest instead of growing as the knob turns.
    */
-  labels?(hit: ControlHit, inVR: boolean): string[];
+  labels?(hit: ControlHit, by: Pointer): string[];
 }
+
+/** What presses the controls: the mouse or a finger, a controller in VR, a gamepad's A at the dot, or a TV's remote's OK there. */
+export type Pointer = 'screen' | 'vr' | 'pad' | 'remote';
 
 /** What pressing a control does until it is let go: `end(click)` with click = not dragged. */
 export interface Hold {
@@ -166,7 +169,7 @@ export function computerExhibit(): Exhibit & { machine: Machine } {
       }
       return null;
     },
-    describe(hit, inVR) {
+    describe(hit, by) {
       const ctl = live[hit.part];
       const name = nameOf(hit);
       switch (ctl?.kind) {
@@ -177,21 +180,28 @@ export function computerExhibit(): Exhibit & { machine: Machine } {
         case 'dip':
           return dipText(name, hit.bit ?? 0, ctl.get(machine));
         case 'pot':
-          return potText(name, inVR, hit.part === 'clock/RV1' ? fmtHz(machine.hz) : potValue(hit, ctl.get(machine)));
+          return potText(name, by, hit.part === 'clock/RV1' ? fmtHz(machine.hz) : potValue(hit, ctl.get(machine)));
         case 'button':
           return `${name} · push`;
       }
       return name;
     },
-    labels(hit, inVR) {
+    labels(hit, by) {
       if (live[hit.part]?.kind !== 'pot') return [];
-      return Array.from({ length: 21 }, (_, i) => potText(nameOf(hit), inVR, potValue(hit, i / 20)));
+      return Array.from({ length: 21 }, (_, i) => potText(nameOf(hit), by, potValue(hit, i / 20)));
     },
   };
 }
 
+/** How each pointer turns a pot (main.ts): a gamepad's A or a remote's OK at the dot holds it, and the right stick or the arrows turn it. */
+const TURN: Record<Pointer, string> = {
+  screen: 'drag up or down',
+  vr: 'hold the trigger and twist',
+  pad: 'hold A, then the right stick left or right',
+  remote: 'OK to hold, then ← and →, OK or Back to let go',
+};
 // the value last: as it changes, nothing else moves
-const potText = (name: string, inVR: boolean, value: string) => `${name} · ${inVR ? 'hold the trigger and twist' : 'drag up or down'} · ${value}`;
+const potText = (name: string, by: Pointer, value: string) => `${name} · ${TURN[by]} · ${value}`;
 /** A pot's value as its label shows it, at `t` of its travel. */
 const potValue = (hit: ControlHit, t: number) => (hit.part === 'clock/RV1' ? fmtHz(speedDial.hz(t)) : `${Math.round(t * 100)}%`);
 

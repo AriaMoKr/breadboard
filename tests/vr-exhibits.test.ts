@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { EXAMPLES } from '../src/breadboard/examples';
 import { hzFromPot } from '../src/breadboard/boards/clock.board';
-import { circuitExhibit, computerExhibit, exampleExhibit, exhibitHash, parseExhibitHash, speedDial, type Exhibit } from '../src/vr/exhibits';
+import { circuitExhibit, computerExhibit, exampleExhibit, exhibitHash, parseExhibitHash, speedDial, type Exhibit, type Pointer } from '../src/vr/exhibits';
 import { buildComputerModel, type ComputerModel, type ControlHit } from '../src/vr/model';
 
 /** A press and release, as a click on a control. */
@@ -51,7 +51,7 @@ describe('a sandbox circuit in VR', () => {
     const e = exampleExhibit('register') as ReturnType<typeof circuitExhibit>;
     click(e, { part: 'SW1', bit: 0 });
     click(e, { part: 'SW1', bit: 2 });
-    expect(e.describe({ part: 'SW1', bit: 2 }, false)).toBe('D0-D3 switch 3: ON');
+    expect(e.describe({ part: 'SW1', bit: 2 }, 'screen')).toBe('D0-D3 switch 3: ON');
     const lit = () => [1, 2, 3, 4].map((k) => e.sim().ledLit(`D${k}`));
     const before = lit();
     click(e, { part: 'SW2' }); // LOAD
@@ -92,10 +92,10 @@ describe('the computer in VR', () => {
   it('works its board controls like the breadboard view', () => {
     const e = computerExhibit();
     expect(e.machine.mode).toBe('auto');
-    expect(e.describe({ part: 'clock/SW2' }, false)).toBe('SW2 auto/manual: auto');
+    expect(e.describe({ part: 'clock/SW2' }, 'screen')).toBe('SW2 auto/manual: auto');
     click(e, { part: 'clock/SW2' });
     expect(e.machine.mode).toBe('manual');
-    expect(e.describe({ part: 'clock/SW2' }, false)).toBe('SW2 auto/manual: manual');
+    expect(e.describe({ part: 'clock/SW2' }, 'screen')).toBe('SW2 auto/manual: manual');
     const c0 = e.machine.computer.cycles;
     click(e, { part: 'clock/SW1' });
     click(e, { part: 'clock/SW1' });
@@ -105,21 +105,31 @@ describe('the computer in VR', () => {
     expect(e.machine.computer.programMode).toBe(false);
     click(e, { part: 'mar/SW6' });
     expect(e.machine.computer.programMode).toBe(true);
-    expect(e.describe({ part: 'mar/SW6' }, false)).toBe('SW6 program/run: program');
-    expect(e.describe({ part: 'clock/RV1' }, true)).toMatch(/^RV1 speed · hold the trigger and twist · .* Hz$/);
+    expect(e.describe({ part: 'mar/SW6' }, 'screen')).toBe('SW6 program/run: program');
+    expect(e.describe({ part: 'clock/RV1' }, 'vr')).toMatch(/^RV1 speed · hold the trigger and twist · .* Hz$/);
+  });
+
+  it('says on a pot how what has the controls turns it: the mouse, a controller, a gamepad, a TV remote', () => {
+    const e = computerExhibit();
+    const how = (by: Pointer) => e.describe({ part: 'clock/RV1' }, by).split(' · ')[1];
+    expect(how('screen')).toBe('drag up or down');
+    expect(how('vr')).toBe('hold the trigger and twist');
+    expect(how('pad')).toBe('hold A, then the right stick left or right');
+    expect(how('remote')).toBe('OK to hold, then ← and →, OK or Back to let go');
+    expect(e.labels!({ part: 'clock/RV1' }, 'remote').every((l) => l.includes('OK to hold'))).toBe(true);
   });
 
   it('names the labels a pot can show, so the one over it is as wide as the widest from the start', () => {
     const e = computerExhibit();
-    const labels = e.labels!({ part: 'clock/RV1' }, true);
+    const labels = e.labels!({ part: 'clock/RV1' }, 'vr');
     expect(labels).toContain('RV1 speed · hold the trigger and twist · 480 Hz');
     expect(labels).toContain('RV1 speed · hold the trigger and twist · 0.72 Hz');
     const longest = Math.max(...labels.map((l) => l.length));
     for (let t = 0; t <= 1; t += 0.01) {
       speedDial.set(e.machine, t);
-      expect(e.describe({ part: 'clock/RV1' }, true).length).toBeLessThanOrEqual(longest);
+      expect(e.describe({ part: 'clock/RV1' }, 'vr').length).toBeLessThanOrEqual(longest);
     }
-    expect(e.labels!({ part: 'clock/SW2' }, true)).toEqual([]); // only a pot's label changes while it's held
+    expect(e.labels!({ part: 'clock/SW2' }, 'vr')).toEqual([]); // only a pot's label changes while it's held
   });
 
   it('keeps the status line still while the speed and output change (fixed-width fields)', () => {
