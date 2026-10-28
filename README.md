@@ -274,9 +274,15 @@ changes it).
 
 Research notes with sources, used for fidelity:
 [docs/research/computer-spec.md](docs/research/computer-spec.md) (exact behaviour of the
-final machine), [docs/research/videos.md](docs/research/videos.md) (per-video content) and
+final machine), [docs/research/videos.md](docs/research/videos.md) (per-video content),
 [docs/research/clock.md](docs/research/clock.md) (the digital clock series) and
 [docs/research/background.md](docs/research/background.md) (the transistor and gates videos).
+
+Sources for growing beyond Ben's series, not used by the simulator yet:
+[docs/research/mims.md](docs/research/mims.md) (Forrest Mims's books and columns),
+[docs/research/tv-typewriter.md](docs/research/tv-typewriter.md) (Don Lancaster's 1973 TV
+Typewriter and the TVTs after it) and [docs/research/sources.md](docs/research/sources.md) (other
+books, datasheets and projects to draw on).
 
 ## Credits
 
