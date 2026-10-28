@@ -63,8 +63,8 @@ borrowed but not downloaded.
   https://archive.org/details/bitsavers_tidataBook2ed00_137882. The others follow the same
   pattern, for example https://archive.org/details/bitsavers_tidataBook2ed01_1276104.
   - [Lab] The datasheet to check each new catalog part against, as clock.md does with Ben's.
-    Several recalled pinouts in mims.md and tv-typewriter.md are still unchecked, such as
-    7489/74LS189 and 7473/74LS107.
+    tv-typewriter.md checks the TV Typewriter's TTL parts against slice 05. Several recalled
+    pinouts are still unchecked, such as 7489/74LS189 in mims.md and 74LS107 in tv-typewriter.md.
 - *Signetics MOS* (1972), for the TV Typewriter's MOS parts: see tv-typewriter.md.
 
 ## Books in the lending library
