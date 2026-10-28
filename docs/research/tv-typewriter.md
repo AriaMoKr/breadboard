@@ -4,7 +4,9 @@ The TV Typewriter (TVT) put 16 lines of 32 characters on an unmodified TV set. I
 first home-built computer terminals, from Radio-Electronics, September 1973. It is a breadboard-era
 digital design like Ben's computer: mostly TTL counters and gates, with a few MOS memory and
 character-generator chips. These notes list what archive.org has on it and what the simulator would
-need to run it, as of 2026-10-27. Nothing in the simulator follows them yet.
+need to run it, as of 2026-10-27. The timing board is built from them: its chips are in the
+catalog and the sandbox, and the first lab, the timing chain (`src/labs/tvt/`), runs it chip by
+chip and draws on a TV ("What the simulation shows", below).
 
 Labels: [R] read in the scan's OCR text (summarised here, not quoted). [D] read in a drawing: a
 schematic, the waveform page or a datasheet's pin diagram. [N] part numbers counted in the OCR
@@ -539,12 +541,12 @@ It adds that the foil patterns are correct. The notes page (23) adds:
 | 555 | cursor | yes (NE555) |
 | 7401 open-collector NAND | memory (page A) | no; not the 7400's pinout |
 | 7406 open-collector hex driver | memory | no |
-| 7410 triple 3-input NAND | timing | no |
-| 7473 dual JK | timing, cursor | no; 74LS107 does the same job on another pinout [I] |
+| 7410 triple 3-input NAND | timing | yes |
+| 7473 dual JK | timing, cursor | yes, master-slave as in TI's function table |
 | 74165 parallel-in serial-out register | memory (page A) | no |
 | 74197 (or 74177) divide-by-16 counter | cursor | no; 74LS161 counts the same way, with other controls |
-| 8288 divide-by-12 counter (Signetics) | timing | no; the 74197's pinout, as a ÷2 and a ÷6. The 74LS92 also divides by 12, but on another pinout and without load inputs [I] |
-| MC4024 dual astable | timing (crystal oscillator) | no |
+| 8288 divide-by-12 counter (Signetics) | timing | yes |
+| MC4024 dual astable | timing (crystal oscillator) | yes, its frequencies set as parameters |
 | 2513 character generator, 2518 and 2524 MOS shift registers | memory | no |
 
 All of these pinouts are checked against datasheets above, except the 74LS107's, 74LS161's and
@@ -552,15 +554,39 @@ All of these pinouts are checked against datasheets above, except the 74LS107's,
 | HD0165 encoder, MC789P RTL inverter | improved encoder | no |
 
 - [Lab] A display part for the sandbox, a TV that draws a raster from a video net and a sync net.
-  Every TVT, and any video circuit, needs one.
-- [Lab] The dot clock is 4.56 MHz, about 76,000 dot clocks a frame, and gate by gate the chip-level
-  engine would not keep up [I]. A slow clock with the screen drawn as it goes would still show how
-  it works, much as Step does in the sandbox. Another route is to run the counters as whole
-  chips.
+  Every TVT, and any video circuit, needs one. The timing lab has the TV itself
+  (`src/labs/tvt/_tv.ts`); it isn't a sandbox part yet.
+- [Lab] The dot clock is 4.56 MHz, about 76,000 dot clocks a frame. Chip by chip, the timing board
+  runs at 160 to 380 thousand dots a second (a browser, and Node), 12 to 28 times slower than the
+  real one: a picture every quarter of a second or so, drawn as it goes.
 - [Lab] A lab track could follow the boards: the timing chain (crystal, ÷12 counters, sync), then
   the character generator and dot shifter, then the recirculating memory, then the cursor.
 - [I] Ben's later video card series builds VGA timing from TTL counters on breadboards, so it
   would pair well with this. That's recalled, not checked against the videos.
+
+## What the simulation shows
+
+[I] Running the timing board as transcribed above (`src/labs/tvt/_timing.ts`,
+`tests/labs-tvt.test.ts`), with the TV in `_tv.ts`, whose numbers are NTSC's:
+
+- Every test point from B to O divides the dot clock as the table above says.
+- As drawn, T never goes low, IC6 counts 0 to 11, and a frame is 288 lines (82,944 dots): 55 Hz.
+  With Q in place of R, T goes low for a few gate delays at count 11, IC6 counts 0 to 10, and a
+  frame is 264 lines (76,032 dots): 60 Hz. This supports the reading that the drawing's R is Q.
+- As drawn there are also two vertical sync pulses a frame with the jumper on P or Q: count 11 has
+  P, Q and S high, as count 9 (or 10) does. The second ends at the top of the text, 48 lines
+  after the first. With NOR(P, Q) there is one; with Q for R, count 11 never lasts, so there is
+  one.
+- HS starts in character time 44, 40, 36 or 32 (counting from 0) for the jumpers H and G, H and
+  G̅, H̅ and G, H̅ and G̅. A TV shows the picture from about 9.4 µs (7 character times) after the
+  pulse begins, for 52.6 µs (40 character times), so H̅ and G centre the 32 characters, and with H
+  and G the first three are cut off on the left.
+- The vertical sync is in IC6 count 9 (P), 10 (Q) or 8 (NOR), in the second half of it (O high):
+  lines 229-240, 253-264 or 205-216, counting the first text line as 1. With P the text starts
+  about 15 lines below the top of the picture.
+- A TV's field oscillator runs free a little slower than 60 Hz, and the sync pulse fires it
+  early. At 55 Hz the pulse comes too late, so the picture rolls until the vertical hold is turned
+  below 55 Hz.
 
 _Sources: the archive.org scans above (their OCR text); the booklet's PDF, its drawings read at
 300 dpi; the pin diagrams in Signetics MOS, Signetics' 8000 Series TTL/MSI, TI's TTL Data Book and

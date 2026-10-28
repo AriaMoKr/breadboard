@@ -18,7 +18,8 @@ video by video.
   `tests/boards-output-control.test.ts`).
 * **Breadboard sandbox** (`#/sandbox`): an empty breadboard with Ben's parts bin (every 74LS chip
   in the build, the 28C16, the 555, LEDs, resistors, buttons, switches, DIP switches, 7-segment
-  displays, and the 74LS85, 74LS90, 74LS92 and CD4511 from his digital clock). Wire up your own circuits and the chip-level engine simulates them. **Move** picks a
+  displays, the 74LS85, 74LS90, 74LS92 and CD4511 from his digital clock, and the 7410, 7473, 8288
+  and MC4024 from Lancaster's TV Typewriter). Wire up your own circuits and the chip-level engine simulates them. **Move** picks a
   part or a wire up and puts it elsewhere (click, then click a hole, or drag it), or just one end of
   a wire or a two-legged part when picked up by that end. **Step** (key S)
   pauses it and moves it on to the next change: a gate delay at a time while a change spreads
@@ -127,6 +128,12 @@ video by video.
 
   The analog parts are small time-step models with Ben's component values (`src/labs/dclock/_analog.ts`).
   The counters are the sandbox's chip models.
+* **TV Typewriter labs** (`#/lab/tvt-timing`): Don Lancaster's TV Typewriter (Radio-Electronics,
+  September 1973), built from his schematics board by board, with his chips: the Signetics 8288
+  counters, the 7473 and the MC4024 crystal oscillator. The first lab is the timing board, run chip
+  by chip a dot at a time, with a TV that draws its picture as it goes and holds it or rolls as a
+  set of the time would. As drawn, one gate can never fire and the frames come at 55 Hz; moving its
+  wire gives Lancaster's 60. Its sync jumpers move the picture.
 * **More videos** (`#/more`): Ben's videos outside the playlist that go with it. These are his first
   build running programs and his introduction to transistors and logic gates (both from 2015 and
   linked from eater.net/8bit), plus his digital clock series (2026, eater.net/clock).
@@ -275,14 +282,15 @@ changes it).
 Research notes with sources, used for fidelity:
 [docs/research/computer-spec.md](docs/research/computer-spec.md) (exact behaviour of the
 final machine), [docs/research/videos.md](docs/research/videos.md) (per-video content),
-[docs/research/clock.md](docs/research/clock.md) (the digital clock series) and
-[docs/research/background.md](docs/research/background.md) (the transistor and gates videos).
+[docs/research/clock.md](docs/research/clock.md) (the digital clock series),
+[docs/research/background.md](docs/research/background.md) (the transistor and gates videos) and
+[docs/research/tv-typewriter.md](docs/research/tv-typewriter.md) (Don Lancaster's 1973 TV
+Typewriter, its schematics transcribed, and the TVTs after it).
 
 Sources for growing beyond Ben's series, not used by the simulator yet:
-[docs/research/mims.md](docs/research/mims.md) (Forrest Mims's books and columns),
-[docs/research/tv-typewriter.md](docs/research/tv-typewriter.md) (Don Lancaster's 1973 TV
-Typewriter and the TVTs after it) and [docs/research/sources.md](docs/research/sources.md) (other
-books, datasheets and projects to draw on).
+[docs/research/mims.md](docs/research/mims.md) (Forrest Mims's books and columns) and
+[docs/research/sources.md](docs/research/sources.md) (other books, datasheets and projects to draw
+on).
 
 ## Credits
 

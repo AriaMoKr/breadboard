@@ -24,9 +24,9 @@ import type { ChipModel, ChipParams } from './types';
  * - 3-state outputs return 'Z'. Bidirectional pins (74LS245 A/B, 28C16 IO)
  *   are listed both as inputs and as outputs.
  * - Delays are in gate delays: gates 1, flip-flops / decoders / muxes /
- *   transceivers / 283 / 273 / 85 / 90 / 92 2, 161 / 173 / 189 / CD4511 3,
- *   28C16 5 (an EEPROM is much slower than TTL; 5 keeps the full computer
- *   fast), 555 1.
+ *   transceivers / 283 / 273 / 85 / 90 / 92 / 8288 2, 161 / 173 / 189 /
+ *   CD4511 3, 28C16 5 (an EEPROM is much slower than TTL; 5 keeps the full
+ *   computer fast), 555 and MC4024 1.
  */
 
 // ---------------------------------------------------------------------------
@@ -255,6 +255,21 @@ function gates2(id: string, f: Fn2, names: [string, string, string][]): ChipMode
 
 const QUAD = [1, 2, 3, 4].map((k): [string, string, string] => [`${k}A`, `${k}B`, `${k}Y`]);
 
+/** Three-input gates: [A, B, C, Y] pin names per gate. */
+function gates3(id: string, f: (ins: Level[]) => Level, names: [string, string, string, string][]): ChipModel {
+  const chip = CHIPS[id];
+  const groups = names.map((g) => g.map((nm) => pinNumber(chip, nm)));
+  return {
+    id,
+    inputs: groups.flatMap(([a, b, c]) => [a, b, c]),
+    outputs: groups.map((g) => g[3]),
+    delay: 1,
+    evaluate: (l) => groups.map((_, i) => f([ttl(l[3 * i]), ttl(l[3 * i + 1]), ttl(l[3 * i + 2])])),
+  };
+}
+
+const TRIPLE = [1, 2, 3].map((k): [string, string, string, string] => [`${k}A`, `${k}B`, `${k}C`, `${k}Y`]);
+
 // ---------------------------------------------------------------------------
 // Flip-flops
 
@@ -313,6 +328,34 @@ function jkUnit(clk: string, pre: string | null, clr: string, j: string, k: stri
     },
   };
 }
+
+/**
+ * 7473 half: a pulse-triggered (master-slave) JK flip-flop with clear, as in TI's function table.
+ * While the clock is high the master takes J if Q is 0, or K if Q is 1, and keeps it, so a J or K
+ * pulse in that time counts even if it is over before the clock falls (ones catching). As the
+ * clock falls, Q (the slave) takes the master. ~CLR low clears both at once. With J and K high or
+ * open it toggles as each clock pulse ends, like a falling-edge flip-flop.
+ */
+const jk73 = (k: number): UnitDef => ({
+  ins: [`${k}CLK`, `~${k}CLR`, `${k}J`, `${k}K`],
+  outs: [`${k}Q`, `~${k}Q`],
+  bits: 2, // 0: Q, 1: the master
+  fn(u) {
+    if (!u.i(1)) {
+      u.w(1, 0);
+      return store1(u, 0, [0, 1]);
+    }
+    let q = u.s(0), m = u.s(1);
+    if (u.fell(0)) u.w(0, (q = m));
+    else if (u.i(0)) {
+      if (u.rose(0)) m = q;
+      if (!q && u.i(2)) m = 1;
+      if (q && u.i(3)) m = 0;
+      u.w(1, m);
+    } else u.w(1, q);
+    return [q, (1 - q) as Bit];
+  },
+});
 
 // ---------------------------------------------------------------------------
 // 28C16 images
@@ -508,6 +551,41 @@ const NE555: ChipModel = {
       st.lastL = st.lastL === 1 ? 0 : 1;
       st.lastT = t;
       drive555(ctx, st, [[t - now, st.lastL]]);
+    }
+  },
+};
+
+// ---------------------------------------------------------------------------
+// MC4024 (digital approximation)
+
+const mc4024Pins = (name: string) => pinNumber(CHIPS.MC4024, name);
+
+/**
+ * MC4024 (74424) dual voltage-controlled astable, Motorola MTTL, not the CMOS 4024 counter. Each
+ * oscillator's frequency comes from the capacitor or crystal across its CAP pins and the voltage
+ * on its FREQ pin, neither simulated: OUT1 and OUT2 are square waves, high and low for
+ * params.halfPeriod1 and params.halfPeriod2 gate delays (default 32 and 512), starting high. The
+ * oscillators' own supply and ground pins aren't read. Like the 555, it reads its outputs back to
+ * wake itself up for the next edge.
+ */
+const MC4024: ChipModel = {
+  id: 'MC4024',
+  inputs: [mc4024Pins('OUT1'), mc4024Pins('OUT2')],
+  outputs: [mc4024Pins('OUT1'), mc4024Pins('OUT2')],
+  delay: 1,
+  evaluate(_levels, ctx, params) {
+    const osc = (ctx.state.osc ??= [null, null]) as ({ t: number; l: Bit } | null)[];
+    const half = [posInt(params.halfPeriod1, 32), posInt(params.halfPeriod2, 512)];
+    for (let k = 0; k < 2; k++) {
+      const o = osc[k];
+      if (!o) {
+        osc[k] = { t: ctx.time + 1, l: 1 };
+        ctx.schedule(k, 1, 1);
+      } else if (o.t <= ctx.time) {
+        o.t = Math.max(o.t + half[k], ctx.time + 1);
+        o.l = (1 - o.l) as Bit;
+        ctx.schedule(k, o.l, o.t - ctx.time);
+      }
     }
   },
 };
@@ -788,6 +866,43 @@ export const CHIP_MODELS: Record<string, ChipModel> = {
   }]),
 
   NE555,
+
+  // ---- the TV Typewriter (Lancaster, 1973)
+
+  '7410': gates3('7410', (ins) => not(and(ins)), TRIPLE),
+  '7473': unitChip('7473', 2, [jk73(1), jk73(2)]),
+
+  /**
+   * Signetics 8288 divide-by-12 counter, the 74196's and 74197's pinout, in two sections that
+   * count on the FALLING edge of their clocks: ~CLK1 toggles QA (÷2); ~CLK2 toggles QB, and QB
+   * falling steps a ÷3 on QC and QD (QC high on its second count, QD on its third), so QB-QD
+   * divide by 6. With QA wired to ~CLK2, QA-QD count 0..11 in binary. ~RESET low clears all four
+   * at once and beats ~STROBE, which, low, loads A-D into them at once. (The ÷3 with QC and QD
+   * both high, which only a load gives it, goes to 0 on its next count.)
+   */
+  '8288': unitChip('8288', 2, [{
+    ins: ['~CLK1', '~CLK2', '~RESET', '~STROBE', 'A', 'B', 'C', 'D'],
+    outs: ['QA', 'QB', 'QC', 'QD'],
+    bits: 4,
+    floatNoEdge: true,
+    fn(u) {
+      let q: Bit[];
+      if (!u.i(2)) q = [0, 0, 0, 0];
+      else if (!u.i(3)) q = [u.i(4), u.i(5), u.i(6), u.i(7)];
+      else {
+        q = [u.s(0), u.s(1), u.s(2), u.s(3)];
+        if (u.fell(0)) q[0] = (1 - q[0]) as Bit;
+        if (u.fell(1)) {
+          if (q[1]) [q[2], q[3]] = !q[2] && !q[3] ? [1, 0] : q[2] && !q[3] ? [0, 1] : [0, 0];
+          q[1] = (1 - q[1]) as Bit;
+        }
+      }
+      q.forEach((b, k) => u.w(k, b));
+      return q;
+    },
+  }]),
+
+  MC4024,
 };
 
 // ---------------------------------------------------------------------------

@@ -133,6 +133,29 @@ export const CHIPS: Record<string, ChipDef> = {
     pins: ['GND', 'TRIG', 'OUT', '~RESET', 'CV', 'THR', 'DIS', 'VCC'],
     datasheet: 'https://eater.net/datasheets/lm555.pdf',
   },
+  // Don Lancaster's TV Typewriter (Radio-Electronics, September 1973): standard TTL of the time and
+  // Signetics' and Motorola's parts, with the pinouts checked in docs/research/tv-typewriter.md
+  '7410': {
+    id: '7410', title: 'Triple 3-input NAND', spacing: 3, vcc: 14, gnd: 7,
+    pins: ['1A', '1B', '2A', '2B', '2C', '2Y', 'GND', '3Y', '3A', '3B', '3C', '1Y', '1C', 'VCC'],
+    datasheet: 'https://archive.org/details/bitsavers_tidataBook2ed05_2430672/page/n7',
+  },
+  '7473': {
+    id: '7473', title: 'Dual JK flip-flop (master-slave) with clear', spacing: 3, vcc: 4, gnd: 11,
+    pins: ['1CLK', '~1CLR', '1K', 'VCC', '2CLK', '~2CLR', '2J', '~2Q', '2Q', '2K', 'GND', '1Q', '~1Q', '1J'],
+    datasheet: 'https://archive.org/details/bitsavers_tidataBook2ed05_2430672/page/n21',
+  },
+  '8288': {
+    id: '8288', title: 'Divide-by-12 counter: ÷2 and ÷6 sections, load and reset (Signetics)', spacing: 3, vcc: 14, gnd: 7,
+    pins: ['~STROBE', 'QC', 'C', 'A', 'QA', '~CLK2', 'GND', '~CLK1', 'QB', 'B', 'D', 'QD', '~RESET', 'VCC'],
+    datasheet: 'https://archive.org/details/bitsavers_signeticsdcs8000SeriesTTLMSI_11847693/page/n115',
+  },
+  MC4024: {
+    // two oscillators, each with its own supply (1, 13) and ground (5, 9), and the outputs' (14, 7)
+    id: 'MC4024', title: 'Dual voltage-controlled astable (Motorola MTTL, also 74424)', spacing: 3, vcc: 14, gnd: 7,
+    pins: ['VCC1', 'FREQ1', 'CAP1', 'CAP1', 'GND1', 'OUT1', 'GND', 'OUT2', 'GND2', 'CAP2', 'CAP2', 'FREQ2', 'VCC2', 'VCC'],
+    datasheet: 'https://archive.org/details/donlancaster_TTLCB1/page/n53',
+  },
 };
 
 export const CHIP_IDS = Object.keys(CHIPS);

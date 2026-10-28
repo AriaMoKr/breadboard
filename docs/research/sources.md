@@ -3,7 +3,8 @@
 Books, articles and datasheets on archive.org that could help the breadboard grow beyond Ben's
 playlist: more parts for the catalog, circuits for the sandbox, and projects to follow next. As of
 2026-10-27. Forrest Mims's books and columns are in mims.md, and the TV Typewriter in
-tv-typewriter.md. Nothing in the simulator follows these yet.
+tv-typewriter.md, whose timing board is the first of them in the simulator. Nothing else here is
+used yet.
 
 Labels: [R] read in the scan's OCR text (summarised here, not quoted). [N] part numbers counted in
 the OCR text, not read in context. [I] inferred or recalled, not checked. [Lab] an idea for the

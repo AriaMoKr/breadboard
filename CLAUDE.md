@@ -8,7 +8,8 @@ A browser simulator for breadboard circuits (TypeScript and Vite 7, no UI framew
 in the VR view only). It is built around Ben Eater's 8-bit breadboard computer: the finished
 computer, the same computer as his boards, a breadboard sandbox simulated chip by chip, a lab for
 each video of his playlist and of his other series that go with it, and a WebXR view. It is meant to
-grow into a breadboard for projects from other learning sites and videos too. `README.md` covers
+grow into a breadboard for projects from other learning sites and videos too: the first is Don
+Lancaster's TV Typewriter (1973), from his schematics with his chips (`docs/research/tv-typewriter.md`). `README.md` covers
 using, building and deploying it; `docs/BREADBOARD.md` the breadboard model (geometry, module
 boards, the chip-level engine, the VR model); `docs/LABS.md` writing a lab; `docs/research/` the
 sources each part follows.
@@ -44,14 +45,14 @@ for that Node).
 - `src/sim/`: the finished computer at control-signal level, cycle-exact (`computer.ts`), with Ben's microcode in its four versions (`microcode.ts`), the display EEPROM (`display.ts`), the assembler and his programs. `machine.ts` wraps it with the clock module's front panel and runs it in real time; the computer page and the breadboard view share one `Machine`.
 - `src/logic/circuit.ts`: the labs' event-driven, gate-level engine (0/1/Z/X, unit gate delays, tri-state).
 - `src/breadboard/` (docs/BREADBOARD.md): geometry, the chip catalog, `Layout`, the SVG view and its `PanZoom`, the computer's module boards (`boards/*.board.ts`, auto-registered), sandbox links (`share.ts`) and the chip-level engine (`sim/`).
-- `src/labs/<group>/<id>.lab.ts`: a lab each, registered by file name (docs/LABS.md); `src/app/chapters.ts` maps the videos to them.
+- `src/labs/<group>/<id>.lab.ts`: a lab each, registered by file name (docs/LABS.md); `src/app/chapters.ts` maps the videos to them, and the parts of other sources' projects (`PROJECTS`).
 - `src/app/`: the pages behind the `#/…` routes (`app.ts`): the computer, the breadboard view, the sandbox, the labs. `src/ui/`: framework-free widgets.
 - `src/vr/` (`vr.html`): `main.ts` (renderer, the rig the camera and controllers ride on, room, panel, input (the mouse, a gamepad on a screen with common's `gamepad.js`, a TV's remote with its `tv.js`, the controllers in VR), the bar's menus (Controls, the panel's buttons; Wires; Comfort), VR entry and `sessiongranted`), `model.ts` (a `Layout` in three.js, with the wires between the computer's modules as arcs, one mesh per kind), `exhibits.ts` (what stands on the table, picked by the `#hash`), `panel.ts`, `carry.ts` (the grips), `hallway.ts` (pure: this door's id and the doorway back as kept for the tab; the rest of the door contract is `common/door.js`), `door.ts` (the doorway back, hung with `common/portal.js`, the Hallway's doorway shader), `move.ts` (pure: walking, turning and jumping in VR, as the Hallway does, and a gamepad's walking and looking on a screen; the choice is `common/nav.js`, the blink `common/fade.js`, the comfort vignette and seated lift `common/access.js`), and `together.ts` (the shared session's words: layersharedsession's `together.js` runs it, with its `avatars.js` drawing the others).
 - `scripts/`: the build steps (`sw-dist.mjs`, `zip-dist.mjs`), the checks (`check-browser.mjs`, `check-input.mjs`, `verify.mjs`) and the pictures (`make-preview.mjs`, `make-icons.mjs`); they drive headless Chrome over DevTools with common's `tools/chrome.mjs`.
 
 ## Conventions
 
-- Ben's designs as he builds them: chip for chip, with his reference designators, component values and microcode. Check behaviour against `docs/research/` and the videos, and note a new source there.
+- Ben's designs as he builds them: chip for chip, with his reference designators, component values and microcode. Check behaviour against `docs/research/` and the videos, and note a new source there. Another source's design likewise: its own chips and designators, as drawn, with what doesn't work as drawn shown and explained, not quietly fixed.
 - One JS and one CSS file per page (`inlineDynamicImports`), and relative URLs only (`base: './'`): the site lives under `/breadboard/`, and a wget mirror, the zip and the offline cache each get all of it. The link-preview tags are the exception: absolute, naming the GitHub Pages copy (`tests/link-preview.test.ts`).
 - The VR view keeps the Hallway's door contract as vrlbry, music and outside do, through the shared packages rather than a copy: a change belongs in AriaMoKr/common or AriaMoKr/layersharedsession, then a new tag here.
 - The TV app (common's README, "The TV app"): in TV mode (`html.tv`) the VR view has the 10-foot view (the room below the bar, `--vr-top`, and its home view a little further back, `TV_HOME`), no Enter VR and asks for no XR, its keys go through `keyOf` (the arrows as taps that speed up while held, move.ts's `KEY`), Back walking is `stepBack` (a held pot let go, then home to the table, then the app's), and whatever the 3D panel does is also a control on the bar. A new panel button gets its control there too (the Controls menu takes the exhibit's `actions` by itself).

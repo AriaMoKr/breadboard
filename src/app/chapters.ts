@@ -210,8 +210,49 @@ export const MORE_VIDEOS: MoreVideo[] = MORE_GROUPS.flatMap((g) => g.videos);
 /** Labs for Ben's other videos (transistors and gates, the digital clock), in order. */
 export const MORE_LAB_IDS: string[] = [...new Set(MORE_VIDEOS.flatMap((v) => (v.lab ? [v.lab] : [])))];
 
-/** Every lab: the playlist's, then those for Ben's other videos. */
-export const ALL_LAB_IDS: string[] = [...LAB_IDS, ...MORE_LAB_IDS];
+/**
+ * Designs from other sources than Ben's videos, built here as his are, part by part with a lab
+ * each: so far Don Lancaster's TV Typewriter, from a magazine article.
+ */
+export interface ProjectPart {
+  title: string;
+  lab: string;
+  /** Where in the source it is. */
+  where: string;
+}
+
+export interface Project {
+  id: string;
+  title: string;
+  /** Who designed it. */
+  by: string;
+  /** What it is, for the lab pages. */
+  text: string;
+  /** The source to read alongside. */
+  source: { href: string; label: string };
+  parts: ProjectPart[];
+}
+
+export const PROJECTS: Project[] = [
+  {
+    id: 'tvt',
+    title: 'TV Typewriter',
+    by: 'Don Lancaster',
+    text: 'Don Lancaster’s TV Typewriter, from Radio-Electronics in September 1973: 16 lines of 32 characters on a television, typed on a keyboard, from standard TTL and Signetics’ MOS memories, on boards that plug into one stack. Built here from his schematics, board by board.',
+    source: { href: 'https://archive.org/details/donlancaster_tv_typewriter_9_73', label: 'Radio-Electronics, September 1973' },
+    parts: [{ title: 'The timing chain', lab: 'tvt-timing', where: 'the timing board, Figs. 6 and 7' }],
+  },
+];
+
+/** Labs for the projects, in order. */
+export const PROJECT_LAB_IDS: string[] = PROJECTS.flatMap((p) => p.parts.map((x) => x.lab));
+
+/** The project a lab belongs to, with its part (1-based). */
+export const projectForLab = (lab: string) =>
+  PROJECTS.flatMap((project) => project.parts.flatMap((part, i) => (part.lab === lab ? [{ project, part, num: i + 1 }] : [])))[0];
+
+/** Every lab: the playlist's, then those for Ben's other videos, then the projects'. */
+export const ALL_LAB_IDS: string[] = [...LAB_IDS, ...MORE_LAB_IDS, ...PROJECT_LAB_IDS];
 
 /** Ben's other videos a lab covers, with their group and part number (1-based). */
 export const moreVideosForLab = (lab: string) =>

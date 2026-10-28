@@ -959,3 +959,106 @@ describe('instantiateChip', () => {
     expect(y.value).toBe(0);
   });
 });
+
+describe("the TV Typewriter's chips: 7410, 7473, 8288, MC4024", () => {
+  it('7410: each of its three gates is a 3-input NAND, an open input reading high', () => {
+    const t = bench('7410');
+    for (const k of [1, 2, 3]) {
+      const ins = [`${k}A`, `${k}B`, `${k}C`];
+      for (let v = 0; v < 8; v++) {
+        t.bus(ins, v);
+        expect(t.get(`${k}Y`), `${k}: ${v}`).toBe(v === 7 ? 0 : 1);
+      }
+      t.set(Object.fromEntries(ins.map((n) => [n, 'Z'])));
+      expect(t.get(`${k}Y`)).toBe(0);
+    }
+  });
+  it('7473: toggles as each clock pulse ends with J and K open, and ~CLR clears', () => {
+    const t = bench('7473');
+    // the bench's open clock reads high, so setting it low is a pulse: clear first
+    t.set({ '1CLK': 0, '~1CLR': 0 }).set({ '~1CLR': 1 });
+    const seen: Level[] = [];
+    for (let k = 0; k < 4; k++) {
+      t.set({ '1CLK': 1 });
+      seen.push(t.get('1Q'));
+      t.set({ '1CLK': 0 });
+      seen.push(t.get('1Q'));
+    }
+    expect(seen, 'Q changes only as the clock falls').toEqual([0, 1, 1, 0, 0, 1, 1, 0]);
+    t.pulse('1CLK');
+    expect(t.gets(['1Q', '~1Q'])).toEqual([1, 0]);
+    t.set({ '~1CLR': 0 });
+    expect(t.gets(['1Q', '~1Q'])).toEqual([0, 1]);
+    t.pulse('1CLK');
+    expect(t.get('1Q'), 'held clear').toBe(0);
+  });
+  it('7473: master-slave, so a J pulse while the clock is high still sets it (ones catching)', () => {
+    const t = bench('7473');
+    t.set({ '2J': 0, '2K': 0, '2CLK': 0, '~2CLR': 0 }).set({ '~2CLR': 1 });
+    t.set({ '2CLK': 1 }).set({ '2J': 1 }).set({ '2J': 0 });
+    expect(t.get('2Q'), 'not yet: the slave waits for the clock to fall').toBe(0);
+    t.set({ '2CLK': 0 });
+    expect(t.gets(['2Q', '~2Q'])).toEqual([1, 0]);
+    // J held before the clock rises and dropped before it falls: still caught; K alone resets
+    t.set({ '2K': 1 }).pulse('2CLK');
+    expect(t.get('2Q')).toBe(0);
+    t.set({ '2K': 0, '2J': 0 }).pulse('2CLK');
+    expect(t.get('2Q'), 'J = K = 0 holds').toBe(0);
+  });
+  it('8288: with QA into ~CLK2 it counts 0..11 in binary on falling edges; the ÷3 has QC then QD', () => {
+    const c = new Circuit();
+    const clk = c.input('clk', 1), reset = c.input('reset', 1), strobe = c.input('strobe', 1);
+    const q = ['QA', 'QB', 'QC', 'QD'].map((n) => c.net(n, 'Z'));
+    const data = ['A', 'B', 'C', 'D'].map((n) => c.input(n, 0));
+    instantiateChip(c, CHIP_MODELS['8288'], { '~CLK1': clk, '~CLK2': q[0], QA: q[0], QB: q[1], QC: q[2], QD: q[3], '~RESET': reset, '~STROBE': strobe, A: data[0], B: data[1], C: data[2], D: data[3] });
+    c.settle();
+    const set = (n: Net, v: Level) => (c.set(n, v), c.settle());
+    const count = () => levelsToNumber(q.map((n) => n.value));
+    expect(count()).toBe(0);
+    const seen: (number | null)[] = [];
+    for (let k = 0; k < 13; k++) {
+      set(clk, 0);
+      set(clk, 1);
+      seen.push(count());
+    }
+    expect(seen).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0, 1]);
+    set(reset, 0);
+    expect(count()).toBe(0);
+    set(clk, 0);
+    expect(count(), 'reset low holds it at 0').toBe(0);
+    set(clk, 1);
+    data.forEach((n, k) => set(n, ((9 >> k) & 1) as Level));
+    set(strobe, 0);
+    expect(count(), 'reset beats the strobe').toBe(0);
+    set(reset, 1);
+    expect(count(), 'the strobe loads A-D').toBe(9);
+    set(strobe, 1);
+    set(clk, 0);
+    expect(count()).toBe(10);
+  });
+  it('8288: the ÷2 and ÷6 sections count on their own', () => {
+    const t = bench('8288');
+    t.set({ '~RESET': 1, '~STROBE': 1, '~CLK1': 1, '~CLK2': 1 });
+    const six: (number | null)[] = [];
+    for (let k = 0; k < 7; k++) {
+      t.pulse('~CLK2').set({ '~CLK2': 1 });
+      six.push(t.num(['QB', 'QC', 'QD']));
+    }
+    expect(six, 'QB + 2 QC + 4 QD').toEqual([1, 2, 3, 4, 5, 0, 1]);
+    expect(t.get('QA')).toBe(0);
+    t.pulse('~CLK1').set({ '~CLK1': 1 });
+    expect(t.get('QA')).toBe(1);
+  });
+  it('MC4024: two free-running square waves of params.halfPeriod1 and halfPeriod2', () => {
+    const t = bench('MC4024', { halfPeriod1: 5, halfPeriod2: 20 }, { free: true });
+    const one = watch(t.c, t.nets.OUT1), two = watch(t.c, t.nets.OUT2);
+    t.c.run(300);
+    const rises = (ev: [number, Level][]) => ev.filter(([, l]) => l === 1).map(([tm]) => tm);
+    const r1 = rises(one), r2 = rises(two);
+    expect(r1.length).toBeGreaterThan(20);
+    for (let k = 1; k < r1.length; k++) expect(r1[k] - r1[k - 1]).toBe(10);
+    for (let k = 1; k < r2.length; k++) expect(r2[k] - r2[k - 1]).toBe(40);
+    const f1 = one.find(([tm, l]) => l === 0 && tm > r1[1])!;
+    expect(f1[0] - r1[1]).toBe(5);
+  });
+});

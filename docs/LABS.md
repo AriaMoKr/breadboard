@@ -13,6 +13,11 @@ lab through its own `lab` field: the digital clock labs in `src/labs/dclock/` ar
 Such labs are in `MORE_LAB_IDS`, and every lab is in `ALL_LAB_IDS`. The sidebar lists them under the
 group's title, and their prev/next links stay within the series.
 
+Designs from other sources, such as a magazine article, are in `PROJECTS` (also in `chapters.ts`),
+part by part, each part with its lab and where it is in the source: Lancaster's TV Typewriter in
+`src/labs/tvt/` is the first. Their labs are in `PROJECT_LAB_IDS`; the sidebar gives each project a
+section, and the lab page shows the source to read alongside where a video would be.
+
 (Vitest's on-disk module cache would keep the registry's old file list when a lab file is added, so
 `vite.config.ts` turns it off with `fsModuleCache: false`.)
 

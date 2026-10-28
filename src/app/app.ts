@@ -2,7 +2,7 @@ import { buildLabel } from '../build-info';
 import type { Lab } from '../labs/types';
 import { Machine } from '../sim/machine';
 import { h } from '../ui/dom';
-import { CHAPTERS, LAB_IDS, MORE_GROUPS, MORE_LAB_IDS, PLAYLIST_URL, VIDEO_BY_INDEX, embedUrl, moreVideosForLab, shortTitle, videoUrl, videosForLab, watchUrl, type MoreGroup } from './chapters';
+import { CHAPTERS, LAB_IDS, MORE_GROUPS, MORE_LAB_IDS, PLAYLIST_URL, PROJECTS, VIDEO_BY_INDEX, embedUrl, moreVideosForLab, projectForLab, shortTitle, videoUrl, videosForLab, watchUrl, type MoreGroup, type Project, type ProjectPart } from './chapters';
 import { mountComputerWorkbench } from './computer-page';
 import { hasLab, loadLab, loadedLab } from './lab-loader';
 
@@ -102,6 +102,14 @@ export class App {
         { class: 'nav-chapter' },
         h('div', { class: 'nav-chapter-title' }, 'More from Ben'),
         h('ol', { class: 'nav-videos' }, MORE_GROUPS.map((g) => h('li', null, h('a', { href: `#/more/${g.id}`, dataset: { route: 'more', group: g.id } }, h('span', { class: 'nav-num' }, '▸'), h('span', { class: 'nav-title' }, g.title), h('span', { class: 'nav-dur' }, String(g.videos.length)))))),
+      ),
+      ...PROJECTS.map((p) =>
+        h(
+          'div',
+          { class: 'nav-chapter' },
+          h('div', { class: 'nav-chapter-title' }, `${p.by}’s ${p.title}`),
+          h('ol', { class: 'nav-videos' }, p.parts.map((part, i) => h('li', null, h('a', { href: labHref(part.lab), dataset: { lab: part.lab } }, h('span', { class: 'nav-num' }, String(i + 1)), h('span', { class: 'nav-title' }, part.title), h('span', { class: 'nav-dur' }))))),
+        ),
       ),
       h('p', { class: 'nav-build', title: 'The commit this site was built from, and its date' }, buildLabel()),
     );
@@ -224,9 +232,9 @@ export class App {
   }
 
   private async renderLab(id: string, videoIndex: number | undefined, token: number) {
-    // prev/next within the playlist, or within the group of Ben's other videos the lab belongs to
-    const group = moreVideosForLab(id)[0]?.group;
-    const order = LAB_IDS.includes(id) || !group ? LAB_IDS : MORE_LAB_IDS.filter((l) => group.videos.some((v) => v.lab === l));
+    // prev/next within the playlist, the group of Ben's other videos the lab belongs to, or its project
+    const group = moreVideosForLab(id)[0]?.group, project = projectForLab(id)?.project;
+    const order = project ? project.parts.map((p) => p.lab) : LAB_IDS.includes(id) || !group ? LAB_IDS : MORE_LAB_IDS.filter((l) => group.videos.some((v) => v.lab === l));
     const idx = order.indexOf(id);
     const prev = idx > 0 ? order[idx - 1] : null;
     const next = idx >= 0 && idx < order.length - 1 ? order[idx + 1] : null;
@@ -244,15 +252,18 @@ export class App {
   private mountLab(id: string, lab: Lab | undefined, videoIndex: number | undefined, prev: string | null, next: string | null) {
     const videos = videosForLab(id);
     const more = moreVideosForLab(id);
+    const project = projectForLab(id);
     const chapter = CHAPTERS.find((c) => c.videos.some((x) => x.lab === id));
-    const title = lab?.title ?? videos[0]?.title ?? more[0]?.video.title ?? id;
+    const title = lab?.title ?? videos[0]?.title ?? more[0]?.video.title ?? project?.part.title ?? id;
     document.title = `${title} · Breadboard 8-bit`;
-    const labTitle = (lid: string) => loadedLab(lid)?.title ?? videosForLab(lid)[0]?.title ?? moreVideosForLab(lid)[0]?.video.title ?? lid;
+    const labTitle = (lid: string) => loadedLab(lid)?.title ?? videosForLab(lid)[0]?.title ?? moreVideosForLab(lid)[0]?.video.title ?? projectForLab(lid)?.part.title ?? lid;
     const crumbs = chapter
       ? [chapter.title, videos.length ? ` · video${videos.length > 1 ? 's' : ''} ${videos.map((x) => x.index).join(', ')}` : '']
       : more.length
         ? [more[0].group.title, more[0].group.numbered ? ` · part${more.length > 1 ? 's' : ''} ${more.map((x) => x.part).join(', ')}` : '']
-        : ['Lab', ''];
+        : project
+          ? [`${project.project.by}’s ${project.project.title}`, ` · part ${project.num}`]
+          : ['Lab', ''];
 
     const head = h(
       'div',
@@ -265,12 +276,17 @@ export class App {
         { class: 'video-list' },
         videos.map((vid) => this.videoCard({ ...vid, num: String(vid.index), url: videoUrl(vid) }, vid.index === videoIndex)),
         more.map(({ group, video, part }) => this.videoCard({ ...video, num: group.numbered ? String(part) : undefined, url: watchUrl(video.youtubeId), lab: undefined }, false)),
+        project ? this.sourceCard(project.project, project.part, project.num) : null,
       ),
     );
     const body = h('div', { class: 'lab-root' });
     const prevLink = prev ? h('a', { class: 'btn btn-ghost', href: labHref(prev) }, `← ${labTitle(prev)}`) : null;
     const nextLink = next ? h('a', { class: 'btn btn-ghost', href: labHref(next) }, `${labTitle(next)} →`) : null;
-    const end = more.length ? h('a', { class: 'btn btn-ghost', href: `#/more/${more[0].group.id}` }, 'More videos →') : h('a', { class: 'btn btn-ghost', href: '#/' }, 'The finished computer →');
+    const end = more.length
+      ? h('a', { class: 'btn btn-ghost', href: `#/more/${more[0].group.id}` }, 'More videos →')
+      : project
+        ? h('a', { class: 'btn btn-ghost', href: '#/sandbox' }, 'Its chips in the sandbox →')
+        : h('a', { class: 'btn btn-ghost', href: '#/' }, 'The finished computer →');
     const nav = h('div', { class: 'lab-nav' }, prevLink ?? h('span'), nextLink ?? end);
     // swap in the real lab titles once the neighbours have loaded
     const token = this.renderToken;
@@ -294,6 +310,17 @@ export class App {
       console.error(err);
       body.appendChild(h('pre', { class: 'error' }, `Lab failed to load: ${(err as Error).message}`));
     }
+  }
+
+  /** A project's source, in place of a video: the article to read alongside the lab. */
+  private sourceCard(project: Project, part: ProjectPart, num: number): HTMLElement {
+    return h(
+      'div',
+      { class: 'video-card' },
+      h('div', { class: 'video-meta' }, h('span', { class: 'nav-num' }, String(num)), h('span', { class: 'video-title' }, `${project.source.label}: ${part.where}`)),
+      h('p', { class: 'dim small' }, project.text),
+      h('div', { class: 'video-actions' }, h('a', { class: 'btn btn-ghost', href: project.source.href, target: '_blank', rel: 'noopener' }, 'Read it on archive.org ↗')),
+    );
   }
 
   private videoCard(vid: CardVideo, focused: boolean): HTMLElement {
