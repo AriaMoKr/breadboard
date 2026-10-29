@@ -5,9 +5,10 @@ import { Circuit, type Level, type Net } from '../../logic/circuit';
  * The TV Typewriter's timing board (Radio-Electronics, September 1973, Figs. 6 and 7) as a
  * chip-level circuit, from the same chip models as the breadboard sandbox, wired pin for pin as
  * docs/research/tv-typewriter.md transcribes it. The lab drives the dot clock (test point A, IC1's
- * crystal oscillator) itself, a dot at a time. IC7 and IC8 are 7432s and IC12 a 7402: the 74LS32's
- * and 74LS02's models, which have their pins and logic. IC9, the latch that loads the output
- * register, belongs to the character generator and isn't here; nor are C7 and R4 on ~HS.
+ * crystal oscillator) itself, a dot at a time. IC7 and IC8 are 7432s and IC9 and IC12 7402s: the
+ * 74LS32's and 74LS02's models, which have their pins and logic. IC9's latch, which tells the
+ * character generator's output register when to load, has its two edge detectors (C5 and R2, C6 and
+ * R3, 35 ns) as pulses of 3 gate delays; C7 and R4 on ~HS aren't here.
  */
 
 /** Lancaster's test points, fastest first (U, the blinker, is IC1's second oscillator). */
@@ -37,6 +38,9 @@ export const DEFAULT_JUMPERS: Jumpers = { t: 'R', h: '~H', g: 'G', v: 'P' };
 
 export interface TimingBoard {
   c: Circuit;
+  /** +5 V and ground, for the boards that plug in beside it. */
+  vcc: Net;
+  gnd: Net;
   /** Test points A-T. */
   tp: Record<TestPoint, Net>;
   /** ~G (IC4 pin 12) and ~H (IC12 pin 10), for the sync jumpers. */
@@ -48,6 +52,20 @@ export interface TimingBoard {
   lineClock: Net;
   /** IC12 pin 13: high in the shown character times of line 1 of each row (this note's name). */
   x: Net;
+  /** IC9 pin 10: NOR(C, D), high in the first third of each character. */
+  norCD: Net;
+  /**
+   * OUTPUT LOAD (45), IC9 pin 1: the latch goes low as NOR(C, D) rises and high again as LINE CLOCK
+   * rises; the output register loads as it falls.
+   */
+  outputLoad: Net;
+  /**
+   * The memory board's clock drives, stack 15 (IC10 pin 6) and 16 (pin 12): each low for a dot,
+   * 15 in the first third of a character and 16 in the second, in the shown character times of line
+   * 1 of each text row (while X is high). On the memory board 15 makes φ2 and 16 φ1.
+   */
+  stack15: Net;
+  stack16: Net;
   /** IC11: ~HS (pin 8), ~VS (pin 6) and SYNC (pin 12, stack 38), high in either sync pulse. */
   hs: Net;
   vs: Net;
@@ -106,11 +124,19 @@ export function timingBoard(start: Partial<Jumpers> = {}): TimingBoard {
   instantiateChip(c, CHIP_MODELS['74LS32'], { '1A': J, '1B': D, '1Y': lineClock, '4A': S, '4B': J, '4Y': sj }, {}, 'IC8');
   const x = net('X'), norPQ = net('NOR(P,Q)');
   instantiateChip(c, CHIP_MODELS['74LS02'], { '4A': line1, '4B': sj, '4Y': x, '3A': H, '3B': gnd, '3Y': notH, '2A': P, '2B': Q, '2Y': norPQ }, {}, 'IC12');
-  // IC10's gate 3: T = NAND(pin 11, P, S), pin 11 on R as drawn or on Q
-  const t11 = net('IC10.11');
+  // IC9: NOR(C, D) (pins 8, 9 to 10), and a latch of gates 1 and 2 (1 to 6, 4 to 3) set by an edge
+  // detector on NOR(C, D) (pin 2) and reset by one on LINE CLOCK (pin 5); pin 1 is OUTPUT LOAD
+  const norCD = net('NOR(C,D)'), outputLoad = net('OUTPUT LOAD'), ic9p4 = net('IC9.4');
+  const ic9p2 = c.net('IC9.2', 0), ic9p5 = c.net('IC9.5', 0);
+  c.edgeDetector(norCD, ic9p2, { width: 3, name: 'C5, R2' });
+  c.edgeDetector(lineClock, ic9p5, { width: 3, name: 'C6, R3' });
+  instantiateChip(c, CHIP_MODELS['74LS02'], { '3A': C, '3B': D, '3Y': norCD, '1A': ic9p2, '1B': ic9p4, '1Y': outputLoad, '2A': ic9p5, '2B': outputLoad, '2Y': ic9p4 }, {}, 'IC9');
+  // IC10: stack 16 = NAND(X, B, C) (pins 1, 2, 13 to 12), stack 15 = NAND(B, X, NOR(C, D)) (pins 3,
+  // 4, 5 to 6), and T = NAND(S, P, pin 11) (pins 9, 10, 11 to 8), pin 11 on R as drawn or on Q
+  const stack15 = net('stack 15'), stack16 = net('stack 16'), t11 = net('IC10.11');
   const T_CHOICES: TGate[] = ['R', 'Q'];
   const pokeT = jumper(c, 'T jumper', [R, Q], t11, () => T_CHOICES.indexOf(jumpers.t));
-  instantiateChip(c, CHIP_MODELS['7410'], { '3A': S, '3B': P, '3C': t11, '3Y': T }, {}, 'IC10');
+  instantiateChip(c, CHIP_MODELS['7410'], { '1A': x, '1B': B, '1C': C, '1Y': stack16, '2A': B, '2B': x, '2C': norCD, '2Y': stack15, '3A': S, '3B': P, '3C': t11, '3Y': T }, {}, 'IC10');
   // IC11, sync: ~HS = NAND(J, H or ~H, G or ~G), ~VS = NAND(S, O, P, Q or NOR(P, Q)), SYNC = HS or VS
   const h10 = net('IC11.10'), g11 = net('IC11.11'), v5 = net('IC11.5');
   const H_CHOICES: HJumper[] = ['H', '~H'], G_CHOICES: GJumper[] = ['G', '~G'], V_CHOICES: VJumper[] = ['P', 'Q', 'NOR'];
@@ -128,7 +154,7 @@ export function timingBoard(start: Partial<Jumpers> = {}): TimingBoard {
 
   const pokes = { t: pokeT, h: pokeH, g: pokeG, v: pokeV };
   const board: TimingBoard = {
-    c, tp, notG, notH, blank, line1, lineClock, x, hs, vs, sync,
+    c, vcc, gnd, tp, notG, notH, blank, line1, lineClock, x, norCD, outputLoad, stack15, stack16, hs, vs, sync,
     dots: 0,
     get tFired() {
       return tFired;
@@ -148,6 +174,13 @@ export function timingBoard(start: Partial<Jumpers> = {}): TimingBoard {
     },
   };
   return board;
+}
+
+/** A frequency in Hz, kHz or MHz, to 5 significant figures. */
+export function hz(f: number): string {
+  if (!Number.isFinite(f) || f <= 0) return '—';
+  const [v, unit] = f >= 1e6 ? [f / 1e6, 'MHz'] : f >= 1e3 ? [f / 1e3, 'kHz'] : [f, 'Hz'];
+  return `${+v.toPrecision(5)} ${unit}`;
 }
 
 /** A level as 0 or 1 (an unknown or floating one as 0). */

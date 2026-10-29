@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { DOT_HZ, charTime, frameCount, period, scanLine, timingBoard, type TestPoint, type TimingBoard, type VJumper } from '../src/labs/tvt/_timing';
+import { DOT_HZ, charTime, frameCount, hz, period, scanLine, timingBoard, type TestPoint, type TimingBoard, type VJumper } from '../src/labs/tvt/_timing';
 import { HOLD, TV_H, TV_W, TvScan } from '../src/labs/tvt/_tv';
-import { hz } from '../src/labs/tvt/tvt-timing.lab';
+import { FONT_2513_CHART, code2513 } from '../src/breadboard/sim/font2513';
+import type { Level } from '../src/logic/circuit';
+import { VIDEO_VOLTS, charGen, type CharGen } from '../src/labs/tvt/_chargen';
+import { SAMPLE_TEXT } from '../src/labs/tvt/tvt-chargen.lab';
 
 /** Dots until `cond` holds after a dot (at most `max`). */
 function until(b: TimingBoard, cond: () => boolean, max = 200_000) {
@@ -173,5 +176,151 @@ describe('TV Typewriter: the TV', () => {
       }
       expect(scan.locked, t).toBe(t === 'Q');
     }
+  });
+});
+
+/** From a frame's start (S falls), one frame of VIDEO OUT, a line a string from the dot J falls in: '#' white, '.' black, '_' sync. */
+function frameArt(g: CharGen): string[] {
+  const b = g.board;
+  let s = b.tp.S.value;
+  until(b, () => {
+    const fell = s === 1 && b.tp.S.value === 0;
+    s = b.tp.S.value;
+    return fell;
+  });
+  const lines: string[] = [];
+  let cur = '', j: Level = 0;
+  const art = { white: '#', black: '.', sync: '_' } as const;
+  for (;;) {
+    j = b.tp.J.value;
+    s = b.tp.S.value;
+    if (lines.length || cur) cur += art[g.video()];
+    else cur = art[g.video()];
+    b.dot();
+    if (s === 1 && b.tp.S.value === 0) break;
+    if (j === 1 && b.tp.J.value === 0) {
+      lines.push(cur);
+      cur = '';
+    }
+  }
+  lines.push(cur);
+  return lines;
+}
+
+/** A row of dots as '#' and '.', O5 first. */
+const glyphRow = (code: number, r: number) => FONT_2513_CHART[(code >> 3) * 8 + r].split(' ')[code & 7];
+
+/** Where a column's five dots are in frameArt's lines: after the gap dot of character time col + 1. */
+const COL0 = 9;
+
+describe('TV Typewriter: the character generator (page A, Fig. 5)', () => {
+  it('draws the memory: each column in the next character time, a gap dot and five dots, rows 1-7 of the 2513 on lines 2-8 of each row', () => {
+    const g = charGen();
+    g.setText(SAMPLE_TEXT);
+    const art = frameArt(g);
+    expect(art.length).toBe(288);
+    const text = g.text();
+    for (let r = 0; r < 16; r++)
+      for (let l = 0; l < 12; l++) {
+        const want = Array.from({ length: 32 }, (_, col) => '.' + (l >= 1 && l <= 7 ? glyphRow(code2513(text[r][col])!, l) : '.....')).join('');
+        expect(art[12 * r + l].slice(COL0 - 1, COL0 - 1 + 192), `row ${r + 1}, line ${l + 1}`).toBe(want);
+      }
+    for (let line = 192; line < 288; line++) expect(art[line].replace(/_/g, ''), `line ${line}`).toMatch(/^\.*$/);
+  });
+  it('reads the memory 512 times a frame, on stack 16, and the 74165 loads 32 times a line', () => {
+    const g = charGen();
+    frameArt(g);
+    const reads = g.reads, loads = g.loads;
+    for (let k = 0; k < 82_944; k++) g.board.dot();
+    expect(g.reads - reads).toBe(512);
+    expect(g.loads - loads).toBe(288 * 32);
+  });
+  it('stack 15 and 16 go low for a dot each, 15 first, 32 pairs on line 1 of each text row', () => {
+    const g = charGen(), b = g.board;
+    frameArt(g);
+    const lows: string[] = [];
+    let lines = 0, j = b.tp.J.value;
+    for (let k = 0; k < 82_944; k++) {
+      b.dot();
+      if (j === 1 && b.tp.J.value === 0) lines++;
+      j = b.tp.J.value;
+      if (b.stack15.value === 0) lows.push(`15@${lines}`);
+      if (b.stack16.value === 0) lows.push(`16@${lines}`);
+    }
+    expect(lows.length).toBe(1024);
+    for (let k = 0; k < 1024; k += 2) {
+      expect(lows[k].startsWith('15@')).toBe(true);
+      expect(lows[k + 1]).toBe(`16@${lows[k].slice(3)}`);
+    }
+    expect(new Set(lows.map((x) => x.slice(3)))).toEqual(new Set(Array.from({ length: 16 }, (_, r) => String(12 * r))));
+  });
+  it('OUTPUT LOAD falls once a character time while LINE CLOCK runs, a character time after it', () => {
+    const g = charGen(), b = g.board;
+    frameArt(g);
+    let falls = 0, firstAt = -1, was = b.outputLoad.value, j = b.tp.J.value, dot = 0;
+    until(b, () => {
+      const fell = j === 1 && b.tp.J.value === 0;
+      j = b.tp.J.value;
+      return fell;
+    });
+    for (; dot < 288; dot++) {
+      b.dot();
+      if (was === 1 && b.outputLoad.value === 0 && falls++ === 0) firstAt = charTime(b);
+      was = b.outputLoad.value;
+    }
+    expect(falls).toBe(32);
+    expect(firstAt).toBe(1);
+  });
+  it('a row full to its 32nd place leaves its last character’s row 3 just left of the next row’s top line', () => {
+    const g = charGen();
+    g.setText(`${'A ROW FULL TO ITS END'.padEnd(31)}?\nNEXT`);
+    const art = frameArt(g);
+    const left = glyphRow(code2513('?')!, 3);
+    expect(left).toContain('#');
+    expect(art[12].slice(1, 6), 'line 1 of row 2: the leftover').toBe(left);
+    expect(art[12].slice(6), 'and nothing else').not.toContain('#');
+    g.setText('NOT FULL\nNEXT');
+    expect(frameArt(g)[12]).not.toContain('#');
+  });
+  it('SELF TEST makes a white raster, FLASH blanks the characters, and CURSOR high makes every place a block', () => {
+    const g = charGen();
+    g.setText(SAMPLE_TEXT);
+    g.setSelfTest(true);
+    let art = frameArt(g);
+    expect(art.every((l) => /^[#_]+$/.test(l))).toBe(true);
+    g.setSelfTest(false);
+    g.setFlash(true);
+    art = frameArt(g);
+    expect(art.some((l) => l.includes('#'))).toBe(false);
+    g.setFlash(false);
+    g.setCursor(true);
+    art = frameArt(g);
+    const block = '.#####'.repeat(32);
+    for (let r = 0; r < 16; r++) for (let l = 0; l < 12; l++) expect(art[12 * r + l].slice(COL0 - 1, COL0 - 1 + 192), `row ${r + 1}, line ${l + 1}`).toBe(l < 8 ? block : '.'.repeat(192));
+  });
+  it('VIDEO OUT: 0 V in sync, about 2 V black, 5 V white', () => {
+    expect(VIDEO_VOLTS.sync).toBe(0);
+    expect(VIDEO_VOLTS.black).toBeCloseTo(2.06, 2);
+    expect(VIDEO_VOLTS.white).toBe(5);
+  });
+  it('the TV holds the picture with the hold below 55 Hz, as the lab starts', () => {
+    const g = charGen();
+    g.setText(SAMPLE_TEXT);
+    const scan = new TvScan();
+    scan.hold = 54;
+    for (let k = 0; k < 3 * 82_944; k++) {
+      g.board.dot();
+      const v = g.video();
+      scan.feed(v === 'white', v === 'sync', 1 / DOT_HZ);
+    }
+    expect(scan.locked).toBe(true);
+    expect(scan.pixels.some((p) => p === 255)).toBe(true);
+  });
+  it('the memory takes text a line a row, capitals for small letters and spaces for the rest', () => {
+    const g = charGen();
+    g.setText('hello {world}\n' + 'X'.repeat(40));
+    expect(g.text()[0]).toBe('HELLO  WORLD '.padEnd(32));
+    expect(g.text()[1]).toBe('X'.repeat(32));
+    expect(g.text()[2]).toBe(' '.repeat(32));
   });
 });

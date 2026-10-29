@@ -18,8 +18,8 @@ video by video.
   `tests/boards-output-control.test.ts`).
 * **Breadboard sandbox** (`#/sandbox`): an empty breadboard with Ben's parts bin (every 74LS chip
   in the build, the 28C16, the 555, LEDs, resistors, buttons, switches, DIP switches, 7-segment
-  displays, the 74LS85, 74LS90, 74LS92 and CD4511 from his digital clock, and the 7410, 7473, 8288
-  and MC4024 from Lancaster's TV Typewriter). Wire up your own circuits and the chip-level engine simulates them. **Move** picks a
+  displays, the 74LS85, 74LS90, 74LS92 and CD4511 from his digital clock, and the 7401, 7410, 7473,
+  74165, 8288, MC4024, 2513 and 2518 from Lancaster's TV Typewriter). Wire up your own circuits and the chip-level engine simulates them. **Move** picks a
   part or a wire up and puts it elsewhere (click, then click a hole, or drag it), or just one end of
   a wire or a two-legged part when picked up by that end. **Step** (key S)
   pauses it and moves it on to the next change: a gate delay at a time while a change spreads
@@ -128,12 +128,15 @@ video by video.
 
   The analog parts are small time-step models with Ben's component values (`src/labs/dclock/_analog.ts`).
   The counters are the sandbox's chip models.
-* **TV Typewriter labs** (`#/lab/tvt-timing`): Don Lancaster's TV Typewriter (Radio-Electronics,
-  September 1973), built from his schematics board by board, with his chips: the Signetics 8288
-  counters, the 7473 and the MC4024 crystal oscillator. The first lab is the timing board, run chip
-  by chip a dot at a time, with a TV that draws its picture as it goes and holds it or rolls as a
-  set of the time would. As drawn, one gate can never fire and the frames come at 55 Hz; moving its
-  wire gives Lancaster's 60. Its sync jumpers move the picture.
+* **TV Typewriter labs** (`#/lab/tvt-timing`, `#/lab/tvt-chargen`): Don Lancaster's TV Typewriter
+  (Radio-Electronics, September 1973), built from his schematics board by board, with his chips:
+  the Signetics 8288 counters, the 7473 and the MC4024 crystal oscillator, then Signetics' 2513
+  character generator and 2518 shift register. The first lab is the timing board, run chip by chip
+  a dot at a time, with a TV that draws its picture as it goes and holds it or rolls as a set of
+  the time would. As drawn, one gate can never fire and the frames come at 55 Hz; moving its wire
+  gives Lancaster's 60. Its sync jumpers move the picture. The second adds the character generator:
+  the 2518 line register, the 2513, the 74165 that shifts the dots out and the 7401 that makes the
+  video, with a stand-in for the memory board that you type into, and the TV draws the text.
 * **More videos** (`#/more`): Ben's videos outside the playlist that go with it. These are his first
   build running programs and his introduction to transistors and logic gates (both from 2015 and
   linked from eater.net/8bit), plus his digital clock series (2026, eater.net/clock).

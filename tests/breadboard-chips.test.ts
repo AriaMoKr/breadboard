@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CHIPS } from '../src/breadboard/catalog';
-import { CHIP_MODELS, eepromImage, instantiateChip, levelsToNumber, peekMemory, pokeMemory } from '../src/breadboard/sim/chips';
+import { CHIP_MODELS, eepromImage, instantiateChip, levelsToNumber, peek2518, peekMemory, pokeMemory } from '../src/breadboard/sim/chips';
+import { FONT_2513_CHART, code2513 } from '../src/breadboard/sim/font2513';
 import type { ChipParams } from '../src/breadboard/sim/types';
 import { Circuit, type Level, type Net } from '../src/logic/circuit';
 import { DEC_DIGITS, displayEepromImage } from '../src/sim/display';
@@ -1060,5 +1061,96 @@ describe("the TV Typewriter's chips: 7410, 7473, 8288, MC4024", () => {
     for (let k = 1; k < r2.length; k++) expect(r2[k] - r2[k - 1]).toBe(40);
     const f1 = one.find(([tm, l]) => l === 0 && tm > r1[1])!;
     expect(f1[0] - r1[1]).toBe(5);
+  });
+});
+
+describe("the TV Typewriter's page A chips: 7401, 74165, 2513, 2518", () => {
+  it('7401: four NANDs with open-collector outputs: low, or let go', () => {
+    const t = bench('7401');
+    for (const k of [1, 2, 3, 4])
+      for (let v = 0; v < 4; v++) {
+        t.bus([`${k}A`, `${k}B`], v);
+        expect(t.get(`${k}Y`), `${k}: ${v}`).toBe(v === 3 ? 0 : 'Z');
+      }
+  });
+  it('74165: SH/~LD low loads A-H at once; each rising clock shifts toward QH, SER coming in', () => {
+    const t = bench('74165');
+    const data = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+    t.set({ CLK: 0, 'CLK INH': 0, SER: 0 }).bus(data, 0b1011_0010).set({ 'SH/~LD': 0 });
+    expect(t.gets(['QH', '~QH']), 'H on QH').toEqual([1, 0]);
+    t.pulse('CLK');
+    expect(t.get('QH'), 'held while loading').toBe(1);
+    t.set({ 'SH/~LD': 1, SER: 1 });
+    const seen: Level[] = [];
+    for (let k = 0; k < 9; k++) {
+      t.pulse('CLK');
+      seen.push(t.get('QH'));
+    }
+    expect(seen, 'G down to A, then SER').toEqual([0, 1, 1, 0, 0, 1, 0, 1, 1]);
+  });
+  it('74165: CLK INH high holds it; it shifts on a rising edge of CLK OR CLK INH', () => {
+    const t = bench('74165');
+    const data = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+    t.set({ CLK: 0, 'CLK INH': 1, SER: 0 }).bus(data, 0b0100_0000).set({ 'SH/~LD': 0 }).set({ 'SH/~LD': 1 });
+    expect(t.get('QH')).toBe(0);
+    t.pulse('CLK').pulse('CLK');
+    expect(t.get('QH'), 'inhibited').toBe(0);
+    t.set({ CLK: 1 }).set({ 'CLK INH': 0 });
+    expect(t.get('QH'), 'INH falling with CLK high: no edge').toBe(0);
+    t.set({ CLK: 0 }).set({ 'CLK INH': 1 });
+    expect(t.get('QH'), 'INH rising with CLK low is an edge').toBe(1);
+  });
+  it('2513: the character on A4-A9 and the row on A1-A3 give five dots, O5 the leftmost', () => {
+    const t = bench('2513');
+    const addr = names((k) => `A${k}`, 1, 9), outs = ['O5', 'O4', 'O3', 'O2', 'O1'];
+    t.set({ '~CE': 0 });
+    const dots = (code: number, r: number) => {
+      t.bus(addr, (code << 3) | r);
+      return t.gets(outs).map((l) => (l === 1 ? '#' : '.')).join('');
+    };
+    expect([1, 2, 3, 4, 5, 6, 7].map((r) => dots(code2513('A')!, r))).toEqual(['..#..', '.#.#.', '#...#', '#...#', '#####', '#...#', '#...#']);
+    for (let code = 0; code < 64; code++) {
+      expect(dots(code, 0), `row 0 of ${code}`).toBe('.....');
+      for (let r = 0; r < 8; r++) expect(dots(code, r)).toBe(FONT_2513_CHART[(code >> 3) * 8 + r].split(' ')[code & 7]);
+    }
+    t.set({ '~CE': 1 });
+    expect(t.gets(outs), 'disabled: open').toEqual(['Z', 'Z', 'Z', 'Z', 'Z']);
+  });
+  it('2513: 450 ns from a new address to its dots (45 gate delays)', () => {
+    const t = bench('2513');
+    t.set({ '~CE': 0 }).bus(names((k) => `A${k}`, 1, 9), (code2513('A')! << 3) | 1);
+    const o3 = watch(t.c, t.nets.O3), from = t.c.time;
+    t.bus(names((k) => `A${k}`, 1, 9), (code2513('A')! << 3) | 2);
+    expect(o3.slice(1)).toEqual([[from + 45, 0]]);
+  });
+  it('2518: REC low writes the inputs, high sends the outputs round: 32 words a turn', () => {
+    const t = bench('2518');
+    const ins = names((k) => `IN${k}`, 1, 6), outs = names((k) => `OUT${k}`, 1, 6);
+    const words = Array.from({ length: 32 }, (_, w) => (w * 7 + 3) & 63);
+    t.set({ CLK: 0, REC: 0 });
+    for (const w of words) t.bus(ins, w).pulse('CLK');
+    t.set({ REC: 1 }).bus(ins, 0);
+    for (let turn = 0; turn < 2; turn++) {
+      const seen: (number | null)[] = [];
+      for (let k = 0; k < 32; k++) {
+        seen.push(t.num(outs));
+        t.pulse('CLK');
+      }
+      expect(seen, `turn ${turn}`).toEqual(words);
+    }
+    expect(peek2518(t.comp.state)).toEqual(words);
+  });
+  it('2518: it takes the inputs as the clock rises and moves on as it falls, 300 ns later', () => {
+    const t = bench('2518');
+    const ins = names((k) => `IN${k}`, 1, 6), outs = names((k) => `OUT${k}`, 1, 6);
+    t.set({ CLK: 0, REC: 0 });
+    for (let k = 0; k < 32; k++) t.bus(ins, 0).pulse('CLK');
+    t.bus(ins, 5).set({ CLK: 1 }).bus(ins, 9);
+    expect(t.num(outs), 'nothing moves while the clock is high').toBe(0);
+    for (let k = 0; k < 31; k++) t.set({ CLK: 0 }).bus(ins, 0).set({ CLK: 1 });
+    const ev = watch(t.c, t.nets.OUT1), from = t.c.time;
+    t.set({ CLK: 0 });
+    expect(t.num(outs), 'the word as the clock rose, not after').toBe(5);
+    expect(ev.slice(1)).toEqual([[from + 30, 1]]);
   });
 });

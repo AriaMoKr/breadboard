@@ -2,6 +2,7 @@ import { and, not, or, xor, type Bit, type Circuit, type Component, type EvalCon
 import { HEX_DIGITS, displayEepromImage } from '../../sim/display';
 import { MICROCODE_VERSIONS, buildMicrocode, buildMicrocodeVersion, microcodeEepromImage, type MicrocodeVersionId } from '../../sim/microcode';
 import { CHIPS, pinNumber } from '../catalog';
+import { FONT_2513 } from './font2513';
 import type { ChipModel, ChipParams } from './types';
 
 /**
@@ -24,9 +25,11 @@ import type { ChipModel, ChipParams } from './types';
  * - 3-state outputs return 'Z'. Bidirectional pins (74LS245 A/B, 28C16 IO)
  *   are listed both as inputs and as outputs.
  * - Delays are in gate delays: gates 1, flip-flops / decoders / muxes /
- *   transceivers / 283 / 273 / 85 / 90 / 92 / 8288 2, 161 / 173 / 189 /
+ *   transceivers / 283 / 273 / 85 / 90 / 92 / 8288 / 74165 2, 161 / 173 / 189 /
  *   CD4511 3, 28C16 5 (an EEPROM is much slower than TTL; 5 keeps the full
- *   computer fast), 555 and MC4024 1.
+ *   computer fast), 555 and MC4024 1. The TV Typewriter's MOS chips take their
+ *   datasheets' typical times at about 10 ns a gate delay: the 2518 30
+ *   (300 ns from its clock to its outputs), the 2513 45 (450 ns access).
  */
 
 // ---------------------------------------------------------------------------
@@ -591,6 +594,54 @@ const MC4024: ChipModel = {
 };
 
 // ---------------------------------------------------------------------------
+// The 2518 (Signetics MOS)
+
+const s2518Pins = (name: string) => pinNumber(CHIPS['2518'], name);
+const SIX = [1, 2, 3, 4, 5, 6];
+
+/**
+ * Signetics 2518: six 32-bit static shift registers on one clock (Signetics MOS, 1972, pp. 81-83).
+ * With REC high each one recirculates, taking its own output back in; with REC low it takes its
+ * input. The timing diagram puts the input's set-up and hold about the clock's rising edge, and the
+ * output follows the clock 300 ns later: the model takes the input (or the output) into a master as
+ * the clock rises and shifts it in as the clock falls, when the outputs change, as a master-slave
+ * flip-flop does. (Which edge moves the outputs is read from how the TV Typewriter uses it, not
+ * the diagram: see docs/research/tv-typewriter.md.) An unknown clock is no edge.
+ */
+const S2518: ChipModel = {
+  id: '2518',
+  inputs: [s2518Pins('CLK'), s2518Pins('REC'), ...SIX.map((k) => s2518Pins(`IN${k}`))],
+  outputs: SIX.map((k) => s2518Pins(`OUT${k}`)),
+  delay: 30,
+  evaluate(levels, ctx) {
+    const st = ctx.state as { ring?: Level[][]; at?: number; master?: Level[] };
+    // the 32 stages as a ring: ring[at] is the oldest, on the outputs
+    const ring = (st.ring ??= Array.from({ length: 32 }, (): Level[] => [0, 0, 0, 0, 0, 0]));
+    st.at ??= 0;
+    st.master ??= [0, 0, 0, 0, 0, 0];
+    const clk = ttl(levels[0]), was = ttl(ctx.prevInputs[0]);
+    if (was === 0 && clk === 1) {
+      const rec = ttl(levels[1]), out = ring[st.at];
+      st.master = out.map((o, b) => {
+        const i = ttl(levels[2 + b]);
+        return rec === 1 ? o : rec === 0 ? i : merge(o, i);
+      });
+    } else if (was === 1 && clk === 0) {
+      ring[st.at] = st.master.slice();
+      st.at = (st.at + 1) % 32;
+    }
+    return ring[st.at].slice();
+  },
+};
+
+/** What a 2518 instance holds, oldest (on its outputs) first: 32 six-bit words, bit 0 from IN1. */
+export function peek2518(state: Record<string, unknown>): (number | null)[] {
+  const st = state as { ring?: Level[][]; at?: number };
+  if (!st.ring) return Array.from({ length: 32 }, () => 0);
+  return Array.from({ length: 32 }, (_, k) => levelsToNumber(st.ring![(st.at! + k) % 32]));
+}
+
+// ---------------------------------------------------------------------------
 // The catalog
 
 export const CHIP_MODELS: Record<string, ChipModel> = {
@@ -903,6 +954,53 @@ export const CHIP_MODELS: Record<string, ChipModel> = {
   }]),
 
   MC4024,
+
+  /** Open-collector NAND gates: a gate whose output would be high lets go of it (a pull-up resistor makes it high). */
+  '7401': gates2('7401', (a, b) => {
+    const y = not(and([a, b]));
+    return y === 1 ? 'Z' : y;
+  }, QUAD),
+
+  /**
+   * Parallel-in, serial-out shift register. SH/~LD low loads A-H at once, whatever the clock does.
+   * Otherwise the register shifts (SER into QA, ... G into QH) as CLK OR CLK INH rises: CLK's
+   * rising edge while CLK INH is low, but also CLK INH's while CLK is low, which TI's datasheet
+   * warns of. ~QH is QH inverted.
+   */
+  '74165': unitChip('74165', 2, [{
+    ins: ['SH/~LD', 'CLK', 'CLK INH', 'SER', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'],
+    outs: ['QH', '~QH'],
+    bits: 8,
+    fn(u) {
+      let q = [0, 1, 2, 3, 4, 5, 6, 7].map((k) => u.s(k));
+      if (!u.i(0)) q = [4, 5, 6, 7, 8, 9, 10, 11].map((k) => u.i(k));
+      else {
+        const before = (k: number): Bit => (u.rose(k) ? 0 : u.fell(k) ? 1 : u.i(k));
+        if (!(before(1) | before(2)) && u.i(1) | u.i(2)) q = [u.i(3), ...q.slice(0, 7)];
+      }
+      q.forEach((b, k) => u.w(k, b));
+      return [q[7], (1 - q[7]) as Bit];
+    },
+  }]),
+
+  /**
+   * Signetics 2513 character generator, the CM2140 ASCII font (font2513.ts): A4-A9 pick one of 64
+   * characters and A1-A3 one of its 8 rows; O1-O5 are the row's dots. ~CE, the datasheet's CHIP
+   * ENABLE, gives the data when low and leaves the outputs open (3-state) when high.
+   */
+  '2513': unitChip('2513', 45, [{
+    ins: ['A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'A9', '~CE'],
+    outs: ['O1', 'O2', 'O3', 'O4', 'O5'],
+    fn(u) {
+      if (u.i(9)) return ['Z', 'Z', 'Z', 'Z', 'Z'];
+      let a = 0;
+      for (let k = 0; k < 9; k++) a |= u.i(k) << k;
+      const dots = FONT_2513[a >> 3][a & 7];
+      return [0, 1, 2, 3, 4].map((b) => ((dots >> b) & 1) as Bit);
+    },
+  }]),
+
+  '2518': S2518,
 };
 
 // ---------------------------------------------------------------------------

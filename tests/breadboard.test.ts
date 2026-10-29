@@ -39,7 +39,8 @@ describe('breadboard geometry', () => {
     for (const c of Object.values(CHIPS)) {
       expect(c.pins.length % 2).toBe(0);
       expect(c.pins[c.vcc - 1]).toBe('VCC');
-      expect(c.pins[c.gnd - 1]).toBe('GND');
+      // the 2518 has no ground pin, and the sandbox takes its VGG (-12 V) for one (catalog.ts)
+      expect(c.pins[c.gnd - 1]).toBe(c.id === '2518' ? 'VGG' : 'GND');
     }
   });
 });

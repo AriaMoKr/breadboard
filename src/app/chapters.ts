@@ -240,7 +240,10 @@ export const PROJECTS: Project[] = [
     by: 'Don Lancaster',
     text: 'Don Lancaster’s TV Typewriter, from Radio-Electronics in September 1973: 16 lines of 32 characters on a television, typed on a keyboard, from standard TTL and Signetics’ MOS memories, on boards that plug into one stack. Built here from his schematics, board by board.',
     source: { href: 'https://archive.org/details/donlancaster_tv_typewriter_9_73', label: 'Radio-Electronics, September 1973' },
-    parts: [{ title: 'The timing chain', lab: 'tvt-timing', where: 'the timing board, Figs. 6 and 7' }],
+    parts: [
+      { title: 'The timing chain', lab: 'tvt-timing', where: 'the timing board, Figs. 6 and 7' },
+      { title: 'The character generator', lab: 'tvt-chargen', where: 'page A, Fig. 5, with the derived timing, Fig. 7' },
+    ],
   },
 ];
 

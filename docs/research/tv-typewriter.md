@@ -266,12 +266,27 @@ its inputs are low. Written here as positive logic:
   - Outputs 1-6 (pins 12, 11, 10, 9, 8, 7) to the 2513's address inputs 4-9 (pins 17-22), each with
     a 6.8 kΩ pull-down to −12 V (R45-R50).
   - Pin 5 is −12 V and pin 16 +5 V.
+  - [D] Signetics' timing diagram (Signetics MOS, scan page n82) has the inputs' set-up and hold
+    about the clock's rising edge, and the outputs following the clock by about 300 ns. [I] Which
+    edge moves the outputs is read from how the TVT uses it: the simulation takes the inputs as
+    LINE CLOCK rises (in the ÷3's third count, after stack 16 has read the memory in its second)
+    and moves the registers on as it falls, as a master-slave register does. Then the 2513 has most
+    of a character time to settle before OUTPUT LOAD, and each character shows in the character
+    time after the one it was read in, as the 32 loads (character times 1-32) need.
 - IC9 2513, the character generator:
   - Address inputs 1-3 (pins 14-16) from L1, L2 and L4 (50, 49, 48), with 2.2 kΩ pull-ups (R40-R42).
   - ENABLE (11) from CURSOR INHIBIT (28), with R37, 47 kΩ, to −12 V. Grounding 28 removes the
     cursor. [R] A high enable gives an all-white cell, which is how the cursor shows.
   - Pin 1 is −12 V, 12 is −5 V, 10 ground and 24 +5 V. Pins 2, 3, 9, 13 and 23 are unused.
   - Outputs 1-5 are pins 4-8.
+  - [D] The standard font, CM2140, is charted in Signetics MOS, p. 71 (scan page n71): eight rows
+    of eight characters, @ A-Z [ \ ] ^ _ then space to ?, ASCII's 0x40-0x5F and 0x20-0x3F in six
+    bits. Address 1 (A1) is the lowest bit of the row and address 4 (A4) of the character (the
+    chart labels A 000001 from A4 down). Row 000 is the top and is blank in every character; the
+    characters are 5 dots wide and 7 high, in rows 1-7. Output 5 is the leftmost dot.
+    `src/breadboard/sim/font2513.ts` has the chart as drawn.
+  - [I] The scan line's count gives A1-A3, so lines 1-8 of a row are the 2513's rows 0-7, and on
+    lines 9-12 (N high) the rows are 0-3 again, which 9-12 BLANK keeps off the screen.
 - IC10 74165, the output register:
   - Parallel inputs C (13), D (14), E (3), F (4) and G (5) take the 2513's outputs 1 to 5. H (6), A
     (11), B (12) and the serial input (10) are grounded.
@@ -282,6 +297,9 @@ its inputs are low. Written here as positive logic:
   - [I] After each load QH gives H (blank), then G, F, E, D and C: one blank dot, then the 2513's
     outputs 5 to 1, six dots a character. B and A never reach QH, since the next load comes six
     clocks later.
+  - [I] 9-12 BLANK stops the clock but not the load, which is asynchronous: on lines 9-12 the
+    register goes on loading 32 times a line and shifts nothing. See What the simulation shows for
+    what that leaves behind.
 - IC11 7401 (open-collector NAND), the video combiner, with R36, 470 Ω, from VIDEO OUT (20) to
   +5 V:
   - Gate 3: NAND(QH (8), FLASH (9), optional), output 10 with R43, 2.2 kΩ, to +5 V.
@@ -523,6 +541,7 @@ It adds that the foil patterns are correct. The notes page (23) adds:
   2524/2525 512-bit recirculating registers. [D] Their pin diagrams are on scan pages n65 (2513),
   n81 (2518) and n93 (2524).
 - A separate 2513 sheet: https://archive.org/details/Signetics-25132560-BitStaticCharacterGenerator64x8x5OCR.
+  The font chart used here is the one in Signetics MOS, p. 71 (scan page n71).
 - *Signetics Digital 8000 Series TTL/MSI* (1972), with the 8288 from scan page n115:
   https://archive.org/details/bitsavers_signeticsdcs8000SeriesTTLMSI_11847693.
 - TI's *TTL Data Book*, 2nd edition, slice 05:
@@ -539,26 +558,28 @@ It adds that the foil patterns are correct. The notes page (23) adds:
 |---|---|---|
 | 7400, 7402, 7408, 7432, 7474 | timing, cursor, encoder | yes (74LS) |
 | 555 | cursor | yes (NE555) |
-| 7401 open-collector NAND | memory (page A) | no; not the 7400's pinout |
+| 7401 open-collector NAND | memory (page A) | yes; not the 7400's pinout |
 | 7406 open-collector hex driver | memory | no |
 | 7410 triple 3-input NAND | timing | yes |
 | 7473 dual JK | timing, cursor | yes, master-slave as in TI's function table |
-| 74165 parallel-in serial-out register | memory (page A) | no |
+| 74165 parallel-in serial-out register | memory (page A) | yes |
 | 74197 (or 74177) divide-by-16 counter | cursor | no; 74LS161 counts the same way, with other controls |
 | 8288 divide-by-12 counter (Signetics) | timing | yes |
 | MC4024 dual astable | timing (crystal oscillator) | yes, its frequencies set as parameters |
-| 2513 character generator, 2518 and 2524 MOS shift registers | memory | no |
+| 2513 character generator, 2518 hex 32-bit register | memory (page A) | yes, on +5 V and ground alone: their −5 and −12 V supplies aren't modelled, and the sandbox takes the 2518's VGG (it has no ground pin) for its ground |
+| 2524 512-bit register | memory | no |
+| HD0165 encoder, MC789P RTL inverter | improved encoder | no |
 
 All of these pinouts are checked against datasheets above, except the 74LS107's, 74LS161's and
 74LS92's.
-| HD0165 encoder, MC789P RTL inverter | improved encoder | no |
 
 - [Lab] A display part for the sandbox, a TV that draws a raster from a video net and a sync net.
   Every TVT, and any video circuit, needs one. The timing lab has the TV itself
   (`src/labs/tvt/_tv.ts`); it isn't a sandbox part yet.
 - [Lab] The dot clock is 4.56 MHz, about 76,000 dot clocks a frame. Chip by chip, the timing board
   runs at 160 to 380 thousand dots a second (a browser, and Node), 12 to 28 times slower than the
-  real one: a picture every quarter of a second or so, drawn as it goes.
+  real one: a picture every quarter of a second or so, drawn as it goes. With the character
+  generator on it, about 140 to 150 thousand: a frame of 288 lines in about 0.6 s.
 - [Lab] A lab track could follow the boards: the timing chain (crystal, ÷12 counters, sync), then
   the character generator and dot shifter, then the recirculating memory, then the cursor.
 - [I] Ben's later video card series builds VGA timing from TTL counters on breadboards, so it
@@ -588,6 +609,29 @@ All of these pinouts are checked against datasheets above, except the 74LS107's,
   early. At 55 Hz the pulse comes too late, so the picture rolls until the vertical hold is turned
   below 55 Hz.
 
+[I] Running page A's character generator on that board (`src/labs/tvt/_chargen.ts`, the same
+tests), with a stand-in for the memory board that gives out the next of 512 characters each time
+stack 16 goes low:
+
+- Stack 15 and stack 16 each go low for one dot, 15 first, in each of the 32 shown character times
+  of line 1 of every text row: 512 pairs a frame, and the memory is read 512 times a frame.
+- OUTPUT LOAD falls once in each character time from 1 to 32 (counting from 0), on every line: 32
+  loads a line, 9,216 a frame as drawn. A character read in character time n shows in character
+  time n + 1, a gap dot and then its five dots, and the 2513's rows 1-7 are lines 2-8 of each row.
+  The whole frame matches the font dot for dot.
+- On lines 9-12 9-12 BLANK holds the 74165's clock, but its load goes on, so at the end of line
+  12 it holds the dots of the row's last character (column 32) for that line: the 2513's row 3. On
+  line 1 of the next row the clock runs again and shifts them out in character time 0, just left
+  of the first column. So under a row full to its 32nd place, a dot or two that no character put
+  there shows on the next row's top line (the 2513's blank row), about one character width left of
+  the text. It follows from the drawing; on the lab's TV, with the H̅ and G jumpers, it is on the
+  screen.
+- Grounding SELF TEST makes every dot white but the sync; grounding FLASH leaves no white; CURSOR
+  high leaves the 2513's outputs open, and every place on lines 1-8 of each row is a block of five
+  white dots.
+- The TV holds the 55 Hz frame still with its vertical hold at 54 Hz.
+
 _Sources: the archive.org scans above (their OCR text); the booklet's PDF, its drawings read at
-300 dpi; the pin diagrams in Signetics MOS, Signetics' 8000 Series TTL/MSI, TI's TTL Data Book and
-the TTL Cookbook; Lancaster's bibliography; the parts in src/breadboard/catalog.ts._
+300 dpi; the pin diagrams and the 2513's font chart in Signetics MOS, Signetics' 8000 Series
+TTL/MSI, TI's TTL Data Book and the TTL Cookbook; Lancaster's bibliography; the parts in
+src/breadboard/catalog.ts._

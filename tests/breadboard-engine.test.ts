@@ -1279,3 +1279,56 @@ describe('layouts built one part at a time (the sandbox)', () => {
     expect(none.time).toBe(10);
   });
 });
+
+describe("BreadboardSim: the TV Typewriter's MOS chips on +5 V and ground", () => {
+  it('runs a 2513: the character on A4-A9 and the row on A1-A3 give its dots', () => {
+    const L = board((bb) => {
+      const U1 = bb.chip('U1', '2513', 10);
+      bb.toVcc(U1.pin('VCC'));
+      bb.toGnd(U1.pin('GND'));
+      bb.toGnd(U1.pin('~CE'));
+      // "A" (1), row 1: A1 and A4 high
+      for (const a of ['A1', 'A4']) bb.toVcc(U1.pin(a));
+      for (const a of ['A2', 'A3', 'A5', 'A6', 'A7', 'A8', 'A9']) bb.toGnd(U1.pin(a));
+    });
+    const sim = new BreadboardSim(L);
+    expect(sim.problems()).toEqual([]);
+    settled(sim);
+    expect(['O5', 'O4', 'O3', 'O2', 'O1'].map((p) => sim.pinLevel('U1', p))).toEqual([0, 0, 1, 0, 0]);
+  });
+  it('powers a 2518 with its VGG pin on ground, for want of a ground pin, and sends 32 words round', () => {
+    const L = board((bb) => {
+      const U1 = bb.chip('U1', '2518', 10);
+      bb.toVcc(U1.pin('VCC'));
+      bb.toGnd(U1.pin('VGG'));
+      bb.port('CLK', U1.free('CLK'), 'left');
+      bb.port('REC', U1.free('REC'), 'left');
+      bb.port('IN1', U1.free('IN1'), 'right');
+      bb.port('OUT1', U1.free('OUT1'), 'right');
+    });
+    const sim = new BreadboardSim(L);
+    expect(sim.problems()).toEqual([]);
+    const pulse = () => {
+      sim.setPort('CLK', 1);
+      settled(sim);
+      sim.setPort('CLK', 0);
+      settled(sim);
+    };
+    sim.setPort('CLK', 0);
+    sim.setPort('REC', 0);
+    settled(sim);
+    const bits = Array.from({ length: 32 }, (_, k) => ((k * 5) % 3 === 0 ? 1 : 0) as Level);
+    for (const b of bits) {
+      sim.setPort('IN1', b);
+      pulse();
+    }
+    sim.setPort('REC', 1);
+    sim.setPort('IN1', 0);
+    const seen: Level[] = [];
+    for (let k = 0; k < 64; k++) {
+      seen.push(sim.portLevel('OUT1'));
+      pulse();
+    }
+    expect(seen).toEqual([...bits, ...bits]);
+  });
+});

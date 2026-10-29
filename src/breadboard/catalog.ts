@@ -156,6 +156,30 @@ export const CHIPS: Record<string, ChipDef> = {
     pins: ['VCC1', 'FREQ1', 'CAP1', 'CAP1', 'GND1', 'OUT1', 'GND', 'OUT2', 'GND2', 'CAP2', 'CAP2', 'FREQ2', 'VCC2', 'VCC'],
     datasheet: 'https://archive.org/details/donlancaster_TTLCB1/page/n53',
   },
+  '7401': {
+    // open-collector outputs, and the 7402's pinout rather than the 7400's
+    id: '7401', title: 'Quad 2-input NAND, open-collector outputs', spacing: 3, vcc: 14, gnd: 7,
+    pins: ['1Y', '1A', '1B', '2Y', '2A', '2B', 'GND', '3A', '3B', '3Y', '4A', '4B', '4Y', 'VCC'],
+    datasheet: 'https://archive.org/details/bitsavers_tidataBook2ed05_2430672/page/n5',
+  },
+  '74165': {
+    id: '74165', title: '8-bit parallel-in, serial-out shift register', spacing: 3, vcc: 16, gnd: 8,
+    pins: ['SH/~LD', 'CLK', 'E', 'F', 'G', 'H', '~QH', 'GND', 'QH', 'SER', 'A', 'B', 'C', 'D', 'CLK INH', 'VCC'],
+    datasheet: 'https://archive.org/details/bitsavers_tidataBook2ed05_2430672/page/n43',
+  },
+  '2513': {
+    // P-MOS: VGG (1) is -12 V and VDD (12) -5 V, which the sandbox doesn't have
+    id: '2513', title: 'Character generator, 64 × 8 × 5 ASCII (Signetics MOS ROM)', spacing: 6, vcc: 24, gnd: 10,
+    pins: ['VGG', 'NC', 'NC', 'O1', 'O2', 'O3', 'O4', 'O5', 'NC', 'GND', '~CE', 'VDD', 'NC', 'A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'A9', 'NC', 'VCC'],
+    datasheet: 'https://archive.org/details/bitsavers_signeticsdcsMOS_10148267/page/n65',
+  },
+  '2518': {
+    // no ground pin: VCC (16) is +5 V and VGG (5) -12 V. The sandbox, with only +5 V and ground,
+    // takes VGG for its GND
+    id: '2518', title: 'Hex 32-bit static shift register, recirculating (Signetics MOS)', spacing: 3, vcc: 16, gnd: 5,
+    pins: ['IN4', 'IN5', 'IN6', 'REC', 'VGG', 'CLK', 'OUT6', 'OUT5', 'OUT4', 'OUT3', 'OUT2', 'OUT1', 'IN1', 'IN2', 'IN3', 'VCC'],
+    datasheet: 'https://archive.org/details/bitsavers_signeticsdcsMOS_10148267/page/n81',
+  },
 };
 
 export const CHIP_IDS = Object.keys(CHIPS);
@@ -171,7 +195,10 @@ export function pinNumber(chip: ChipDef, name: string): number {
   return i + 1;
 }
 
-/** Label for a pin as printed in the UI (leading "~" becomes an overline). */
+/** Label for a pin as printed in the UI (leading "~" becomes an overline, also after a "/": SH/~LD). */
 export function prettyPin(name: string): string {
-  return name.startsWith('~') ? [...name.slice(1)].map((ch) => ch + '̅').join('') : name;
+  return name
+    .split('/')
+    .map((part) => (part.startsWith('~') ? [...part.slice(1)].map((ch) => ch + '̅').join('') : part))
+    .join('/');
 }

@@ -3,7 +3,7 @@ import { Button, Led, LedBar, Scope, Slider, note, panel, readouts, row, select 
 import { Disposer, animate, h, setText } from '../../ui/dom';
 import { callout, injectStyle, truthTable } from '../latches/_shared';
 import { defineLab } from '../types';
-import { DOT_HZ, TEST_POINTS, charTime, frameCount, scanLine, timingBoard, type GJumper, type HJumper, type TGate, type TestPoint, type VJumper } from './_timing';
+import { DOT_HZ, TEST_POINTS, charTime, frameCount, hz, scanLine, timingBoard, type GJumper, type HJumper, type TGate, type TestPoint, type VJumper } from './_timing';
 import { HOLD, TvScan, TvScreen } from './_tv';
 
 type Probe = 'cells' | 'blank' | 'line1' | 'clock' | 'none';
@@ -45,13 +45,6 @@ const CSS = `
 .tvt-lab .tvt-points .led { vertical-align: middle; }
 .tvt-lab .led.tvt-flicker { opacity: 0.55; }
 `;
-
-/** A frequency in Hz, kHz or MHz, to 5 significant figures. */
-export function hz(f: number): string {
-  if (!Number.isFinite(f) || f <= 0) return '—';
-  const [v, unit] = f >= 1e6 ? [f / 1e6, 'MHz'] : f >= 1e3 ? [f / 1e3, 'kHz'] : [f, 'Hz'];
-  return `${+v.toPrecision(5)} ${unit}`;
-}
 
 export default defineLab({
   id: 'tvt-timing',
@@ -314,7 +307,7 @@ export default defineLab({
         { class: 'lab-stack' },
         panel(
           'On the TV',
-          { accent: 'blue', chips: 'the timing board, Figs. 6 and 7: IC1 MC4024 · IC2, IC3, IC5, IC6 8288 · IC4 7473 · IC7, IC8 7432 · IC10, IC11 7410 · IC12 7402' },
+          { accent: 'blue', chips: 'the timing board, Figs. 6 and 7: IC1 MC4024 · IC2, IC3, IC5, IC6 8288 · IC4 7473 · IC7, IC8 7432 · IC9, IC12 7402 · IC10, IC11 7410' },
           screen.el,
           row(probeSel, speedSel, dotBtn.el),
           row(hold.el),
