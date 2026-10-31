@@ -291,7 +291,9 @@ final machine), [docs/research/videos.md](docs/research/videos.md) (per-video co
 Typewriter, its schematics transcribed, and the TVTs after it).
 
 Sources for growing beyond Ben's series, not used by the simulator yet:
-[docs/research/mims.md](docs/research/mims.md) (Forrest Mims's books and columns) and
+[docs/research/mims.md](docs/research/mims.md) (Forrest Mims's books and columns),
+[docs/research/moritz-klein.md](docs/research/moritz-klein.md) (Moritz Klein's DIY synthesizer
+videos, from his breadboard guide on) and
 [docs/research/sources.md](docs/research/sources.md) (other books, datasheets and projects to draw
 on).
 
