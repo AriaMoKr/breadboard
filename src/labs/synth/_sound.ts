@@ -1,3 +1,27 @@
+/** How many harmonics `Tone.wave` keeps: WebAudio drops those above half the sample rate itself. */
+const HARMONICS = 64;
+
+/**
+ * The Fourier series of one period of a wave, from `samples` evenly spaced over it: the cosine
+ * (`real`) and sine (`imag`) terms 1 to `n`, as WebAudio's PeriodicWave takes them. Term 0, the
+ * average, stays 0: it would only be an offset, which a speaker doesn't play.
+ */
+export function periodicWave(samples: readonly number[], n: number): { real: Float32Array; imag: Float32Array } {
+  const m = samples.length;
+  const real = new Float32Array(n + 1), imag = new Float32Array(n + 1);
+  for (let k = 1; k <= n; k++) {
+    let re = 0, im = 0;
+    for (let i = 0; i < m; i++) {
+      const ph = (2 * Math.PI * k * i) / m;
+      re += samples[i] * Math.cos(ph);
+      im += samples[i] * Math.sin(ph);
+    }
+    real[k] = (2 * re) / m;
+    imag[k] = (2 * im) / m;
+  }
+  return { real, imag };
+}
+
 /**
  * The synth labs' "Listen" toggles: a circuit's tone through WebAudio, quietly. Browsers only play
  * sound after a click or a key, so it starts from the toggle; where there is no AudioContext (the
@@ -15,7 +39,24 @@ export class Tone {
 
   /** Play (or retune) a square wave at `hz`. */
   square(hz: number) {
-    if (typeof AudioContext === 'undefined') return;
+    const osc = this.start();
+    if (!osc) return;
+    osc.type = 'square';
+    osc.frequency.value = hz;
+  }
+
+  /** Play (or retune) a wave of which `samples` is one period, evenly spaced, at `hz`. */
+  wave(hz: number, samples: readonly number[]) {
+    const osc = this.start();
+    if (!osc || !this.ctx) return;
+    const { real, imag } = periodicWave(samples, HARMONICS);
+    osc.setPeriodicWave(this.ctx.createPeriodicWave(real, imag));
+    osc.frequency.value = hz;
+  }
+
+  /** The oscillator, started (fading in) if it isn't playing; null where there is no WebAudio. */
+  private start(): OscillatorNode | null {
+    if (typeof AudioContext === 'undefined') return null;
     const ctx = (this.ctx ??= new AudioContext());
     void ctx.resume();
     if (!this.osc) {
@@ -26,11 +67,10 @@ export class Tone {
       this.gain.gain.linearRampToValueAtTime(this.volume, now + 0.02);
       this.gain.connect(ctx.destination);
       this.osc = ctx.createOscillator();
-      this.osc.type = 'square';
       this.osc.connect(this.gain);
       this.osc.start(now);
     }
-    this.osc.frequency.value = hz;
+    return this.osc;
   }
 
   stop() {

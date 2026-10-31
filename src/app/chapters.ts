@@ -226,7 +226,7 @@ export const OTHER_GROUPS: MoreGroup[] = [
     numbered: true,
     videos: [
       m('XpMZoR3fgd0', "Complete beginner's guide to using a breadboard", '21:22', '2021-03-29', 'using-a-breadboard'),
-      m('QBatvo8bCa4', 'DIY VCO Part 1: The analog oscillator core anyone can build', '27:09', '2020-06-20'),
+      m('QBatvo8bCa4', 'DIY VCO Part 1: The analog oscillator core anyone can build', '27:09', '2020-06-20', 'oscillator-core'),
       m('4qxgwN9aq8E', 'DIY VCO Part 2: The simplest exponential converter', '22:59', '2020-07-07'),
       m('dd1dws6pSNo', 'DIY VCO Part 3: Tuning your VCO (and making sure it stays in tune)', '24:56', '2020-07-24'),
       m('E76z9ZTc5po', 'DIY VCO Part 4: Shaping Sawtooth to Square', '27:11', '2020-08-17'),

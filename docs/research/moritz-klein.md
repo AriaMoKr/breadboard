@@ -7,7 +7,8 @@ playlists, and since 2022 Erica Synths has sold his designs as kits (mki x es.ED
 cover which videos could make a section here, starting with his "For Beginners" playlist (the
 breadboard guide, then DIY VCO parts 1-4), and what the simulator needs for them. The playlist is
 a group on the site (`OTHER_GROUPS` in `src/app/chapters.ts`), and its labs are in
-`src/labs/synth/`, starting with the breadboard guide's (`using-a-breadboard`).
+`src/labs/synth/`: the breadboard guide's (`using-a-breadboard`), then VCO part 1's
+(`oscillator-core`).
 
 Labels: [V] his own words in the video, from YouTube's auto-generated transcript, read in the
 browser (summarised here, not quoted). [D] from the video's description: his bill of materials,
@@ -118,6 +119,17 @@ panel works in the in-app browser.
 - [I] On 9 V, a 40106's thresholds are near 5.3 V and 3.5 V (recalled from the datasheet), so the
   fall through 100k × 2.2 nF takes RC ln(5.3/3.5), about 90 µs: roughly 10 kHz, which fits "too
   high".
+- [Lab] The lab (`oscillator-core`) builds it in the video's five steps: the core; a jack straight
+  on it; the buffer; the AC coupling; the divider and the jack, with the sound. Its estimates,
+  said on the page:
+  - the thresholds above, a 0.7 V diode, and the 40106's output as about 300 Ω. The jump then
+    takes about 0.3 µs and the pitch is about 10.9 kHz. The 40106's delay of some tens of
+    nanoseconds is left out: in a real core the capacitor overshoots the upper threshold a little,
+    which lowers the pitch.
+  - What is plugged into the jack in the second step. Headphones (about 32 Ω) hold the capacitor
+    under a volt, so the core stops. An amplifier's line input (about 10k) would instead drain it
+    about ten times faster, above 100 kHz.
+  - After the 1 µF, the wave settles on its average, about 4.34 V, not on the middle of its swing.
 
 ### Parts 2-4 (from the descriptions)
 
@@ -244,8 +256,8 @@ kit", 3-8 minutes each) are left out.
   - The breadboard guide's four circuits and the VCO part 1 core fit this: Schmitt thresholds, a
     diode, a capacitor charging and draining.
   - Add sound through WebAudio and a scope trace (the labs have scopes).
-  - It's the smallest real step, and it would cover the "For Beginners" playlist's first two
-    videos.
+  - It's the smallest real step, and it covers the "For Beginners" playlist's first two videos:
+    their labs are built this way.
 - [Lab] An analog engine for the sandbox, for VCO parts 2-4 and everything after them.
   - Modified nodal analysis, Newton-Raphson for diodes and transistors, and companion models for
     capacitors.

@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { ANALOG_CHIPS, CHIPS, CHIP_IDS, chipDef } from '../src/breadboard/catalog';
 import { validateLayout } from '../src/breadboard/layout';
-import { FloatingInput, Relaxation, VSAT, comparator, divide, ledCurrent, relaxationPeriod } from '../src/labs/synth/_analog';
+import { Coupling, FloatingInput, PHONES, Relaxation, SchmittCore, VN, VP, VSAT, comparator, coreTimes, coreWave, divide, ledCurrent, par, relaxationPeriod, sampleCore } from '../src/labs/synth/_analog';
 import { guideLayout, guideNets, type Setup } from '../src/labs/synth/_board';
+import { periodicWave } from '../src/labs/synth/_sound';
 
 /** Rising edges of `Relaxation`'s output over `secs`, stepped `dt` at a time, after the first one. */
 function periods(rf: number, c: number, dt: number, secs: number): number[] {
@@ -160,5 +161,98 @@ describe('synth: the breadboard guide’s board', () => {
     expect(n.layout.parts.some((p) => p.kind === 'led')).toBe(false);
     const sleeve = n.layout.parts.filter((p) => p.kind === 'port' && p.name === 'GND').map((p) => (p.kind === 'port' ? p.hole : ''));
     expect(sleeve).toContain('bn13');
+  });
+});
+
+describe('synth: DIY VCO part 1’s oscillator core', () => {
+  it('jumps up through the diode in a fraction of a microsecond and falls through 100k in about 91 µs: about 10.9 kHz', () => {
+    const t = coreTimes();
+    expect(t.fall).toBeCloseTo(100e3 * 2.2e-9 * Math.log(VP / VN), 12);
+    expect(t.fall * 1e6).toBeCloseTo(91.3, 1);
+    expect(t.rise * 1e6).toBeGreaterThan(0.2);
+    expect(t.rise * 1e6).toBeLessThan(0.5);
+    expect(1 / t.period / 1e3).toBeCloseTo(10.9, 1);
+  });
+
+  it('is exact at any step: 50 cycles and a half come out the same in steps of 0.1 µs or in one', () => {
+    const t = coreTimes();
+    const total = 50 * t.period + t.rise + t.fall / 2;
+    for (const dt of [1e-7, 3.3e-6, 1e-4, total]) {
+      const core = new SchmittCore();
+      core.vc = VN;
+      let flips = 0, left = total;
+      while (left > 1e-15) {
+        const d = Math.min(dt, left);
+        flips += core.step(d);
+        left -= d;
+      }
+      // 51 times low at the top, 50 times high at the bottom; halfway down the 51st fall
+      expect(flips, `dt ${dt}`).toBe(101);
+      expect(core.high).toBe(false);
+      expect(core.vc).toBeCloseTo(Math.sqrt(VP * VN), 6);
+    }
+  });
+
+  it('swings between its thresholds and averages about 4.34 V', () => {
+    const { mean } = coreTimes();
+    const w = coreWave(20000);
+    expect(w.reduce((a, b) => a + b, 0) / w.length).toBeCloseTo(mean, 2);
+    expect(mean).toBeCloseTo(4.34, 2);
+    expect(Math.max(...w)).toBeLessThanOrEqual(VP + 1e-9);
+    expect(Math.min(...w)).toBeGreaterThanOrEqual(VN - 1e-9);
+  });
+
+  it('its output is high only for the jumps: readings 0.8 µs apart catch each one', () => {
+    const core = new SchmittCore();
+    core.vc = VN;
+    core.step(1e-3);
+    const { vc, out } = sampleCore(core, 0.8e-6, 1000); // 0.8 ms: 8.7 cycles
+    const pulses = out.filter((v, i) => v > 0 && !(out[i - 1] > 0)).length;
+    expect(pulses).toBeGreaterThanOrEqual(8);
+    expect(pulses).toBeLessThanOrEqual(9);
+    expect(out.filter((v) => v > 0).length).toBeLessThanOrEqual(2 * pulses);
+    expect(Math.min(...vc)).toBeGreaterThanOrEqual(VN - 1e-9);
+    expect(Math.max(...vc)).toBeLessThanOrEqual(VP + 1e-9);
+  });
+
+  it('headphones straight on the capacitor hold it under a volt, and it stops; unplugged, it starts again', () => {
+    const core = new SchmittCore();
+    core.vc = VN;
+    core.step(1e-3);
+    core.load = PHONES;
+    core.step(1e-6);
+    expect(core.step(10e-3)).toBe(0);
+    expect(core.high).toBe(true);
+    expect(core.vc).toBeCloseTo(0.8, 1);
+    core.load = Infinity;
+    expect(core.step(5e-3)).toBeGreaterThan(100);
+  });
+
+  it('a line input (10k) instead wouldn’t stop it, but drain it ten times faster: above 100 kHz', () => {
+    expect(1 / coreTimes(par(100e3, 10e3)).period).toBeGreaterThan(100e3);
+  });
+
+  it('AC coupling: everything passes at first, then the wave centres on 0 V within five time constants, whatever the frames', () => {
+    const { mean } = coreTimes();
+    const ac = new Coupling(100e3, 1e-6);
+    expect(ac.tau).toBeCloseTo(0.1, 9);
+    expect(ac.out(VP)).toBe(VP);
+    for (let i = 0; i < 30; i++) ac.step(1 / 60, mean);
+    expect(ac.vcap).toBeCloseTo(mean, 1);
+    expect(ac.out(VP)).toBeCloseTo(VP - mean, 1);
+    const a = new Coupling(100e3), b = new Coupling(100e3);
+    a.step(0.3, mean);
+    for (let i = 0; i < 300; i++) b.step(1e-3, mean);
+    expect(a.vcap).toBeCloseTo(b.vcap, 9);
+  });
+
+  it('the sound’s harmonics: a square wave’s odd ones at 4/(πn), a cosine’s first alone, and no offset', () => {
+    const m = 1024;
+    const sq = periodicWave(Array.from({ length: m }, (_, i) => (i < m / 2 ? 1 : -1)), 8);
+    for (let k = 1; k <= 8; k++) expect(sq.imag[k], `harmonic ${k}`).toBeCloseTo(k % 2 ? 4 / (Math.PI * k) : 0, 2);
+    const cw = periodicWave(Array.from({ length: m }, (_, i) => 3 + Math.cos((2 * Math.PI * i) / m)), 4);
+    expect(cw.real[1]).toBeCloseTo(1, 6);
+    expect([cw.real[0], cw.imag[0]]).toEqual([0, 0]);
+    for (const x of [cw.real[2], cw.real[3], cw.imag[1], cw.imag[2]]) expect(Math.abs(x)).toBeLessThan(1e-6);
   });
 });
