@@ -13,6 +13,11 @@ lab through its own `lab` field: the digital clock labs in `src/labs/dclock/` ar
 Such labs are in `MORE_LAB_IDS`, and every lab is in `ALL_LAB_IDS`. The sidebar lists them under the
 group's title, and their prev/next links stay within the series.
 
+Other creators' videos are in `OTHER_GROUPS`, groups like those with a `by`: Moritz Klein's "For
+Beginners" playlist, with its labs in `src/labs/synth/`, is the first. Their labs are in
+`OTHER_LAB_IDS`. The sidebar heads each group with whose it is ("Moritz Klein: For Beginners"),
+and the More videos page lists their videos after Ben's.
+
 Designs from other sources, such as a magazine article, are in `PROJECTS` (also in `chapters.ts`),
 part by part, each part with its lab and where it is in the source: Lancaster's TV Typewriter in
 `src/labs/tvt/` is the first. Their labs are in `PROJECT_LAB_IDS`; the sidebar gives each project a
@@ -51,6 +56,9 @@ body.
 | Microcode | `buildMicrocode`, `MICROCODE_VERSIONS` (`control-logic` v38, `arduino` v40 (+SUB), `more-instructions` v41, `flags` v44), `microcodeEepromImage`, `Machine.editMicrocode` — `src/sim/microcode.ts`; `MicrocodePanel` (`editable`, `highlightOpcodes`; `setHighlight(opcodes)`, `rowEl(op)`) |
 | Programs | `assemble`, `disassemble` — `src/sim/assembler.ts` (also Ben's on-screen binary notation: `1110: 0001 1100`, `LDA 1110`); `PROGRAMS` / `PROGRAM_BY_ID` — `src/sim/programs.ts`; `ProgramPanel.setSource(src)`, `selectProgram(id)` (the panel also follows any `machine.loadSource()` call) |
 | 7-segment / display EEPROM | `HEX_DIGITS`, `DEC_DIGITS`, `displayEepromImage`, `displaySegments` — `src/sim/display.ts` |
+| Analog parts | Small models of a group's own, with the circuit's equations: `src/labs/dclock/_analog.ts` (Ben's clock: the supply, the LM339 with hysteresis, the square-wave chain, switch bounce), `src/labs/synth/_analog.ts` (Moritz Klein's: the op-amp relaxation oscillator, stepped exactly from crossing to crossing, and a floating input); the symbols are `src/labs/clock/_draw.ts`'s kit |
+| A breadboard in a lab | `LayoutView` (`src/breadboard/render.ts`) draws a `Layout` built for the lab, as `src/labs/synth/_board.ts` does: `buildNets` checks its wiring in the tests, and `ANALOG_CHIPS` has chips to draw that the engine doesn't simulate |
+| Sound | `Tone` (`src/labs/synth/_sound.ts`): a quiet tone through WebAudio, started only by a control (a browser won't play before a click) and closed in cleanup |
 
 ### The Computer model in one paragraph
 

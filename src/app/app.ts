@@ -2,7 +2,7 @@ import { buildLabel } from '../build-info';
 import type { Lab } from '../labs/types';
 import { Machine } from '../sim/machine';
 import { h } from '../ui/dom';
-import { CHAPTERS, LAB_IDS, MORE_GROUPS, MORE_LAB_IDS, PLAYLIST_URL, PROJECTS, VIDEO_BY_INDEX, embedUrl, moreVideosForLab, projectForLab, shortTitle, videoUrl, videosForLab, watchUrl, type MoreGroup, type Project, type ProjectPart } from './chapters';
+import { CHAPTERS, LAB_IDS, MORE_GROUPS, OTHER_GROUPS, PLAYLIST_URL, PROJECTS, VIDEO_BY_INDEX, embedUrl, groupLabs, groupTitle, moreVideosForLab, projectForLab, shortTitle, videoUrl, videosForLab, watchUrl, type MoreGroup, type Project, type ProjectPart } from './chapters';
 import { mountComputerWorkbench } from './computer-page';
 import { hasLab, loadLab, loadedLab } from './lab-loader';
 
@@ -81,6 +81,9 @@ export class App {
         h('ol', { class: 'nav-videos' }, ch.videos.map((vid) => h('li', null, h('a', { href: labHref(vid.lab, vid.index), dataset: { lab: vid.lab, video: String(vid.index) } }, h('span', { class: 'nav-num' }, String(vid.index)), h('span', { class: 'nav-title' }, shortTitle(vid.title)), h('span', { class: 'nav-dur' }, vid.duration))))),
       ),
     );
+    // a group's videos that have labs, numbered if it is a series in parts
+    const labVideos = (g: MoreGroup) => g.videos.filter((v) => v.lab).map((v) => h('li', null, h('a', { href: labHref(v.lab!), dataset: { lab: v.lab! } }, h('span', { class: 'nav-num' }, g.numbered ? String(g.videos.indexOf(v) + 1) : '·'), h('span', { class: 'nav-title' }, shortTitle(v.title)), h('span', { class: 'nav-dur' }, v.duration))));
+    const moreLink = (g: MoreGroup, title: string) => h('li', null, h('a', { href: `#/more/${g.id}`, dataset: { route: 'more', group: g.id } }, h('span', { class: 'nav-num' }, '▸'), h('span', { class: 'nav-title' }, title), h('span', { class: 'nav-dur' }, String(g.videos.length))));
     return h(
       'nav',
       { class: 'sidebar', 'aria-label': 'Chapters' },
@@ -90,19 +93,9 @@ export class App {
       h('a', { class: 'nav-computer', href: 'vr.html', dataset: { route: 'vr' }, title: 'The breadboard computer in 3D: VR headsets, or mouse and touch' }, '◈ VR view'),
       h('ol', { class: 'nav-chapters' }, items),
       ...MORE_GROUPS.filter((g) => g.videos.some((v) => v.lab)).map((g) =>
-        h(
-          'div',
-          { class: 'nav-chapter' },
-          h('div', { class: 'nav-chapter-title' }, g.title),
-          h('ol', { class: 'nav-videos' }, g.videos.filter((v) => v.lab).map((v) => h('li', null, h('a', { href: labHref(v.lab!), dataset: { lab: v.lab! } }, h('span', { class: 'nav-num' }, g.numbered ? String(g.videos.indexOf(v) + 1) : '·'), h('span', { class: 'nav-title' }, shortTitle(v.title)), h('span', { class: 'nav-dur' }, v.duration))))),
-        ),
+        h('div', { class: 'nav-chapter' }, h('div', { class: 'nav-chapter-title' }, g.title), h('ol', { class: 'nav-videos' }, labVideos(g))),
       ),
-      h(
-        'div',
-        { class: 'nav-chapter' },
-        h('div', { class: 'nav-chapter-title' }, 'More from Ben'),
-        h('ol', { class: 'nav-videos' }, MORE_GROUPS.map((g) => h('li', null, h('a', { href: `#/more/${g.id}`, dataset: { route: 'more', group: g.id } }, h('span', { class: 'nav-num' }, '▸'), h('span', { class: 'nav-title' }, g.title), h('span', { class: 'nav-dur' }, String(g.videos.length)))))),
-      ),
+      h('div', { class: 'nav-chapter' }, h('div', { class: 'nav-chapter-title' }, 'More from Ben'), h('ol', { class: 'nav-videos' }, MORE_GROUPS.map((g) => moreLink(g, g.title)))),
       ...PROJECTS.map((p) =>
         h(
           'div',
@@ -110,6 +103,10 @@ export class App {
           h('div', { class: 'nav-chapter-title' }, `${p.by}’s ${p.title}`),
           h('ol', { class: 'nav-videos' }, p.parts.map((part, i) => h('li', null, h('a', { href: labHref(part.lab), dataset: { lab: part.lab } }, h('span', { class: 'nav-num' }, String(i + 1)), h('span', { class: 'nav-title' }, part.title), h('span', { class: 'nav-dur' }))))),
         ),
+      ),
+      // other creators: a group's labs, then all its videos on the More videos page
+      ...OTHER_GROUPS.map((g) =>
+        h('div', { class: 'nav-chapter' }, h('div', { class: 'nav-chapter-title' }, groupTitle(g)), h('ol', { class: 'nav-videos' }, labVideos(g), moreLink(g, 'All its videos'))),
       ),
       h('p', { class: 'nav-build', title: 'The commit this site was built from, and its date' }, buildLabel()),
     );
@@ -183,24 +180,24 @@ export class App {
     this.cleanup = wb.dispose;
   }
 
-  /** Ben's videos outside the playlist, grouped; `group` scrolls to one group. */
+  /** Ben's videos outside the playlist, then other creators', grouped; `group` scrolls to one group. */
   private renderMore(group: string | undefined) {
     document.title = 'More videos · Breadboard 8-bit';
     const head = h(
       'div',
       { class: 'page-head' },
       h('h1', null, 'More videos'),
-      h('p', { class: 'lede' }, 'Ben’s videos outside the playlist that go with it: his first build running programs, his introduction to transistors and logic gates, and his new digital clock series.'),
+      h('p', { class: 'lede' }, 'Ben’s videos outside the playlist that go with it: his first build running programs, his introduction to transistors and logic gates, and his new digital clock series. Then videos from other channels that teach circuits on a breadboard: Moritz Klein’s synthesizer videos, from his guide to the breadboard on.'),
     );
     const section = (g: MoreGroup) =>
       h(
         'section',
         { class: 'more-group', id: `more-${g.id}` },
-        h('h2', null, g.title),
-        h('p', { class: 'lede' }, g.text, ' ', h('span', { class: 'dim' }, 'Ben lists them on ', h('a', { href: g.source.href, target: '_blank', rel: 'noopener' }, `${g.source.label} ↗`), '.')),
+        h('h2', null, groupTitle(g)),
+        h('p', { class: 'lede' }, g.text, ' ', h('span', { class: 'dim' }, `${g.by ?? 'Ben'} lists them on `, h('a', { href: g.source.href, target: '_blank', rel: 'noopener' }, `${g.source.label} ↗`), '.')),
         h('div', { class: 'video-list' }, g.videos.map((v, i) => this.videoCard({ ...v, num: g.numbered ? String(i + 1) : undefined, url: watchUrl(v.youtubeId), lab: v.lab }, false))),
       );
-    this.main.append(head, ...MORE_GROUPS.map(section));
+    this.main.append(head, ...MORE_GROUPS.map(section), ...OTHER_GROUPS.map(section));
     if (group) this.main.querySelector(`#more-${group}`)?.scrollIntoView?.();
   }
 
@@ -232,9 +229,9 @@ export class App {
   }
 
   private async renderLab(id: string, videoIndex: number | undefined, token: number) {
-    // prev/next within the playlist, the group of Ben's other videos the lab belongs to, or its project
+    // prev/next within the playlist, the group of videos the lab belongs to, or its project
     const group = moreVideosForLab(id)[0]?.group, project = projectForLab(id)?.project;
-    const order = project ? project.parts.map((p) => p.lab) : LAB_IDS.includes(id) || !group ? LAB_IDS : MORE_LAB_IDS.filter((l) => group.videos.some((v) => v.lab === l));
+    const order = project ? project.parts.map((p) => p.lab) : LAB_IDS.includes(id) || !group ? LAB_IDS : groupLabs(group);
     const idx = order.indexOf(id);
     const prev = idx > 0 ? order[idx - 1] : null;
     const next = idx >= 0 && idx < order.length - 1 ? order[idx + 1] : null;
@@ -260,7 +257,7 @@ export class App {
     const crumbs = chapter
       ? [chapter.title, videos.length ? ` · video${videos.length > 1 ? 's' : ''} ${videos.map((x) => x.index).join(', ')}` : '']
       : more.length
-        ? [more[0].group.title, more[0].group.numbered ? ` · part${more.length > 1 ? 's' : ''} ${more.map((x) => x.part).join(', ')}` : '']
+        ? [groupTitle(more[0].group), more[0].group.numbered ? ` · part${more.length > 1 ? 's' : ''} ${more.map((x) => x.part).join(', ')}` : '']
         : project
           ? [`${project.project.by}’s ${project.project.title}`, ` · part ${project.num}`]
           : ['Lab', ''];

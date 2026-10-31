@@ -153,9 +153,11 @@ export interface MoreVideo {
 export interface MoreGroup {
   id: string;
   title: string;
+  /** Whose videos they are, if not Ben's (`OTHER_GROUPS`). */
+  by?: string;
   /** What these videos are and how they relate to the series. */
   text: string;
-  /** Where Ben lists them. */
+  /** Where Ben (or `by`) lists them. */
   source: { href: string; label: string };
   /** A series in parts, numbered in the list. */
   numbered?: boolean;
@@ -211,6 +213,39 @@ export const MORE_VIDEOS: MoreVideo[] = MORE_GROUPS.flatMap((g) => g.videos);
 export const MORE_LAB_IDS: string[] = [...new Set(MORE_VIDEOS.flatMap((v) => (v.lab ? [v.lab] : [])))];
 
 /**
+ * Other creators' videos that teach circuits on a breadboard, with labs built as Ben's are: so far
+ * Moritz Klein's synthesizer videos (docs/research/moritz-klein.md), from his breadboard guide on.
+ */
+export const OTHER_GROUPS: MoreGroup[] = [
+  {
+    id: 'klein-beginners',
+    title: 'For Beginners',
+    by: 'Moritz Klein',
+    text: 'Moritz Klein designs analog synthesizer circuits on a breadboard and explains them from scratch. His “For Beginners” playlist starts with a guide to the breadboard itself, then builds a voltage-controlled oscillator in four parts: a sawtooth core, an exponential converter for 1 V per octave, keeping it in tune, and shaping the sawtooth into a square.',
+    source: { href: 'https://www.youtube.com/playlist?list=PLHeL0JWdJLvRv-r0TTjWxegtBha0ajdYh', label: 'his “For Beginners” playlist' },
+    numbered: true,
+    videos: [
+      m('XpMZoR3fgd0', "Complete beginner's guide to using a breadboard", '21:22', '2021-03-29', 'using-a-breadboard'),
+      m('QBatvo8bCa4', 'DIY VCO Part 1: The analog oscillator core anyone can build', '27:09', '2020-06-20'),
+      m('4qxgwN9aq8E', 'DIY VCO Part 2: The simplest exponential converter', '22:59', '2020-07-07'),
+      m('dd1dws6pSNo', 'DIY VCO Part 3: Tuning your VCO (and making sure it stays in tune)', '24:56', '2020-07-24'),
+      m('E76z9ZTc5po', 'DIY VCO Part 4: Shaping Sawtooth to Square', '27:11', '2020-08-17'),
+    ],
+  },
+];
+
+export const OTHER_VIDEOS: MoreVideo[] = OTHER_GROUPS.flatMap((g) => g.videos);
+
+/** Labs for other creators' videos, in order. */
+export const OTHER_LAB_IDS: string[] = [...new Set(OTHER_VIDEOS.flatMap((v) => (v.lab ? [v.lab] : [])))];
+
+/** A group's name for headings: Ben's by its title, others' with whose they are ("Moritz Klein: For Beginners"). */
+export const groupTitle = (g: MoreGroup) => (g.by ? `${g.by}: ${g.title}` : g.title);
+
+/** The labs of a group's videos, in order. */
+export const groupLabs = (g: MoreGroup) => [...new Set(g.videos.flatMap((v) => (v.lab ? [v.lab] : [])))];
+
+/**
  * Designs from other sources than Ben's videos, built here as his are, part by part with a lab
  * each: so far Don Lancaster's TV Typewriter, from a magazine article.
  */
@@ -254,19 +289,20 @@ export const PROJECT_LAB_IDS: string[] = PROJECTS.flatMap((p) => p.parts.map((x)
 export const projectForLab = (lab: string) =>
   PROJECTS.flatMap((project) => project.parts.flatMap((part, i) => (part.lab === lab ? [{ project, part, num: i + 1 }] : [])))[0];
 
-/** Every lab: the playlist's, then those for Ben's other videos, then the projects'. */
-export const ALL_LAB_IDS: string[] = [...LAB_IDS, ...MORE_LAB_IDS, ...PROJECT_LAB_IDS];
+/** Every lab: the playlist's, then those for Ben's other videos and other creators', then the projects'. */
+export const ALL_LAB_IDS: string[] = [...LAB_IDS, ...MORE_LAB_IDS, ...OTHER_LAB_IDS, ...PROJECT_LAB_IDS];
 
-/** Ben's other videos a lab covers, with their group and part number (1-based). */
+/** The videos outside Ben's playlist (his other videos, then other creators') a lab covers, with their group and part number (1-based). */
 export const moreVideosForLab = (lab: string) =>
-  MORE_GROUPS.flatMap((group) => group.videos.flatMap((video, i) => (video.lab === lab ? [{ group, video, part: i + 1 }] : [])));
+  [...MORE_GROUPS, ...OTHER_GROUPS].flatMap((group) => group.videos.flatMap((video, i) => (video.lab === lab ? [{ group, video, part: i + 1 }] : [])));
 
 /** A video's title without the series name ("Making a square wave square: Breadboard clock part 2" -> "Making a square wave square"). */
 export const shortTitle = (title: string) =>
   title
     .replace(/ - (8[- ]bit (computer clock|register)|8-bit register) - [Pp]art \d/, '')
     .replace(/: Breadboard clock part \d+$/, '')
-    .replace(/ (for my clock|on my breadboard clock)$/, '');
+    .replace(/ (for my clock|on my breadboard clock)$/, '')
+    .replace(/^DIY VCO Part \d+: /, '');
 
 export const watchUrl = (youtubeId: string) => `https://www.youtube.com/watch?v=${youtubeId}`;
 export const videoUrl = (vid: Video) => `https://www.youtube.com/watch?v=${vid.youtubeId}&list=${PLAYLIST_ID}&index=${vid.index}`;

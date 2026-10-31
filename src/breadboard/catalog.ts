@@ -185,6 +185,22 @@ export const CHIPS: Record<string, ChipDef> = {
 export const CHIP_IDS = Object.keys(CHIPS);
 
 /**
+ * Analog chips the chip-level engine doesn't simulate, for the labs that model them themselves
+ * and draw them on a breadboard. Not in CHIP_IDS, so the sandbox doesn't offer them.
+ */
+export const ANALOG_CHIPS: Record<string, ChipDef> = {
+  TL074: {
+    // on a split supply: V+ (4) and V− (11), no ground pin; `gnd` is V−
+    id: 'TL074', title: 'Quad JFET-input op amp', spacing: 3, vcc: 4, gnd: 11,
+    pins: ['1OUT', '1IN−', '1IN+', 'VCC+', '2IN+', '2IN−', '2OUT', '3OUT', '3IN−', '3IN+', 'VCC−', '4IN+', '4IN−', '4OUT'],
+    datasheet: 'https://www.ti.com/lit/ds/symlink/tl074.pdf',
+  },
+};
+
+/** A chip's pinout, from CHIPS or ANALOG_CHIPS. */
+export const chipDef = (id: string): ChipDef | undefined => CHIPS[id] ?? ANALOG_CHIPS[id];
+
+/**
  * 1-based pin number of a named pin: the exact name first (the CD4511 has inputs A-D and
  * segment outputs a-g), else ignoring case. Throws if unknown.
  */

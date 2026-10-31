@@ -5,8 +5,9 @@ part by part, on his YouTube channel (Moritz Klein, @MoritzKlein0), which sets o
 electronics more accessible. As of 2026-10-31 it has 61 uploads since April 2020 in 12
 playlists, and since 2022 Erica Synths has sold his designs as kits (mki x es.EDU). These notes
 cover which videos could make a section here, starting with his "For Beginners" playlist (the
-breadboard guide, then DIY VCO parts 1-4), and what the simulator would need for them. Nothing in
-the simulator follows them yet.
+breadboard guide, then DIY VCO parts 1-4), and what the simulator needs for them. The playlist is
+a group on the site (`OTHER_GROUPS` in `src/app/chapters.ts`), and its labs are in
+`src/labs/synth/`, starting with the breadboard guide's (`using-a-breadboard`).
 
 Labels: [V] his own words in the video, from YouTube's auto-generated transcript, read in the
 browser (summarised here, not quoted). [D] from the video's description: his bill of materials,
@@ -78,6 +79,18 @@ panel works in the in-app browser.
     reversed by more than the 5 V most LED datasheets allow, with 1k limiting any current. His
     sequencer video (2022) has a chapter on safe status LEDs.
   - In circuit 2, the − input floats whenever the jumper is out.
+- [Lab] The lab (`using-a-breadboard`) builds the four circuits on one board, as the video does,
+  with his parts and values, and these estimates, said on the page:
+  - the TL074's output swings to about ±7.5 V on ±9 V (its datasheet gives the swing on ±15 V
+    only), and a red LED drops about 2 V;
+  - the floating − input is drift and mains hum made up to show the idea, not measured;
+  - the oscillators are the exact solution of the RC charge between the thresholds, so the period
+    is 2RC ln 3 at any time step; the sound is a square wave at that pitch;
+  - headphones (about 32 Ω) load the 1k of the divider down to a few tens of millivolts.
+
+  The holes are the lab's own, since these notes come from the transcript rather than the
+  picture: the second battery sits above the board, its − lead in the top rail and its + lead in
+  the bottom ground rail.
 
 ### DIY VCO Part 1: The analog oscillator core anyone can build
 
@@ -250,12 +263,9 @@ kit", 3-8 minutes each) are left out.
 ## As a section of the site
 
 - [Lab] It's a creator's video series, like Ben's "More videos" groups (`MORE_GROUPS` in
-  `src/app/chapters.ts`), but by someone else. Two ways to fit it:
-  - give `MoreGroup` a `by`, with a heading per creator;
-  - or add a list beside `PROJECTS`.
-
-  The first group could be his own "For Beginners" playlist, numbered: the guide, then VCO parts
-  1-4.
+  `src/app/chapters.ts`), but by someone else. It went in the first of two ways: `MoreGroup` has
+  a `by`, and `OTHER_GROUPS` holds his "For Beginners" playlist, numbered: the guide, then VCO
+  parts 1-4. (The other way was a list beside `PROJECTS`.)
 - [Lab] Labs, in order:
   - "Using a breadboard": the guide's four circuits;
   - "The oscillator core" (VCO part 1);
@@ -272,7 +282,7 @@ kit", 3-8 minutes each) are left out.
 
 | Part | Used in | Nearest part in the catalog |
 |---|---|---|
-| TL072, TL074 op amps | nearly every video, the breadboard guide | — |
+| TL072, TL074 op amps | nearly every video, the breadboard guide | the TL074 in `ANALOG_CHIPS`: drawn and wired, not simulated |
 | CD40106 hex Schmitt inverter | VCO core and part 4, arpeggiator 2, hi-hat | 74LS04 (no hysteresis) |
 | BC548, BC558, 2N3904 transistors | VCO 2-3, VCA, sequencer, wavefolder, drums | — |
 | 1N4148 diodes | VCO core, envelope, sequencer, mixer | — |
@@ -284,7 +294,7 @@ kit", 3-8 minutes each) are left out.
 | TLC7524 DAC, ADC0820 | arpeggiator 1 and 3 | — |
 | 7805, 7812, 7912 regulators | arpeggiator 3, the dual supply | — (the clock labs model a 7805) |
 | LDR and LED (vactrol) | VCF 3 | — |
-| Jack sockets, 9 V batteries | everything | — |
+| Jack sockets, 9 V batteries | everything | — (the guide's lab draws them beside its board) |
 | MN3205 / V3205 BBD | delay | — |
 | Capacitors as timing parts | everything | — (the sandbox's capacitors only make edge pulses) |
 

@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { ALL_LAB_IDS, CHAPTERS, LAB_IDS, MORE_GROUPS, MORE_LAB_IDS, MORE_VIDEOS, VIDEOS } from '../src/app/chapters';
+import { ALL_LAB_IDS, CHAPTERS, LAB_IDS, MORE_GROUPS, MORE_LAB_IDS, MORE_VIDEOS, OTHER_GROUPS, OTHER_LAB_IDS, OTHER_VIDEOS, VIDEOS } from '../src/app/chapters';
 import { App } from '../src/app/app';
 import { mountComputerWorkbench } from '../src/app/computer-page';
 import { clearLabCache, hasLab, loadLab } from '../src/app/lab-loader';
@@ -677,16 +677,21 @@ describe('integration: chapter map', () => {
     expect(new Set(VIDEOS.map((v) => v.youtubeId)).size).toBe(44);
     expect(CHAPTERS.flatMap((c) => c.videos).length).toBe(44);
   });
-  it("lists Ben's other videos once each, none from the playlist, each dated", () => {
-    const ids = MORE_VIDEOS.map((v) => v.youtubeId);
+  it("lists Ben's other videos, and other channels', once each, none from the playlist, each dated", () => {
+    const ids = [...MORE_VIDEOS, ...OTHER_VIDEOS].map((v) => v.youtubeId);
     expect(new Set(ids).size).toBe(ids.length);
     for (const id of ids) expect(VIDEOS.some((v) => v.youtubeId === id), id).toBe(false);
-    for (const v of MORE_VIDEOS) expect(v.date, v.title).toMatch(/^20\d\d-[01]\d-[0-3]\d$/);
-    expect(new Set(MORE_GROUPS.map((g) => g.id)).size).toBe(MORE_GROUPS.length);
+    for (const v of [...MORE_VIDEOS, ...OTHER_VIDEOS]) expect(v.date, v.title).toMatch(/^20\d\d-[01]\d-[0-3]\d$/);
+    const groups = [...MORE_GROUPS, ...OTHER_GROUPS];
+    expect(new Set(groups.map((g) => g.id)).size).toBe(groups.length);
+    expect(MORE_GROUPS.some((g) => g.by)).toBe(false);
+    expect(OTHER_GROUPS.every((g) => g.by)).toBe(true);
   });
   it('every lab id in chapters.ts has a *.lab.ts that registers it, and vice versa', () => {
     expect(MORE_LAB_IDS).toEqual(['transistor-gates', 'mains-60hz', 'square-wave', 'divide-by-60', 'minutes-seconds', 'setting-time']);
     expect(MORE_LAB_IDS.filter((id) => LAB_IDS.includes(id))).toEqual([]);
+    expect(OTHER_LAB_IDS).toEqual(['using-a-breadboard']);
+    expect(OTHER_LAB_IDS.filter((id) => LAB_IDS.includes(id) || MORE_LAB_IDS.includes(id))).toEqual([]);
     const missing = ALL_LAB_IDS.filter((id) => !LABS.has(id));
     expect(missing, `labs without a *.lab.ts: ${missing.join(', ')}`).toEqual([]);
     const orphan = [...LABS.keys()].filter((id) => !ALL_LAB_IDS.includes(id));
@@ -1064,11 +1069,11 @@ describe('shared UI pieces (fake DOM)', () => {
       expect(main.querySelector('h1')?.textContent).toBe(LABS.get(id)!.title);
       expect(doc.title).toContain(LABS.get(id)!.title);
     }
-    // Ben's other videos: every group with a card per video, the group's sidebar link lit
+    // Ben's other videos, then other channels': every group with a card per video, the group's sidebar link lit
     loc.hash = '#/more/clock';
     app.render();
-    expect(host.querySelectorAll('.more-group').length).toBe(MORE_GROUPS.length);
-    expect(host.querySelectorAll('.more-group .video-card').length).toBe(MORE_VIDEOS.length);
+    expect(host.querySelectorAll('.more-group').length).toBe(MORE_GROUPS.length + OTHER_GROUPS.length);
+    expect(host.querySelectorAll('.more-group .video-card').length).toBe(MORE_VIDEOS.length + OTHER_VIDEOS.length);
     expect(host.querySelector('.more-group .video-card a')?.attributes.href).toBe(`https://www.youtube.com/watch?v=${MORE_VIDEOS[0].youtubeId}`);
     expect(host.querySelectorAll('.sidebar a.active').map((a) => a.textContent)).toEqual([expect.stringContaining('Build a digital clock')]);
     expect(doc.title).toContain('More videos');

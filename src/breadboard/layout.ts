@@ -1,6 +1,6 @@
 import type { Computer } from '../sim/computer';
 import type { Machine } from '../sim/machine';
-import { CHIPS, pinNumber, type ChipDef } from './catalog';
+import { chipDef, pinNumber, type ChipDef } from './catalog';
 import {
   BOARD_H, BOARD_W, RAIL_COLUMNS, ROWS, dipPinHole, holeName, holeXY, isRail, parseHole, stripHoles, stripOf,
   type BoardPlacement, type Hole, type Rail,
@@ -29,7 +29,8 @@ export type PartSpec =
   | { kind: 'chip'; chip: string; col: number; rotated?: boolean; params?: Record<string, unknown> }
   | { kind: 'led'; color: LedColor; anode: string; cathode: string }
   | { kind: 'resistor'; ohms: number; a: string; b: string }
-  | { kind: 'capacitor'; farads: number; a: string; b: string; polarized?: boolean }
+  /** `film`: a foil (film) capacitor's box, else a ceramic disc; `polarized`: an electrolytic's can. */
+  | { kind: 'capacitor'; farads: number; a: string; b: string; polarized?: boolean; film?: boolean }
   /** Jumper wire. `via` are optional board-local bend points (pitch units). */
   | { kind: 'wire'; color: WireColor; a: string; b: string; via?: [number, number][] }
   /** DIP switch bank straddling the channel (rows e/f) starting at column `col`; switch k joins (f, col+k-1) and (e, col+k-1). */
@@ -85,7 +86,7 @@ export interface PartPin {
 export function partPins(p: Part): PartPin[] {
   switch (p.kind) {
     case 'chip': {
-      const def = CHIPS[p.chip];
+      const def = chipDef(p.chip);
       if (!def) throw new Error(`Unknown chip "${p.chip}" (part ${p.id})`);
       return def.pins.map((name, i) => ({ name, number: i + 1, hole: dipPinHole(p.col, def.pins.length, i + 1, def.spacing, p.rotated) }));
     }
@@ -292,7 +293,7 @@ export class BoardBuilder {
   }
 
   chip(id: string, chip: string, col: number, opts: { rotated?: boolean; label?: string; params?: Record<string, unknown> } = {}): ChipHandle {
-    const def = CHIPS[chip];
+    const def = chipDef(chip);
     if (!def) throw new Error(`Unknown chip "${chip}"`);
     this.part(id, { kind: 'chip', chip, col, rotated: opts.rotated, params: opts.params }, opts.label ?? id);
     const pinHole = (p: number | string) => {

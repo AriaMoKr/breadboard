@@ -38,6 +38,7 @@
 .bb-cap-ceramic { fill: #e3a33a; stroke: #a8711c; stroke-width: 0.05; }
 .bb-cap-ceramic.big { fill: #3e74d6; stroke: #23468a; }
 .bb-cap-elec { fill: #233a7a; stroke: #111d3d; stroke-width: 0.05; }
+.bb-cap-film { fill: #c23b32; stroke: #7d1f19; stroke-width: 0.05; }
 .bb-cap-stripe { fill: none; stroke: #c9d3ec; stroke-width: 0.14; }
 
 .bb-dip-body { fill: #c8302a; stroke: #8e1d18; stroke-width: 0.05; }

@@ -137,9 +137,18 @@ video by video.
   gives Lancaster's 60. Its sync jumpers move the picture. The second adds the character generator:
   the 2518 line register, the 2513, the 74165 that shifts the dots out and the 7401 that makes the
   video, with a stand-in for the memory board that you type into, and the TV draws the text.
+* **Moritz Klein's labs** (`#/lab/using-a-breadboard`): his synthesizer videos, from his "For
+  Beginners" playlist on. The first lab is his complete beginner's guide to using a breadboard:
+  four circuits on one board, a TL074 on two 9 V batteries, with his parts and values. They are an
+  LED, a crude op-amp inverter (its − input on the + rail, the − rail or left floating), an
+  oscillator that flashes the LED, and one you can hear through a jack. Each has its schematic,
+  and the strips inside the board can be shown. A scope shows the oscillators, and WebAudio
+  plays the audible one quietly. The analog parts are small per-lab models with his values
+  (`src/labs/synth/_analog.ts`).
 * **More videos** (`#/more`): Ben's videos outside the playlist that go with it. These are his first
   build running programs and his introduction to transistors and logic gates (both from 2015 and
-  linked from eater.net/8bit), plus his digital clock series (2026, eater.net/clock).
+  linked from eater.net/8bit), plus his digital clock series (2026, eater.net/clock). Then other
+  channels' videos that teach circuits on a breadboard: Moritz Klein's "For Beginners" playlist.
 
 ## Running
 
@@ -286,14 +295,14 @@ Research notes with sources, used for fidelity:
 [docs/research/computer-spec.md](docs/research/computer-spec.md) (exact behaviour of the
 final machine), [docs/research/videos.md](docs/research/videos.md) (per-video content),
 [docs/research/clock.md](docs/research/clock.md) (the digital clock series),
-[docs/research/background.md](docs/research/background.md) (the transistor and gates videos) and
+[docs/research/background.md](docs/research/background.md) (the transistor and gates videos),
 [docs/research/tv-typewriter.md](docs/research/tv-typewriter.md) (Don Lancaster's 1973 TV
-Typewriter, its schematics transcribed, and the TVTs after it).
+Typewriter, its schematics transcribed, and the TVTs after it) and
+[docs/research/moritz-klein.md](docs/research/moritz-klein.md) (Moritz Klein's DIY synthesizer
+videos, from his breadboard guide on).
 
 Sources for growing beyond Ben's series, not used by the simulator yet:
-[docs/research/mims.md](docs/research/mims.md) (Forrest Mims's books and columns),
-[docs/research/moritz-klein.md](docs/research/moritz-klein.md) (Moritz Klein's DIY synthesizer
-videos, from his breadboard guide on) and
+[docs/research/mims.md](docs/research/mims.md) (Forrest Mims's books and columns) and
 [docs/research/sources.md](docs/research/sources.md) (other books, datasheets and projects to draw
 on).
 

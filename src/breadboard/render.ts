@@ -1,6 +1,6 @@
 import { s } from '../ui/dom';
 import './breadboard.css';
-import { CHIPS, prettyPin } from './catalog';
+import { chipDef, prettyPin } from './catalog';
 import {
   BOARD_H, BOARD_W, COLUMNS, RAIL_COLUMNS, ROWS, ROW_Y, colX, dipRows, holeXY, isRail, parseHole, toScene,
   type BoardPlacement, type RowOrRail,
@@ -277,7 +277,7 @@ export class LayoutView {
   }
 
   private drawChip(part: Extract<Part, { kind: 'chip' }>) {
-    const def = CHIPS[part.chip];
+    const def = chipDef(part.chip)!;
     const g = this.boardGroup(part, this.layerParts, 'bb-chip');
     const n = def.pins.length / 2;
     const [top, bottom] = dipRows(def.spacing);
@@ -379,6 +379,8 @@ export class LayoutView {
     if (part.polarized) {
       body.appendChild(s('circle', { cx: 0, cy: 0, r: 0.65, class: 'bb-cap-elec' }));
       body.appendChild(s('path', { d: 'M 0.25 -0.6 A 0.65 0.65 0 0 1 0.25 0.6', class: 'bb-cap-stripe' }));
+    } else if (part.film) {
+      body.appendChild(s('rect', { x: -0.62, y: -0.42, width: 1.24, height: 0.84, rx: 0.1, class: 'bb-cap-film' }));
     } else {
       body.appendChild(s('ellipse', { cx: 0, cy: 0, rx: 0.42, ry: 0.55, class: part.farads >= 1e-7 ? 'bb-cap-ceramic big' : 'bb-cap-ceramic' }));
     }

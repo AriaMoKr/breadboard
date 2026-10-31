@@ -19,7 +19,7 @@ on its own by driving its ports, which is how the boards are verified.
 | File | What |
 | --- | --- |
 | `src/breadboard/geometry.ts` | BB830 geometry: holes `a1..j63`, rails `tn/tp/bp/bn` + column (only `RAIL_COLUMNS` exist), strips, DIP pin positions, board placement |
-| `src/breadboard/catalog.ts` | Chip pinouts (`CHIPS`), datasheet pin names; `~` prefix = active low |
+| `src/breadboard/catalog.ts` | Chip pinouts (`CHIPS`), datasheet pin names; `~` prefix = active low. `ANALOG_CHIPS` (the TL074) are drawn and wired but not simulated, so the sandbox's bin leaves them out; `chipDef(id)` looks in both |
 | `src/breadboard/layout.ts` | `Layout` data, part kinds, `validateLayout`, `LayoutBuilder`/`BoardBuilder`, live bindings, `ModuleBoardDef` |
 | `src/breadboard/nets.ts` | Static connectivity (`buildNets`, `pinNet`, `unpoweredChips`) |
 | `src/breadboard/render.ts` | SVG renderer `LayoutView` (+ `breadboard.css`) |
