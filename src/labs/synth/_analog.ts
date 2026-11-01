@@ -4,9 +4,10 @@
  * the square-wave oscillator of his breadboard guide; then DIY VCO part 1's oscillator core, a
  * 40106 with a diode, 2.2 nF and 100k, and what follows it; then part 2's exponential converter, a
  * BC548C in the 100k's place with a pot and a sequencer at its base; then part 3's BC558C emitter
- * follower in front of that base, and the scale tuned with a trimmer. Time is in seconds, voltages
- * in volts, currents in amps. Plain arithmetic, as src/labs/dclock/_analog.ts does for Ben's clock,
- * so the labs and the tests share it.
+ * follower in front of that base, and the scale tuned with a trimmer; then part 4's thermistors and
+ * fine-tune knob in its mixer, and the sawtooth amplified and shaped into a pulse by another of the
+ * 40106's inverters. Time is in seconds, voltages in volts, currents in amps. Plain arithmetic, as
+ * src/labs/dclock/_analog.ts does for Ben's clock, so the labs and the tests share it.
  */
 
 import { rng } from '../dclock/_analog';
@@ -547,7 +548,7 @@ export function mixer(feeds: readonly Feed[], shunt: number, pnp = ROOM, npn = R
   return { vm, ...f };
 }
 
-/** Part 3's values around the mixer: the offset pot from ground to −12 V, 100k from its wiper and from the CV jack, and 1.5k with a 1k ten-turn trimmer to ground. */
+/** Part 3's values around the mixer: the offset pot from ground to −12 V, 100k from its wiper and from the CV jack, and 1.5k with a 1k ten-turn trimmer to ground. (Part 4's additions, `Extras`, follow below.) */
 export const TUNING = { pot: 100e3, r: 100e3, fixed: 1.5e3, trimmer: 1e3 };
 
 /** The two transistors' temperatures, in °C. */
@@ -559,21 +560,28 @@ export interface Temps {
 /**
  * Part 3's converter with `cv` on the jack, the offset pot `turn` of the way from ground to −12 V and
  * `shunt` from the mixer to ground, both rails at ±`supply`: the pot's wiper, the mixer, the follower's
- * emitter (the BC548C's base), the BC548C's current and the core's times.
+ * emitter (the BC548C's base), the BC548C's current and the core's times. `extras` adds part 4's
+ * thermistors and fine-tune knob to the mixer.
  */
-export function converter(cv: number, turn: number, shunt: number, temps: Temps = { pnp: ROOM, npn: ROOM }, supply = V12) {
+export function converter(cv: number, turn: number, shunt: number, temps: Temps = { pnp: ROOM, npn: ROOM }, supply = V12, extras: Extras = PART3) {
+  const rt = extras.ntc === null ? 0 : thermistor(extras.ntc);
   const w = wiper(turn, -supply, TUNING.pot);
-  const m = mixer([{ v: w.v, r: TUNING.r + w.r }, { v: cv, r: TUNING.r }], shunt, temps.pnp, temps.npn, supply);
+  const feeds: Feed[] = [{ v: w.v, r: TUNING.r + rt + w.r }, { v: cv, r: TUNING.r + rt }];
+  if (extras.fine !== null) {
+    const f = wiper(extras.fine, -supply, FINE.pot);
+    feeds.push({ v: f.v, r: FINE.r + rt + f.r });
+  }
+  const m = mixer(feeds, shunt, temps.pnp, temps.npn, supply);
   const i = collectorCurrent(m.ve, temps.npn);
   return { ...m, w, i, t: sinkTimes(i, 2.2e-9, supply) };
 }
 
 /** The offset pot's turn that makes 0 V on the jack play `low`, with `shunt` to ground: by bisection, since the pitch falls as the pot turns towards −12 V. */
-export function offsetFor(shunt: number, low = noteHz('C2'), temps: Temps = { pnp: ROOM, npn: ROOM }): number {
+export function offsetFor(shunt: number, low = noteHz('C2'), temps: Temps = { pnp: ROOM, npn: ROOM }, extras: Extras = PART3): number {
   let lo = 0, hi = 1;
   for (let k = 0; k < 40; k++) {
     const mid = (lo + hi) / 2;
-    if (converter(0, mid, shunt, temps).t.hz > low) lo = mid;
+    if (converter(0, mid, shunt, temps, V12, extras).t.hz > low) lo = mid;
     else hi = mid;
   }
   return (lo + hi) / 2;
@@ -581,18 +589,158 @@ export function offsetFor(shunt: number, low = noteHz('C2'), temps: Temps = { pn
 
 /**
  * Where the offset pot and the trimmer go for 1 V per octave, with 0 V on the jack playing `low`, both
- * transistors at `celsius`: what Moritz finds by ear, but exact. For each trimmer setting, the pot
- * that puts 0 V on the note (`offsetFor`); then the trimmer that makes 1 V play the octave above, by
- * bisection, since the octave widens as the trimmer grows.
+ * transistors (and any thermistors) at `celsius`: what Moritz finds by ear, but exact. For each
+ * trimmer setting, the pot that puts 0 V on the note (`offsetFor`); then the trimmer that makes 1 V
+ * play the octave above, by bisection, since the octave widens as the trimmer grows.
  */
-export function tune(low = noteHz('C2'), celsius = ROOM): { turn: number; trim: number } {
+export function tune(low = noteHz('C2'), celsius = ROOM, extras: Extras = PART3): { turn: number; trim: number } {
   const temps = { pnp: celsius, npn: celsius };
+  const ex = extras.ntc === null ? extras : { ...extras, ntc: celsius };
   let lo = 0, hi = TUNING.trimmer;
   for (let k = 0; k < 40; k++) {
     const mid = (lo + hi) / 2, shunt = TUNING.fixed + mid;
-    if (converter(1, offsetFor(shunt, low, temps), shunt, temps).t.hz < 2 * low) lo = mid;
+    if (converter(1, offsetFor(shunt, low, temps, ex), shunt, temps, V12, ex).t.hz < 2 * low) lo = mid;
     else hi = mid;
   }
   const trim = (lo + hi) / 2;
-  return { turn: offsetFor(TUNING.fixed + trim, low, temps), trim };
+  return { turn: offsetFor(TUNING.fixed + trim, low, temps, ex), trim };
 }
+
+// ---------------------------------------------------------------------------
+// DIY VCO part 4: thermistors and a fine-tune knob in the mixer, then a pulse from the sawtooth
+
+/**
+ * Part 4's NTC thermistors, one in series with each of the mixer's inputs: 10k at 25 °C, as René
+ * Schmitz's VCO has them with its 100k, which Moritz follows. Their B value isn't given: 3950 K, a
+ * common one for 10k beads, makes them about 4.4% less for each degree warmer.
+ */
+export const NTC = { r25: 10e3, b: 3950 };
+
+/** A thermistor's resistance at `celsius`: R25 e^(B (1/T − 1/T25)). */
+export const thermistor = (celsius: number) => NTC.r25 * Math.exp(NTC.b * (1 / (celsius + 273.15) - 1 / (ROOM + 273.15)));
+
+/** Part 4's fine-tune knob: a second 100k pot from ground to −12 V, its wiper through 1M (and a thermistor) into the mixer. */
+export const FINE = { pot: 100e3, r: 1e6 };
+
+/** What part 4 adds to part 3's mixer: the thermistors at a temperature, and the fine-tune pot's turn; null for none. */
+export interface Extras {
+  ntc: number | null;
+  fine: number | null;
+}
+
+/** Part 3's mixer, with neither. */
+export const PART3: Extras = { ntc: null, fine: null };
+
+/** How far a TL074's output gets on ±12 V: about 1.5 V short of either rail, as on ±9 V (`VSAT`). */
+export const VSAT12 = V12 - 1.5;
+
+/** A non-inverting amplifier's gain, with `rf` from the output to the − input and `rg` from there to ground: Infinity with `rg` at 0. */
+export const gainOf = (rf: number, rg: number) => 1 + rf / rg;
+
+/** An op amp's output for `v` on its + input at gain `g`, clipped where it can go no further. */
+export const amplify = (v: number, g: number, vsat = VSAT12) => Math.max(-vsat, Math.min(vsat, v === 0 ? 0 : g * v));
+
+/** One period of the core's sawtooth on `vdd`, `n` readings from just after its jump: a straight fall from the upper threshold to the lower. (The jump takes about a microsecond.) */
+export function sawWave(n: number, vdd = V12): number[] {
+  const { vp, vn } = thresholds(vdd);
+  return Array.from({ length: n }, (_, k) => vp - ((vp - vn) * k) / n);
+}
+
+/**
+ * A wave through a capacitor in series, with `tau` (R C) to ground after it, once settled: part 1's
+ * AC coupling as a filter rather than `Coupling`'s average. `wave` is one period, `period` seconds
+ * long, evenly sampled; each reading follows from the last exactly for a wave that changes in a
+ * straight line between them, and the settled wave is the one that comes back round to where it
+ * started. Its average is 0 V. With `tau` not much longer than the period, its straight lines droop.
+ */
+export function coupled(wave: readonly number[], period: number, tau: number): number[] {
+  const n = wave.length, dt = period / n, a = Math.exp(-dt / tau), g = ((1 - a) * tau) / dt;
+  const step = (k: number) => (wave[k] - wave[(k + n - 1) % n]) * g;
+  let sum = 0;
+  for (let k = 0; k < n; k++) sum = a * sum + step(k);
+  // the reading before the first, where one period brings it back to
+  let y = sum / (1 - a ** n);
+  return Array.from({ length: n }, (_, k) => (y = a * y + step(k)));
+}
+
+/** Where part 4 picks up the sawtooth: after part 1's 1 µF, into its 100k, with part 2's two 10k to the jack beside it until Moritz takes them out. */
+export const pickupTau = (divider: boolean) => 1e-6 * (divider ? par(100e3, 20e3) : 100e3);
+
+/** The 1N4148's drop with the 100k pull-down after it: about 0.5 V at the tenth of a milliamp it carries. */
+export const VD_PULL = 0.5;
+
+/** How far below ground the 40106's input protection diode lets its input go: about a diode's drop. TI allows −0.5 V. */
+export const CLAMP_IN = 0.7;
+
+/** How the op amp's output gets to the 40106's input: a wire, the 1N4148 alone, or the 1N4148 and a 100k pull-down. */
+export type Shaper = 'wire' | 'diode' | 'pulldown';
+
+/**
+ * The 40106's input for `op` on the op amp's output, connected as `how` says. A wire passes the
+ * negative half too, until the input's protection diode clamps it, about 0.7 V below ground, with
+ * as much current as the op amp gives. The 1N4148 passes only what is a diode's drop above the
+ * input: with the 100k it pulls the input to ground the rest of the time; alone, it leaves the
+ * input to `floating`, wherever that is.
+ */
+export function shaperIn(op: number, how: Shaper, floating = 0): number {
+  if (how === 'wire') return Math.max(-CLAMP_IN, op);
+  if (how === 'diode') return Math.max(op - VD_PULL, floating);
+  return Math.max(0, op - VD_PULL);
+}
+
+/**
+ * A 40106 inverter's output, high or low, over `input` (one period of a wave that repeats): it
+ * goes low once the input passes `vp` and high again once it falls under `vn`. Where it starts
+ * depends on the period before, which a first pass finds.
+ */
+export function schmittOut(input: readonly number[], vp: number, vn: number): boolean[] {
+  let high = true;
+  const next = (v: number) => (high = high ? v < vp : v <= vn);
+  input.forEach(next);
+  return input.map(next);
+}
+
+/** How much of the time an output is high. */
+export const pulseWidth = (out: readonly boolean[]) => out.filter(Boolean).length / out.length;
+
+/**
+ * Part 4's pulse at `hz`: the core's sawtooth after the 1 µF (`tau`), amplified by an op amp with
+ * `rf` from its output to its − input and the pot at `rpot` from there to ground, then through the
+ * 1N4148 with the 100k pull-down into another of the 40106's inverters. Each stage over one period
+ * of `n` readings, the gain, and the pulse width: how much of the time the inverter's output is high.
+ */
+export function pulse(hz: number, rf: number, rpot: number, tau: number, n = 512) {
+  const saw = coupled(sawWave(n), 1 / hz, tau), g = gainOf(rf, rpot);
+  const op = saw.map((v) => amplify(v, g));
+  const input = op.map((v) => shaperIn(v, 'pulldown'));
+  const { vp, vn } = thresholds(V12);
+  const out = schmittOut(input, vp, vn);
+  return { saw, g, op, input, out, width: pulseWidth(out) };
+}
+
+/**
+ * The most the pot can be for there to be a pulse at all: the amplified sawtooth's top, `peak` times
+ * the gain, has to get a diode's drop past the upper threshold `vp`. Infinity if any gain will do.
+ */
+export function potForPulse(rf: number, peak: number, vp = thresholds(V12).vp): number {
+  const g = (vp + VD_PULL) / peak;
+  return g <= 1 ? Infinity : rf / (g - 1);
+}
+
+/** The square out's divider after its 1 µF and 100k: 20k down to 100k, a sixth off. */
+export const SQUARE_DIV = { top: 20e3, bottom: 100e3 };
+
+/**
+ * Part 4's square out, from the inverter's output `out` (one period, high at 12 V) at `hz`: through
+ * 1 µF into 100k, which centres it on 0 V (±6 V at 50%), then 20k with 100k to ground, about ±5 V.
+ */
+export function squareOut(out: readonly boolean[], hz: number): number[] {
+  const tau = 1e-6 * par(100e3, SQUARE_DIV.top + SQUARE_DIV.bottom), k = SQUARE_DIV.bottom / (SQUARE_DIV.top + SQUARE_DIV.bottom);
+  return coupled(out.map((v) => (v ? V12 : 0)), 1 / hz, tau).map((v) => v * k);
+}
+
+/** The saw out's amplifier, the TL074's last op amp: 100k from its output to its − input and 33k from there to ground, a gain of about 4. */
+export const SAW_AMP = { rf: 100e3, rg: 33e3 };
+
+/** Part 4's saw out, from the sawtooth after the 1 µF: amplified about four times, about ±4.8 V. */
+export const sawOut = (saw: readonly number[]) => saw.map((v) => amplify(v, gainOf(SAW_AMP.rf, SAW_AMP.rg)));

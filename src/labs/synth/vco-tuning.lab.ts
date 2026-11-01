@@ -1,13 +1,13 @@
 import { Circuit } from '../../logic/circuit';
 import { Button, Scope, Slider, Toggle, note, panel, readouts, row, select, type ScopeChannel } from '../../ui/components';
-import { Disposer, animate, growOnly, h, s, setClass, setText } from '../../ui/dom';
+import { Disposer, animate, growOnly, h, setClass, setText } from '../../ui/dom';
 import { Schematic } from '../../ui/schematic';
 import { Kit, kitCss } from '../clock/_draw';
 import { callout, injectStyle } from '../latches/_shared';
 import { defineLab } from '../types';
 import { R_FOLLOW, ROOM, TUNING, V12, collectorCurrent, converter, follower, noteHz, noteOf, offsetFor, sinkTimes, thermalVoltage, tune, type Temps } from './_analog';
 import { diode, jack, npnLeft, pnpLeft, potDivider, railDown, schmitt } from './_draw';
-import { HEARING, fmtA, fmtCv, fmtV, mV, pitchText, playsText } from './_shared';
+import { HEARING, IN_TUNE, cents, fmtA, fmtCv, fmtV, mV, offText, pitchText, playsText, sMV, sV, tunerCss, tunerRow } from './_shared';
 import { Tone } from './_sound';
 
 const SCOPE_CLASS = 'synth-tune';
@@ -17,7 +17,6 @@ const WARM_TAU = 6; // s: and this fast (an estimate)
 const NOTE_S = 1 / 3; // the sequencer moves on three times a second
 const REC_N = 300; // the chart recorder's readings: thirty seconds' worth
 const REC_DT = 0.1; // s between them
-const IN_TUNE = 5; // cents either way that the tuner calls in tune
 
 /** What 0 V on the jack plays, once tuned: C2. */
 const LOW = noteHz('C2');
@@ -59,18 +58,6 @@ const sagCents = (tuned: Tuning) => 1200 * Math.log2(converter(0, tuned.turn, TU
 
 // ---- formatting
 
-/** Volts with their sign. */
-const sV = (v: number) => `${v < -5e-4 ? '−' : ''}${Math.abs(v).toFixed(3)} V`;
-/** Millivolts with their sign, to a tenth. */
-const sMV = (v: number) => {
-  const m = Math.round(v * 1e4) / 10;
-  return `${m < 0 ? '−' : m > 0 ? '+' : ''}${Math.abs(m).toFixed(1)} mV`;
-};
-/** Cents off a note: +3¢ or −12¢, or semitones once it's a note or more. */
-const offText = (c: number) =>
-  Math.abs(c) < 99.5 ? `${c >= 0.5 ? '+' : c <= -0.5 ? '−' : '±'}${Math.abs(Math.round(c))}¢` : `${c > 0 ? '+' : '−'}${(Math.abs(c) / 100).toFixed(1)} semitones`;
-const centsWords = (c: number) => (Math.round(c) === 0 ? 'dead on' : `${Math.abs(Math.round(c))} cents ${c > 0 ? 'sharp' : 'flat'}`);
-const cents = (hz: number, ref: number) => 1200 * Math.log2(hz / ref);
 const tempText = (t: number, finger: boolean) => `${t.toFixed(1)} °C${finger ? ', a finger on it' : t > ROOM + 0.05 ? ', cooling' : ''}`;
 
 const CSS = `
@@ -81,24 +68,7 @@ const CSS = `
 .${SCOPE_CLASS} .kv dd { font-variant-numeric: tabular-nums; }
 .${SCOPE_CLASS} .pot-slider { display: flex; width: 100%; }
 .${SCOPE_CLASS} .pot-slider input { flex: 1 1 auto; width: auto; min-width: 0; }
-.${SCOPE_CLASS} .tuner { display: grid; gap: 6px; margin-bottom: 8px; }
-.${SCOPE_CLASS} .t-row { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 12px; padding: 4px 8px; border-radius: 6px; }
-.${SCOPE_CLASS} .t-row.current { background: color-mix(in srgb, var(--accent) 14%, transparent); }
-.${SCOPE_CLASS} .t-label { min-width: 4.5em; color: var(--fg-dim); }
-.${SCOPE_CLASS} .t-note { min-width: 3.2em; font-size: 1.25rem; font-weight: 700; }
-.${SCOPE_CLASS} .t-cents { min-width: 7em; font-variant-numeric: tabular-nums; }
-.${SCOPE_CLASS} .t-bar { flex: 1 1 150px; max-width: 260px; height: auto; display: block; }
-.${SCOPE_CLASS} .t-bar .bar { fill: var(--panel-2); stroke: var(--fg-faint); }
-.${SCOPE_CLASS} .t-bar .tick { stroke: var(--fg-faint); stroke-width: 1.5; }
-.${SCOPE_CLASS} .t-bar .tick.zero { stroke: var(--fg-dim); stroke-width: 2.5; }
-.${SCOPE_CLASS} .t-bar .mark { fill: var(--fg); }
-.${SCOPE_CLASS} .t-row.ok .t-bar .mark { fill: var(--accent); }
-.${SCOPE_CLASS} .seq-table { font-size: 0.8rem; }
-.${SCOPE_CLASS} .seq-table th, .${SCOPE_CLASS} .seq-table td { padding: 2px 7px; }
-@media (forced-colors: active) {
-  .${SCOPE_CLASS} .t-row.current { outline: 2px solid Highlight; }
-}
-`;
+${tunerCss(SCOPE_CLASS)}`;
 
 type Step = 1 | 2 | 3 | 4 | 5;
 const STEPS: { value: `${Step}`; label: string }[] = [
@@ -140,35 +110,6 @@ function stepText(step: Step): string {
     case 5:
       return `Tuned, a sequence in C major (the lab’s own) plays in tune. Now warm or cool the room: both transistors follow it together, and the follower cancels most of the drift, but not all. What’s left is the scale: each octave needs V_T ln 2 at the BC548C’s base, and V_T grows with the absolute temperature, about ${(100 / (ROOM + 273.15)).toFixed(2)}% a degree, so warmth narrows the octaves. The note that puts the BC558C’s base at 0 V hardly moves (about ${noteOf(STEP2.t.hz).name}, as in the second step); those below it go sharp, those above flat, by cents. Part 2’s converter, tuned the same, would be off by semitones. Retuning puts it right for the new temperature; part 4 takes on what’s left, with thermistors.`;
   }
-}
-
-/** One line of the tuner: what plays, its nearest note, and how many cents off it, on a bar from −50 to +50. */
-function tunerRow(label: string) {
-  const head = h('span', { class: 't-label' }, label);
-  const name = h('span', { class: 't-note' });
-  const off = h('span', { class: 't-cents' });
-  const mark = s('rect', { x: 98, y: 3, width: 4, height: 18, rx: 1, class: 'mark' });
-  // the bar's ends are 50 cents either way
-  const bar = s(
-    'svg',
-    { viewBox: '0 0 200 24', class: 't-bar', role: 'img', 'aria-label': '' },
-    s('rect', { x: 5, y: 8, width: 190, height: 8, rx: 4, class: 'bar' }),
-    ...[-25, 0, 25].map((c) => s('line', { x1: 100 + c * 1.9, y1: c ? 6 : 2, x2: 100 + c * 1.9, y2: c ? 18 : 22, class: c ? 'tick' : 'tick zero' })),
-    mark,
-  );
-  const el = h('div', { class: 't-row' }, head, name, off, bar);
-  return {
-    el,
-    setLabel: (text: string) => setText(head, text),
-    set(hz: number) {
-      const n = noteOf(hz);
-      setText(name, n.name);
-      setText(off, `${offText(n.cents)} ${Math.abs(n.cents) <= IN_TUNE ? '(in tune)' : ''}`.trim());
-      mark.setAttribute('x', (98 + clamp(n.cents, -50, 50) * 1.9).toFixed(1));
-      bar.setAttribute('aria-label', `Tuner: ${n.name}, ${centsWords(n.cents)}`);
-      setClass(el, 'ok', Math.abs(n.cents) <= IN_TUNE);
-    },
-  };
 }
 
 export default defineLab({

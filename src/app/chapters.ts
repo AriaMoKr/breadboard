@@ -237,7 +237,7 @@ export const OTHER_GROUPS: MoreGroup[] = [
       m('QBatvo8bCa4', 'DIY VCO Part 1: The analog oscillator core anyone can build', '27:09', '2020-06-20', 'oscillator-core'),
       m('4qxgwN9aq8E', 'DIY VCO Part 2: The simplest exponential converter', '22:59', '2020-07-07', 'exponential-converter'),
       m('dd1dws6pSNo', 'DIY VCO Part 3: Tuning your VCO (and making sure it stays in tune)', '24:56', '2020-07-24', 'vco-tuning'),
-      m('E76z9ZTc5po', 'DIY VCO Part 4: Shaping Sawtooth to Square', '27:11', '2020-08-17'),
+      m('E76z9ZTc5po', 'DIY VCO Part 4: Shaping Sawtooth to Square', '27:11', '2020-08-17', 'sawtooth-to-square'),
     ],
   },
 ];

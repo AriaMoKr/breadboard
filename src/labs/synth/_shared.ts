@@ -1,6 +1,7 @@
+import { h, s, setClass, setText } from '../../ui/dom';
 import { noteOf } from './_analog';
 
-/** How the VCO labs (parts 2 and 3) write voltages, currents, times and pitches. */
+/** How the VCO labs (parts 2 to 4) write voltages, currents, times and pitches, and parts 3 and 4's tuner. */
 
 /** The top of hearing. */
 export const HEARING = 20e3;
@@ -48,3 +49,75 @@ export function playsText(t: Pitch): string {
   if (t.hz > HEARING) return `${fmtHz(t.hz)}, too high`;
   return `${noteOf(t.hz).name}, ${fmtHz(t.hz)}`;
 }
+
+/** Volts with their sign. */
+export const sV = (v: number) => `${v < -5e-4 ? '−' : ''}${Math.abs(v).toFixed(3)} V`;
+
+/** Millivolts with their sign, to a tenth. */
+export const sMV = (v: number) => {
+  const m = Math.round(v * 1e4) / 10;
+  return `${m < 0 ? '−' : m > 0 ? '+' : ''}${Math.abs(m).toFixed(1)} mV`;
+};
+
+/** How many cents `hz` is above `ref`. */
+export const cents = (hz: number, ref: number) => 1200 * Math.log2(hz / ref);
+
+/** Cents off a note: +3¢ or −12¢, or semitones once it's a note or more. */
+export const offText = (c: number) =>
+  Math.abs(c) < 99.5 ? `${c >= 0.5 ? '+' : c <= -0.5 ? '−' : '±'}${Math.abs(Math.round(c))}¢` : `${c > 0 ? '+' : '−'}${(Math.abs(c) / 100).toFixed(1)} semitones`;
+
+/** The same in words, for a screen reader. */
+export const centsWords = (c: number) => (Math.round(c) === 0 ? 'dead on' : `${Math.abs(Math.round(c))} cents ${c > 0 ? 'sharp' : 'flat'}`);
+
+/** Cents either way that the tuner calls in tune. */
+export const IN_TUNE = 5;
+
+/** One line of the tuner: what plays, its nearest note, and how many cents off it, on a bar from −50 to +50. Styled by `tunerCss`. */
+export function tunerRow(label: string) {
+  const head = h('span', { class: 't-label' }, label);
+  const name = h('span', { class: 't-note' });
+  const off = h('span', { class: 't-cents' });
+  const mark = s('rect', { x: 98, y: 3, width: 4, height: 18, rx: 1, class: 'mark' });
+  // the bar's ends are 50 cents either way
+  const bar = s(
+    'svg',
+    { viewBox: '0 0 200 24', class: 't-bar', role: 'img', 'aria-label': '' },
+    s('rect', { x: 5, y: 8, width: 190, height: 8, rx: 4, class: 'bar' }),
+    ...[-25, 0, 25].map((c) => s('line', { x1: 100 + c * 1.9, y1: c ? 6 : 2, x2: 100 + c * 1.9, y2: c ? 18 : 22, class: c ? 'tick' : 'tick zero' })),
+    mark,
+  );
+  const el = h('div', { class: 't-row' }, head, name, off, bar);
+  return {
+    el,
+    setLabel: (text: string) => setText(head, text),
+    set(hz: number) {
+      const n = noteOf(hz);
+      setText(name, n.name);
+      setText(off, `${offText(n.cents)} ${Math.abs(n.cents) <= IN_TUNE ? '(in tune)' : ''}`.trim());
+      mark.setAttribute('x', (98 + Math.max(-50, Math.min(50, n.cents)) * 1.9).toFixed(1));
+      bar.setAttribute('aria-label', `Tuner: ${n.name}, ${centsWords(n.cents)}`);
+      setClass(el, 'ok', Math.abs(n.cents) <= IN_TUNE);
+    },
+  };
+}
+
+/** The tuner's rows and the sequence tables beside them, under `.${scope}`. */
+export const tunerCss = (scope: string) => `
+.${scope} .tuner { display: grid; gap: 6px; margin-bottom: 8px; }
+.${scope} .t-row { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 12px; padding: 4px 8px; border-radius: 6px; }
+.${scope} .t-row.current { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.${scope} .t-label { min-width: 4.5em; color: var(--fg-dim); }
+.${scope} .t-note { min-width: 3.2em; font-size: 1.25rem; font-weight: 700; }
+.${scope} .t-cents { min-width: 7em; font-variant-numeric: tabular-nums; }
+.${scope} .t-bar { flex: 1 1 150px; max-width: 260px; height: auto; display: block; }
+.${scope} .t-bar .bar { fill: var(--panel-2); stroke: var(--fg-faint); }
+.${scope} .t-bar .tick { stroke: var(--fg-faint); stroke-width: 1.5; }
+.${scope} .t-bar .tick.zero { stroke: var(--fg-dim); stroke-width: 2.5; }
+.${scope} .t-bar .mark { fill: var(--fg); }
+.${scope} .t-row.ok .t-bar .mark { fill: var(--accent); }
+.${scope} .seq-table { font-size: 0.8rem; }
+.${scope} .seq-table th, .${scope} .seq-table td { padding: 2px 7px; }
+@media (forced-colors: active) {
+  .${scope} .t-row.current { outline: 2px solid Highlight; }
+}
+`;

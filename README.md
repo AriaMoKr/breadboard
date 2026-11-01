@@ -145,8 +145,8 @@ and Moritz Klein's synth, from his
   the 2518 line register, the 2513, the 74165 that shifts the dots out and the 7401 that makes the
   video, with a stand-in for the memory board that you type into, and the TV draws the text.
 * **Moritz Klein's labs** (`#/lab/using-a-breadboard`, `#/lab/oscillator-core`,
-  `#/lab/exponential-converter`, `#/lab/vco-tuning`): his synthesizer videos, from his
-  "For Beginners" playlist on.
+  `#/lab/exponential-converter`, `#/lab/vco-tuning`, `#/lab/sawtooth-to-square`): his
+  synthesizer videos, from his "For Beginners" playlist on.
   The first lab is his complete beginner's guide to using a breadboard: four circuits on one
   board, a TL074 on two 9 V batteries, with his parts and values. They are an LED, a crude op-amp
   inverter (its − input on the + rail, the − rail or left floating), an oscillator that flashes
@@ -164,8 +164,12 @@ and Moritz Klein's synth, from his
   the pitch up, one on the BC558C down (a chart recorder shows both), and once both are equally
   warm they cancel. The offset pot now subtracts, and 1.5k and a ten-turn trimmer set 1 V per
   octave, tuned against a tuner with four steps at 0 V and four at 1, 2 or 5 V. A warmer room then
-  leaves it cents out where part 2's would be semitones. The analog parts are small per-lab models
-  with his values (`src/labs/synth/_analog.ts`).
+  leaves it cents out where part 2's would be semitones. The fifth is part 4: three 10k NTC
+  thermistors in the mixer, which keep a warmer room's notes together, and a fine-tune knob
+  through 1M; then a pulse from the sawtooth. A spare op amp amplifies it, a pot setting its gain,
+  and a 1N4148 with a pull-down feeds it to a spare 40106 inverter, the pot setting the pulse's
+  width on a scope. Both waves are then brought to 10 V peak to peak for their jacks. The analog
+  parts are small per-lab models with his values (`src/labs/synth/_analog.ts`).
 * **More videos** (`#/more`): Ben's videos outside the playlist that go with it. These are his first
   build running programs and his introduction to transistors and logic gates (both from 2015 and
   linked from eater.net/8bit), plus his digital clock series (2026, eater.net/clock). Then other

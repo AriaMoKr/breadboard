@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { ANALOG_CHIPS, CHIPS, CHIP_IDS, chipDef } from '../src/breadboard/catalog';
 import { validateLayout } from '../src/breadboard/layout';
 import {
-  BC548C, Coupling, FloatingInput, PHONES, R_FOLLOW, R_OUT, Relaxation, SchmittCore, SinkCore, TUNING, V12, VDIODE, VN, VP, VSAT, baseVoltage, collectorCurrent, comparator, converter,
-  coreTimes, coreWave, divide, follower, ledCurrent, mixer, noteHz, noteOf, offsetFor, par, pnpSaturationCurrent, relaxationPeriod, sampleCore, saturationCurrent, sinkTimes,
-  thermalVoltage, thresholds, tune, wiper,
+  BC548C, CLAMP_IN, Coupling, FloatingInput, PHONES, R_FOLLOW, R_OUT, Relaxation, SAW_AMP, SQUARE_DIV, SchmittCore, SinkCore, TUNING, V12, VDIODE, VD_PULL, VN, VP, VSAT, VSAT12, amplify,
+  baseVoltage, collectorCurrent, comparator, converter, coreTimes, coreWave, coupled, divide, follower, gainOf, ledCurrent, mixer, noteHz, noteOf, offsetFor, par, pickupTau,
+  pnpSaturationCurrent, potForPulse, pulse, pulseWidth, relaxationPeriod, sampleCore, saturationCurrent, sawOut, sawWave, schmittOut, shaperIn, sinkTimes, squareOut, thermalVoltage,
+  thermistor, thresholds, tune, wiper,
 } from '../src/labs/synth/_analog';
 import { guideLayout, guideNets, type Setup } from '../src/labs/synth/_board';
 import { periodicWave } from '../src/labs/synth/_sound';
@@ -520,5 +521,166 @@ describe('synth: DIY VCO part 3’s follower and tuning', () => {
     expect(sag(0)).toBeGreaterThan(20);
     expect(sag(0)).toBeLessThan(27);
     for (const cv of [1, 2, 5]) expect(Math.abs(sag(cv) - sag(0)), `${cv} V`).toBeLessThan(1);
+  });
+});
+
+describe('synth: DIY VCO part 4’s thermistors, fine tuning and pulse', () => {
+  const C2 = noteHz('C2'), C3 = noteHz('C3');
+  const cents = (hz: number, ref: number) => 1200 * Math.log2(hz / ref);
+  const room = { pnp: 25, npn: 25 };
+  /** The thermistors at `celsius`, and the fine knob's turn (null without one). */
+  const ntc = (celsius: number, fine: number | null = null) => ({ ntc: celsius, fine });
+  const part3 = tune();
+  const retuned = tune(C2, 25, ntc(25));
+  const SEQ = ['C3', 'E3', 'G3', 'C4', 'E4', 'G4', 'C5', 'G4'];
+  const cvOf = (name: string) => Math.log2(noteHz(name) / C2);
+  /** The sawtooth after the 1 µF at C3, with part 2's two 10k still on it or not. */
+  const sawAt = (hz: number, divider = true) => coupled(sawWave(512), 1 / hz, pickupTau(divider));
+
+  it('the thermistors: 10k at 25 °C, about 4.3% less for each degree warmer', () => {
+    expect(thermistor(25)).toBeCloseTo(10e3, 6);
+    const perK = thermistor(26) / thermistor(25) - 1;
+    expect(perK).toBeLessThan(-0.041);
+    expect(perK).toBeGreaterThan(-0.045);
+    expect(thermistor(30)).toBeLessThan(thermistor(25));
+    expect(thermistor(20)).toBeGreaterThan(thermistor(25));
+  });
+
+  it('added to part 3’s tuning, they put it out: 0 V about two semitones sharp, and the octaves about 9% narrow', () => {
+    const at = (cv: number) => converter(cv, part3.turn, TUNING.fixed + part3.trim, room, V12, ntc(25));
+    expect(cents(at(0).t.hz, C2)).toBeGreaterThan(190);
+    expect(cents(at(0).t.hz, C2)).toBeLessThan(240);
+    const perVolt = Math.log2(at(1).t.hz / at(0).t.hz);
+    expect(perVolt).toBeGreaterThan(0.89);
+    expect(perVolt).toBeLessThan(0.93);
+    // without them, part 3's circuit as it was
+    expect(Math.abs(cents(converter(0, part3.turn, TUNING.fixed + part3.trim).t.hz, C2))).toBeLessThan(1);
+  });
+
+  it('retuned with them: about 531 Ω of the trimmer, and 0 to 5 V within 4 cents', () => {
+    expect(retuned.trim).toBeGreaterThan(510);
+    expect(retuned.trim).toBeLessThan(550);
+    const at = (cv: number) => converter(cv, retuned.turn, TUNING.fixed + retuned.trim, room, V12, ntc(25));
+    for (const cv of [0, 1, 2, 3, 4, 5]) expect(Math.abs(cents(at(cv).t.hz, C2 * 2 ** cv)), `${cv} V`).toBeLessThan(4);
+  });
+
+  it('a room 5 °C warmer: with them, the sequence goes about 8 cents sharp throughout, nearly an offset; part 3’s spreads over 40 cents', () => {
+    const warm = { pnp: 30, npn: 30 };
+    const offs = SEQ.map((n) => cents(converter(cvOf(n), retuned.turn, TUNING.fixed + retuned.trim, warm, V12, ntc(30)).t.hz, noteHz(n)));
+    const was = SEQ.map((n) => cents(converter(cvOf(n), part3.turn, TUNING.fixed + part3.trim, warm).t.hz, noteHz(n)));
+    for (const c of offs) {
+      expect(c).toBeGreaterThan(5);
+      expect(c).toBeLessThan(10);
+    }
+    expect(Math.max(...offs) - Math.min(...offs)).toBeLessThan(2);
+    expect(Math.max(...was) - Math.min(...was)).toBeGreaterThan(35);
+  });
+
+  it('fingers on both transistors, the thermistors at the room: just as part 3’s circuit, since they don’t feel it', () => {
+    const warm = { pnp: 32, npn: 32 };
+    for (const n of SEQ) {
+      const withNtc = converter(cvOf(n), retuned.turn, TUNING.fixed + retuned.trim, warm, V12, ntc(25)).t.hz;
+      const without = converter(cvOf(n), part3.turn, TUNING.fixed + part3.trim, warm).t.hz;
+      expect(Math.abs(cents(withNtc, without)), n).toBeLessThan(0.5);
+    }
+    // the low notes go sharp and the high ones flat, about the note with the base at 0 V
+    expect(cents(converter(cvOf('C3'), retuned.turn, TUNING.fixed + retuned.trim, warm, V12, ntc(25)).t.hz, noteHz('C3'))).toBeGreaterThan(30);
+    expect(cents(converter(cvOf('C5'), retuned.turn, TUNING.fixed + retuned.trim, warm, V12, ntc(25)).t.hz, noteHz('C5'))).toBeLessThan(-10);
+  });
+
+  it('the fine knob through 1M: a whole turn about 1.3 octaves, a tenth of the coarse knob’s, and halfway is in tune', () => {
+    const t = tune(C2, 25, ntc(25, 0.5));
+    const hz = (turn: number, fine: number) => converter(0, turn, TUNING.fixed + t.trim, room, V12, ntc(25, fine)).t.hz;
+    expect(Math.abs(cents(hz(t.turn, 0.5), C2))).toBeLessThan(1);
+    const fineOct = Math.log2(hz(t.turn, 0) / hz(t.turn, 1));
+    const coarseOct = Math.log2(hz(0, 0.5) / hz(1, 0.5));
+    expect(fineOct).toBeGreaterThan(1.2);
+    expect(fineOct).toBeLessThan(1.4);
+    expect(coarseOct).toBeGreaterThan(11);
+    expect(coarseOct).toBeLessThan(13);
+    // towards −12 V, lower
+    expect(hz(t.turn, 0.6)).toBeLessThan(hz(t.turn, 0.5));
+  });
+
+  it('the non-inverting amplifier: 1 + Rf ÷ the pot, clipped 1.5 V short of the rails', () => {
+    expect(gainOf(100e3, 100e3)).toBe(2);
+    expect(gainOf(200e3, 50e3)).toBe(5);
+    expect(gainOf(100e3, 0)).toBe(Infinity);
+    expect(amplify(1, 2)).toBe(2);
+    expect(amplify(2, 10)).toBe(VSAT12);
+    expect(amplify(-2, 10)).toBe(-VSAT12);
+    expect(VSAT12).toBe(V12 - 1.5);
+    // at 0 Ω, a comparator: anything but 0 V ends at a rail
+    expect(amplify(1e-3, Infinity)).toBe(VSAT12);
+    expect(amplify(0, Infinity)).toBe(0);
+  });
+
+  it('after the 1 µF: the sawtooth about ±1.2 V around 0 V, its top higher at low notes while part 2’s two 10k are on it', () => {
+    const c3 = sawAt(C3);
+    expect(c3.reduce((a, b) => a + b) / c3.length).toBeCloseTo(0, 9);
+    expect(Math.max(...c3)).toBeGreaterThan(1.26);
+    expect(Math.max(...c3)).toBeLessThan(1.32);
+    expect(Math.max(...sawAt(noteHz('C1')))).toBeGreaterThan(1.5);
+    const plain = sawAt(C3, false);
+    expect(Math.max(...plain)).toBeGreaterThan(1.19);
+    expect(Math.max(...plain)).toBeLessThan(1.23);
+    expect(Math.min(...plain)).toBeLessThan(-1.16);
+  });
+
+  it('the 40106’s output: low once its input reaches the upper threshold, high again at the lower one', () => {
+    const { vp, vn } = thresholds(V12);
+    const out = schmittOut([0, vp - 0.1, vp, vp - 0.1, vn + 0.1, vn, 0], vp, vn);
+    expect(out).toEqual([true, true, false, false, false, true, true]);
+    expect(pulseWidth(out)).toBeCloseTo(4 / 7, 12);
+  });
+
+  it('into it: a wire takes its input below 0 V, as far as its protection diode; the 1N4148 with the pull-down keeps it at 0 V and above', () => {
+    const op = sawAt(C3).map((v) => amplify(v, gainOf(100e3, 10e3)));
+    expect(Math.min(...op)).toBe(-VSAT12);
+    expect(Math.min(...op.map((v) => shaperIn(v, 'wire')))).toBe(-CLAMP_IN);
+    expect(-CLAMP_IN).toBeLessThan(-0.5);
+    expect(Math.min(...op.map((v) => shaperIn(v, 'pulldown')))).toBe(0);
+    expect(Math.max(...op.map((v) => shaperIn(v, 'pulldown')))).toBeCloseTo(VSAT12 - VD_PULL, 9);
+    // the diode alone: while it blocks, wherever the input floats
+    expect(shaperIn(-5, 'diode', 6.2)).toBe(6.2);
+    expect(shaperIn(VSAT12, 'diode', 6.2)).toBeCloseTo(VSAT12 - VD_PULL, 9);
+  });
+
+  it('a pulse: about 52% at the most gain, wider as the pot turns up, gone past about 20.5k (with the 200k, about 41k)', () => {
+    const width = (rf: number, r: number, divider = true) => pulse(C3, rf, r, pickupTau(divider)).width;
+    expect(width(100e3, 0)).toBeGreaterThan(0.5);
+    expect(width(100e3, 0)).toBeLessThan(0.54);
+    expect(width(100e3, 0, false)).toBeCloseTo(0.5, 1);
+    expect(width(100e3, 10e3)).toBeGreaterThan(width(100e3, 5e3));
+    const peak = Math.max(...sawAt(C3));
+    const r100 = potForPulse(100e3, peak), r200 = potForPulse(200e3, peak);
+    expect(r100 / 1e3).toBeGreaterThan(19.5);
+    expect(r100 / 1e3).toBeLessThan(21.5);
+    expect(r200 / r100).toBeCloseTo(2, 9);
+    expect(width(100e3, 0.98 * r100)).toBeLessThan(1);
+    expect(width(100e3, 1.02 * r100)).toBe(1);
+    expect(width(200e3, 0.98 * r200)).toBeLessThan(1);
+    expect(width(200e3, 1.02 * r200)).toBe(1);
+    // not the whole turn
+    expect(width(200e3, 100e3)).toBe(1);
+    // a sawtooth so big that no gain is too little
+    expect(potForPulse(100e3, 10)).toBe(Infinity);
+  });
+
+  it('10 V peak to peak: the square through 1 µF, 20k and 100k about ±5 V at 50%; the saw times 4.03 about ±4.8 V', () => {
+    expect(SQUARE_DIV.bottom / (SQUARE_DIV.top + SQUARE_DIV.bottom)).toBeCloseTo(5 / 6, 12);
+    const p = pulse(C3, 200e3, 0, pickupTau(false));
+    expect(p.width).toBeCloseTo(0.5, 1);
+    const sq = squareOut(p.out, C3);
+    expect(Math.max(...sq)).toBeGreaterThan(4.9);
+    expect(Math.max(...sq)).toBeLessThan(5.4);
+    expect(Math.min(...sq)).toBeLessThan(-4.9);
+    expect(Math.min(...sq)).toBeGreaterThan(-5.4);
+    expect(gainOf(SAW_AMP.rf, SAW_AMP.rg)).toBeCloseTo(4.03, 2);
+    const saw = sawOut(p.saw);
+    expect(Math.max(...saw)).toBeGreaterThan(4.7);
+    expect(Math.max(...saw)).toBeLessThan(5);
+    expect(Math.min(...saw)).toBeLessThan(-4.6);
+    expect(Math.min(...saw)).toBeGreaterThan(-4.9);
   });
 });

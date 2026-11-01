@@ -8,7 +8,8 @@ cover which videos could make a section here, starting with his "For Beginners" 
 breadboard guide, then DIY VCO parts 1-4), and what the simulator needs for them. The playlist is
 a group on the site (`OTHER_GROUPS` in `src/app/chapters.ts`), and its labs are in
 `src/labs/synth/`: the breadboard guide's (`using-a-breadboard`), then VCO part 1's
-(`oscillator-core`), part 2's (`exponential-converter`) and part 3's (`vco-tuning`).
+(`oscillator-core`), part 2's (`exponential-converter`), part 3's (`vco-tuning`) and part 4's
+(`sawtooth-to-square`).
 
 Labels: [V] his own words in the video, from YouTube's auto-generated transcript, read in the
 browser (summarised here, not quoted). [D] from the video's description: his bill of materials,
@@ -286,7 +287,7 @@ panel works in the in-app browser.
   - The tuning is exact, by bisection, not by ear. The trimmer is at about 346 Ω and the pot about
     23.6% of the way to −12 V. 0 to 5 V then come out within 4 cents.
 
-### Part 4 (from the description)
+### DIY VCO Part 4: Shaping Sawtooth to Square
 
 - [D] Parts: two 100k linear pots, 1 µF, a 1N4148, 1M, 200k, three 100k, 33k, 20k and three 10k
   NTC thermistors.
@@ -300,10 +301,97 @@ panel works in the in-app browser.
   base voltage for a given current falls about 2.4 mV a degree in the converter's window, about
   1.6 semitones in part 2's lab. VT grows with absolute temperature too, which changes the scale.
   That is the drift parts 3 and 4 fight: part 3's follower takes out the first, and the second is
-  left for the thermistors. [Lab] Part 3's lab has a temperature slider for the room; part 4's
-  could add the thermistors.
+  left for the thermistors.
+- [V] A viewer suggested thermistors. He calls part 3's "the NPN and the PNP react alike to
+  warmth" a broad generalisation, points to the Ebers-Moll equation, which he says he can't
+  really get his head round, and tries a primitive experiment instead: a finger on both
+  transistors at once. In a perfect world the pitch wouldn't move. It goes down before it
+  settles, so the PNP wins, and he deduces that its response needs taming: its base should rise
+  as it warms.
+- [V] An NTC thermistor's resistance falls as it warms. In series with the 100k, it makes the
+  divider's ratio depend on the temperature, its output rising as it warms, and every input
+  needs one. Out of his depth on the value, he takes René Schmitz's, whose VCO he draws on
+  heavily for the series: 10k thermistors with the 100k, between each 100k and the PNP's base.
+  They add at least a few k, so the VCO needs retuning.
+- [V] The fine-tune knob: the coarse pot's 0 to −12 V divided by about 50 is 0 to about −240 mV,
+  a huge range. A second 100k pot, also from ground to −12 V, goes in through 1M where the others
+  have 100k, with its own 10k thermistor: a division of about 500. (The captions give 0 to
+  "minus 4" millivolts; 12 V over 500 is 24 mV.) It also makes it easier to detune one VCO
+  against others.
+- [V] The pulse needs no new chip: the 40106 has five spare inverters. Its output goes off when
+  its input passes the upper threshold and on again under the lower one, a pulse out of phase
+  with the sawtooth, which doesn't matter. The width depends on the sawtooth's size, which has
+  to reach the upper threshold, about 7 V, but after the 1 µF it is only about ±1.2 V. So one of
+  the TL074's three spare op amps amplifies it.
+- [V] Op amps in his water pipes: two pressure sensors that let no water in, and a pump that
+  pushes out their difference times a huge gain, as far as its supply allows, which is where it
+  ends up 99.9% of the time. As a buffer, its output on its − input, it settles a hair under the
+  input: a unity-gain amplifier, one that doesn't amplify. With a divider from the output to the
+  − input it has to work harder: two 100k double the input, and any divider gives a gain above 1,
+  since a divider only reduces.
+- [V] The non-inverting amplifier: the sawtooth, picked up right after the 1 µF, on the + input,
+  100k from the output to the − input, and a 100k pot from there to ground. Turning the pot, the
+  sawtooth grows and shrinks, clips at what he calls the ±12 V lines, and becomes a 50% square
+  wave. For a fixed 50% square alone, the Schmitt trigger could be skipped.
+- [V] Into the 40106: a wire would probably fry it, since the wave's lower half is below 0 V and
+  its inputs must stay between 0 and 12 V. A 1N4148 pointing at the inverter is a one-way street,
+  but while it blocks the input is undefined and picks up noise, so 100k pulls it down.
+- [V] His test: with the gain fully cranked, a 50% square. Turning the pot widens the on phase
+  until, after about a third of its range, it takes over; the other two thirds are useless. By
+  trial and error he puts 200k in place of the 100k from the output to the − input, which should
+  move evenly from 50 to 100% over one turn, and it seems to work nicely.
+- [V] The outputs: AC coupling as in part 1, 1 µF and 100k after the inverter. Modules often
+  expect 10 V peak to peak, ±5 V, and the square is ±6 V, so 20k and 100k after the capacitor
+  take roughly 17% off. The sawtooth, 2.4 V peak to peak, needs a gain a bit over four: the last
+  op amp with 100k and "32k" (the parts list has 33k), its + input on the sawtooth once part 2's
+  divider is out.
+- [V] Through a jack, the square at 50% is very round and heavy, and more and more nasal as the
+  pot turns. Next comes the module: panel, stripboard and soldering, with full schematics on his
+  Patreon.
+- [I] The thermistors in the model (B 3950 K assumed). The follower already cancels the drift of
+  the transistors' I_S (part 3), and what is left is V_T, about 0.34% a degree. A 10k NTC with the
+  100k lets an input about 0.39% further through each degree (about 0.34% for the offset, through
+  the pot's wiper too), close to what V_T needs, so the notes keep their spacing.
+  - Added to part 3's tuning, they put 0 V about 2.2 semitones sharp and leave 0.91 octaves a
+    volt. Retuned (the trimmer about 531 Ω instead of 346 Ω), 0 to 5 V are within 4 cents.
+  - At 30 °C, the arpeggio from C3 to C5 sits 8 to 9 cents sharp throughout, nearly an offset that
+    the fine knob puts back; part 3's circuit, tuned the same, runs from +29 to −11 cents. At
+    20 °C the thermistors' notes run from −2 to −15 cents: the correction isn't symmetric, since an
+    NTC is exponential in 1/T where V_T is linear in T.
+  - His finger test warms the transistors and not the thermistors, so it shows part 3's circuit:
+    with both transistors equally warm, the note at V_mix = 0 (about F4) stays put, those below it
+    go sharp and those above flat. The dip he hears fits the BC558C warming first.
+  - With the offset on the negative side, warmer thermistors let the BC558C's base further down
+    for the notes below that F4, not up. What they do is scale every input's share, as V_T needs.
+- [I] The pulse's range in the model. After the 1 µF, the sawtooth's top is about 1.29 V at C3
+  while part 2's two 10k still load it (its coupling's time constant about 17 ms instead of 0.1 s),
+  and higher at low notes, 1.54 V at C1. A pulse needs that top, amplified, to reach the upper
+  threshold (TI's typical 7.06 V on 12 V) plus the diode's drop: a gain over about 5.9, so the pot
+  under 20.5k with the 100k (21% of its turn) and 41.1k with the 200k. A 40106 at the low end of
+  TI's range (its upper threshold about 5.5 V on 12 V) gives 27.5k and 54.9k, and at C1 about 35k
+  and 69k: a third, then two thirds. The whole turn would need a gain of 3 to be enough, an upper
+  threshold under about 3.4 V, below TI's range.
+- [I] The TL074 on ±12 V, from TI's datasheet (SLOS080W): the original swings to about ±13.5 V on
+  ±15 V, so about 1.5 V short of each rail; the newer TL074H gets within about 0.1 V. Its output
+  is short-circuit protected, about 26 mA for the H, more than the 10 mA a 40106 input is rated
+  for, and the 40106's inputs are rated from −0.5 V to its supply plus 0.5 V (SCHS097F).
+- [I] In the model, the square out at 50% is about +5.1 and −5.2 V, and the saw out about ±4.8 V.
 - [D] "How to build a DIY 3X VCO module from scratch" (OCAb2UoSPs0, 16:17, 2020-09-28) ends the
   series: three VCOs on stripboard, behind a panel.
+- [Lab] The lab (`sawtooth-to-square`) has six steps:
+  - the thermistors, with the room's temperature, fingers on both transistors, and a sequencer
+    playing a major arpeggio beside part 3's circuit tuned the same;
+  - the fine-tune knob, with both knobs' whole turns;
+  - the amplifier, its pot and a scope, at C3;
+  - into the 40106: a wire, the diode alone, or the diode and the pull-down;
+  - the 200k, with a chart of the pulse width over the pot's turn;
+  - 10 V peak to peak: the square and saw outputs with the sequencer.
+
+  Its estimates, said on the page: the thermistors' B value of 3950 K, common for 10k ones (the
+  video gives none), and the thermistors at the room's temperature; the TL074's swing, 1.5 V
+  short of the rails; the 1N4148's 0.5 V with the pull-down; the 40106's protection diode at
+  0.7 V; TI's typical thresholds; the floating input, made up; the note C3 from the third step to
+  the fifth; the finger's 32 °C and 6 s, as in parts 2 and 3; and the sequence, the lab's own.
 
 ## The other series
 
@@ -431,7 +519,7 @@ kit", 3-8 minutes each) are left out.
   - "The oscillator core" (VCO part 1);
   - "The exponential converter" (part 2);
   - "Tuning the VCO" (part 3);
-  - sawtooth to square (part 4).
+  - "Sawtooth to square" (part 4).
 
   The embeds and links work as Ben's do (youtube-nocookie), with the playlist or his channel as
   the source.
@@ -459,7 +547,8 @@ kit", 3-8 minutes each) are left out.
 | Capacitors as timing parts | everything | — (the sandbox's capacitors only make edge pulses) |
 
 _Sources: his channel and its playlists on YouTube (the watch pages' details and descriptions; the
-transcripts of the guide and VCO parts 1-3); his CircuitJS links (tinyurl.com, decoded); Erica
+transcripts of the guide and VCO parts 1-4); his CircuitJS links (tinyurl.com, decoded); Erica
 Synths' kit pages; CDM, 3 January 2022; the Mixer kit's manual as rendered on manualsdir.com;
 onsemi's BC556B/BC557/BC558B datasheet (Rev. 3, 2007) and Fairchild's BC556-BC560 (Rev. 1.7,
-2016); the parts in src/breadboard/catalog.ts._
+2016); TI's CD40106B (SCHS097F) and TL07xx (SLOS080W) datasheets; the parts in
+src/breadboard/catalog.ts._

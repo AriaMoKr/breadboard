@@ -4,7 +4,8 @@ import type { Kit } from '../clock/_draw';
 /**
  * Symbols the synth labs' schematics need beyond the clock labs' `Kit`: a battery, a supply rail
  * pointing down (for −9 V), a jack socket, an LED turned round, a diode, a Schmitt-trigger
- * inverter, a pot wired as a divider, an NPN transistor facing the other way, and a PNP one.
+ * inverter, a pot wired as a divider, an NPN transistor facing the other way, a PNP one, and an NTC
+ * thermistor.
  */
 
 type P = [number, number];
@@ -104,6 +105,18 @@ export function schmitt(kit: Kit, x: number, y: number): { in: P; out: P } {
   );
   kit.over.appendChild(g);
   return { in: [x, y], out: [x + 48, y] };
+}
+
+/**
+ * An NTC thermistor, horizontal and 30 long, centred on (x, y): a resistor with the slanted line
+ * through it, its foot flat, that marks a resistance changing by itself, and −t° beside it, since
+ * it falls as it warms. Its label goes over it. Returns its two ends.
+ */
+export function ntc(kit: Kit, x: number, y: number, label?: string): { a: P; b: P } {
+  const r = kit.resistor(x, y, 'h', label, 'top');
+  kit.over.appendChild(s('path', { d: `M${x - 17},${y + 9} h6 L${x + 11},${y - 9}`, class: 'part ntc-mark' }));
+  kit.text('−t°', [x + 15, y + 12], { anchor: 'start', size: 9, class: 'dim' });
+  return { a: r.a, b: r.b };
 }
 
 /** `Kit.led`, turned round: its anode at the bottom (y + 12) and its cathode at the top. */
