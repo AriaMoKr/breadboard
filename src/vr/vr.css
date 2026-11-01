@@ -66,7 +66,7 @@ html.tv :focus-visible { outline: 4px solid #ffd98a !important; outline-offset: 
 html.tv #vr-root canvas:focus-visible { outline: none !important; box-shadow: none; }
 html.tv .vr-menu label:has(input:focus-visible) { outline: 4px solid #ffd98a; outline-offset: 4px; border-radius: 4px; }
 html.tv .vr-menu label input:focus-visible { outline-width: 2px !important; outline-offset: 1px; box-shadow: none; }
-html.tv .vr-bar { gap: 8px 18px; padding: 27px 48px 14px; }
+html.tv .vr-bar { gap: 8px 12px; padding: 27px 48px 14px; }
 html.tv .vr-bar h1 { font-size: 20px; }
 html.tv .vr-menus, html.tv .vr-together { gap: 8px 12px; }
 html.tv .vr-menu, html.tv .vr-together { font-size: 17px; }

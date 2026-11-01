@@ -674,7 +674,7 @@ try {
     // Menu: into the bar, the card; Controls has the panel's buttons, each pressed with OK
     await page.evaluate('hallwayTV.menu()');
     const c0 = await tvView();
-    assert(c0.card && c0.focus === '← Breadboard 8-bit' && c0.dot === 'hidden' && c0.hint.startsWith('Up, down'), `Menu: ${JSON.stringify(c0)}`);
+    assert(c0.card && c0.focus === '← Breadboard Workshop' && c0.dot === 'hidden' && c0.hint.startsWith('Up, down'), `Menu: ${JSON.stringify(c0)}`);
     await focusTo('Controls');
     await remoteKey('Enter');
     const labels = await page.evaluate(`[...document.querySelectorAll('.vr-controls button')].map((b) => b.textContent)`);

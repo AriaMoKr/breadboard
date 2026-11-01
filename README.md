@@ -1,8 +1,12 @@
-# Breadboard 8-bit
+# Breadboard Workshop
 
-An interactive browser simulator that follows Ben Eater's YouTube playlist
-[**Building an 8-bit breadboard computer!**](https://www.youtube.com/playlist?list=PLowKtXNTBypGqImE405J2565dvjafglHU)
-video by video.
+Breadboard builds, part for part, in your browser, with a lab for each stage: Ben Eater's 8-bit
+computer from his YouTube playlist
+[**Building an 8-bit breadboard computer!**](https://www.youtube.com/playlist?list=PLowKtXNTBypGqImE405J2565dvjafglHU),
+video by video; Don Lancaster's TV Typewriter, from his article in
+[Radio-Electronics, September 1973](https://archive.org/details/donlancaster_tv_typewriter_9_73);
+and Moritz Klein's synth, from his
+["For Beginners" playlist](https://www.youtube.com/playlist?list=PLHeL0JWdJLvRv-r0TTjWxegtBha0ajdYh).
 
 * **The finished computer** (`#/`): the SAP-1-style machine as it stands at the end of
   the series. It has 16 bytes of RAM, A/B registers, an adder/subtractor ALU with carry

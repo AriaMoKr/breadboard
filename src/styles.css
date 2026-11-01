@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Breadboard 8-bit — design tokens
+   Breadboard Workshop — design tokens
    ========================================================================== */
 :root {
   color-scheme: dark;
@@ -487,6 +487,10 @@ table.microcode td.editing { position: relative; color: transparent; }
   .output-log { columns: 3; }
   .btn-label-long { display: none; }
   .btn-label-short { display: inline; }
+}
+@media (max-width: 400px) {
+  /* no room beside the name; each of Ben's videos still links to YouTube inside his playlist */
+  .topbar-link { display: none; }
 }
 
 /* Touch screens: a fingertip needs bigger targets than a mouse pointer (aim for 32 px or more). */

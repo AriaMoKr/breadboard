@@ -4,11 +4,13 @@ Guidance for Claude Code in this repository.
 
 ## What this is
 
-A browser simulator for breadboard circuits (TypeScript and Vite 7, no UI framework; three.js 0.186
-in the VR view only). It is built around Ben Eater's 8-bit breadboard computer: the finished
-computer, the same computer as his boards, a breadboard sandbox simulated chip by chip, a lab for
-each video of his playlist and of his other series that go with it, and a WebXR view. It is meant to
-grow into a breadboard for projects from other learning sites and videos too: the first is Don
+Breadboard Workshop, a browser simulator for breadboard circuits (TypeScript and Vite 7, no UI
+framework; three.js 0.186 in the VR view only). Its name and description are in `index.html`,
+`vr.html`, `public/manifest.webmanifest` and `src/app/app.ts` (`SITE`). It is built around Ben
+Eater's 8-bit breadboard computer: the finished computer, the same computer as his boards, a
+breadboard sandbox simulated chip by chip, a lab for each video of his playlist and of his other
+series that go with it, and a WebXR view. It is meant to grow into a breadboard for projects from
+other learning sites and videos too: the first is Don
 Lancaster's TV Typewriter (1973), from his schematics with his chips (`docs/research/tv-typewriter.md`), then Moritz
 Klein's synthesizer videos, from his breadboard guide on, with small analog models of their own (`docs/research/moritz-klein.md`). `README.md` covers
 using, building and deploying it; `docs/BREADBOARD.md` the breadboard model (geometry, module

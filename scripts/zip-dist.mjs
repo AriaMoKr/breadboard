@@ -15,7 +15,7 @@ const name = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).name;
 const zipName = `${name}.zip`;
 
 // Browsers won't run the app from file://, which is the first thing people try.
-const README = `Breadboard 8-bit, offline copy
+const README = `Breadboard Workshop, offline copy
 
 Browsers don't run this app from file://, so serve this folder over HTTP.
 From this folder:

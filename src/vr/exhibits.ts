@@ -111,7 +111,7 @@ export function computerExhibit(): Exhibit & { machine: Machine } {
   const pressed = new Set<string>();
 
   return {
-    title: 'Breadboard 8-bit',
+    title: 'Ben Eater’s 8-bit computer',
     layout: composed.layout,
     links: (pos) => moduleLinks(composed, pos),
     machine,

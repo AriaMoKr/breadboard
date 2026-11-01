@@ -37,6 +37,8 @@ interface CardVideo {
 
 const DATE = new Intl.DateTimeFormat('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' });
 
+/** The site's name, in the top bar and every page's title (index.html and vr.html have it too). */
+const SITE = 'Breadboard Workshop';
 /** The whole site as one zip, written next to index.html by scripts/zip-dist.mjs. */
 const SITE_ZIP = 'breadboard-8bit.zip';
 
@@ -62,9 +64,9 @@ export class App {
       'header',
       { class: 'topbar' },
       menuBtn,
-      h('a', { class: 'brand', href: '#/' }, h('span', { class: 'brand-led' }), 'Breadboard 8-bit'),
-      h('span', { class: 'topbar-sub' }, 'a simulator that follows Ben Eater’s “Building an 8-bit breadboard computer!”'),
-      h('a', { class: 'topbar-link', href: PLAYLIST_URL, target: '_blank', rel: 'noopener' }, 'Playlist ↗'),
+      h('a', { class: 'brand', href: '#/' }, h('span', { class: 'brand-led' }), SITE),
+      h('span', { class: 'topbar-sub' }, 'Ben Eater’s 8-bit computer, Don Lancaster’s TV Typewriter and Moritz Klein’s synth, part for part'),
+      h('a', { class: 'topbar-link', href: PLAYLIST_URL, target: '_blank', rel: 'noopener' }, 'Ben’s playlist ↗'),
     );
     this.shell = h('div', { class: 'shell' }, header, h('div', { class: 'shell-body' }, this.nav, this.main));
     this.root.replaceChildren(this.shell);
@@ -166,7 +168,7 @@ export class App {
   }
 
   private renderComputer() {
-    document.title = 'The finished computer · Breadboard 8-bit';
+    document.title = `The finished computer · ${SITE}`;
     const intro = h(
       'div',
       { class: 'page-head' },
@@ -182,7 +184,7 @@ export class App {
 
   /** Ben's videos outside the playlist, then other creators', grouped; `group` scrolls to one group. */
   private renderMore(group: string | undefined) {
-    document.title = 'More videos · Breadboard 8-bit';
+    document.title = `More videos · ${SITE}`;
     const head = h(
       'div',
       { class: 'page-head' },
@@ -203,7 +205,7 @@ export class App {
 
   private async renderBoardPage(kind: 'breadboard' | 'sandbox', token: number) {
     const breadboard = kind === 'breadboard';
-    document.title = `${breadboard ? 'Breadboard view' : 'Breadboard sandbox'} · Breadboard 8-bit`;
+    document.title = `${breadboard ? 'Breadboard view' : 'Breadboard sandbox'} · ${SITE}`;
     const head = h(
       'div',
       { class: 'page-head' },
@@ -252,7 +254,7 @@ export class App {
     const project = projectForLab(id);
     const chapter = CHAPTERS.find((c) => c.videos.some((x) => x.lab === id));
     const title = lab?.title ?? videos[0]?.title ?? more[0]?.video.title ?? project?.part.title ?? id;
-    document.title = `${title} · Breadboard 8-bit`;
+    document.title = `${title} · ${SITE}`;
     const labTitle = (lid: string) => loadedLab(lid)?.title ?? videosForLab(lid)[0]?.title ?? moreVideosForLab(lid)[0]?.video.title ?? projectForLab(lid)?.part.title ?? lid;
     const crumbs = chapter
       ? [chapter.title, videos.length ? ` · video${videos.length > 1 ? 's' : ''} ${videos.map((x) => x.index).join(', ')}` : '']

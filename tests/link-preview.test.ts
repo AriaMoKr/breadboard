@@ -33,7 +33,7 @@ describe('link previews', () => {
   ])('%s says what the page says, with its picture', (page, url) => {
     const { meta, title } = head(page);
     expect(meta.get('og:type')).toBe('website');
-    expect(meta.get('og:site_name')).toBe('Breadboard 8-bit');
+    expect(meta.get('og:site_name')).toBe('Breadboard Workshop');
     expect(meta.get('og:title')).toBe(title);
     expect(meta.get('og:description')).toBe(meta.get('description'));
     expect(meta.get('og:url')).toBe(url);
