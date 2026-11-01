@@ -141,6 +141,18 @@ code, pre { font-family: var(--mono); }
 .video-embed iframe { width: 100%; max-width: 860px; aspect-ratio: 16 / 9; border: 0; border-radius: 8px; margin-top: 6px; }
 .more-group { max-width: 980px; margin-bottom: 28px; scroll-margin-top: calc(var(--topbar-h) + 12px); }
 .more-group h2 { font-size: 1.2rem; margin: 0 0 4px; }
+/* the home page: a card for each build, with its stages (their labs, numbered as in the sidebar),
+   where to start and its source */
+.home-build { max-width: 980px; margin-bottom: 16px; padding: 14px 18px 16px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--panel); }
+.home-build h2 { display: flex; align-items: center; gap: 10px; font-size: 1.2rem; margin: 0 0 6px; }
+.home-led { flex: none; width: 12px; height: 12px; border-radius: 50%; background: var(--home-led); box-shadow: 0 0 10px var(--home-led); }
+.home-led.red { --home-led: var(--led-red); }
+.home-led.green { --home-led: var(--led-green); }
+.home-led.yellow { --home-led: var(--led-yellow); }
+.home-stages { list-style: none; margin: 10px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr)); gap: 2px 12px; }
+.home-stages a { display: grid; grid-template-columns: 40px 1fr; gap: 8px; align-items: baseline; padding: 4px 8px; border-radius: 7px; text-decoration: none; }
+.home-stages a:hover { background: var(--panel-2); }
+.home-links { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
 
 .lab-nav { display: flex; justify-content: space-between; gap: 10px; margin-top: 30px; padding-top: 16px; border-top: 1px solid var(--border); flex-wrap: wrap; }
 .placeholder { border: 1px dashed var(--border); border-radius: var(--radius); padding: 30px; text-align: center; color: var(--fg-dim); }
@@ -472,7 +484,7 @@ table.microcode td.editing { position: relative; color: transparent; }
   .shell-body { grid-template-columns: minmax(0, 1fr); }
   .btn.menu-btn { display: inline-flex; }
   .topbar-sub { display: none; }
-  .topbar { padding: 8px 12px; }
+  .topbar { padding: 8px 12px; gap: 10px; }
   .sidebar { position: fixed; top: var(--topbar-h); left: 0; bottom: 0; width: min(320px, 86vw); height: auto; z-index: 30; transform: translateX(-102%); transition: transform 0.2s; box-shadow: 0 0 40px rgba(0, 0, 0, 0.5); }
   .shell.nav-open .sidebar { transform: none; }
   .content { padding: 16px 16px 50px; }

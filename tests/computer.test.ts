@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { ALL_LAB_IDS, CHAPTERS, LAB_IDS, MORE_GROUPS, MORE_LAB_IDS, MORE_VIDEOS, OTHER_GROUPS, OTHER_LAB_IDS, OTHER_VIDEOS, VIDEOS } from '../src/app/chapters';
+import { ALL_LAB_IDS, CHAPTERS, LAB_IDS, MORE_GROUPS, MORE_LAB_IDS, MORE_VIDEOS, OTHER_GROUPS, OTHER_LAB_IDS, OTHER_VIDEOS, PLAYLIST_URL, PROJECT_LAB_IDS, VIDEOS } from '../src/app/chapters';
 import { App } from '../src/app/app';
 import { mountComputerWorkbench } from '../src/app/computer-page';
 import { clearLabCache, hasLab, loadLab } from '../src/app/lab-loader';
@@ -1046,7 +1046,19 @@ describe('shared UI pieces (fake DOM)', () => {
     };
     loc.hash = '#/';
     const app = new App(asEl(host) as unknown as HTMLElement);
+    // the home page: a card for each build, with every lab of the TV Typewriter's and Moritz's among
+    // its stages, and no one source to link in the top bar
+    expect(doc.title).toBe('Breadboard Workshop');
+    expect(host.querySelectorAll('.home-build h2').map((e) => e.textContent)).toEqual(['Ben Eater’s 8-bit computer', 'Don Lancaster’s TV Typewriter', 'Moritz Klein’s synth']);
+    const stages = host.querySelectorAll('.home-stages a').map((a) => a.attributes.href);
+    expect(stages.length).toBe(CHAPTERS.length + PROJECT_LAB_IDS.length + OTHER_LAB_IDS.length);
+    for (const id of [...PROJECT_LAB_IDS, ...OTHER_LAB_IDS]) expect(stages, id).toContain(`#/lab/${id}`);
+    const source = host.querySelector('.topbar-link')!;
+    expect(source.hasAttribute('hidden')).toBe(true);
+    loc.hash = '#/computer';
+    app.render();
     expect(host.querySelector('.workbench')).not.toBeNull();
+    expect([source.hasAttribute('hidden'), source.textContent, source.attributes.href]).toEqual([false, 'Ben’s playlist ↗', PLAYLIST_URL]);
     // a lab that finishes loading after the user already navigated on must not mount
     clearLabCache();
     loc.hash = '#/lab/sr-latch';
@@ -1069,6 +1081,13 @@ describe('shared UI pieces (fake DOM)', () => {
       expect(main.querySelector('h1')?.textContent).toBe(LABS.get(id)!.title);
       expect(doc.title).toContain(LABS.get(id)!.title);
     }
+    // the top bar's link follows the build: Ben's playlist on his labs, eater.net on his other
+    // videos', the article on the TV Typewriter's, Moritz's playlist on his labs and his videos
+    for (const [hash, text] of [['#/lab/sr-latch', 'Ben’s playlist ↗'], ['#/lab/divide-by-60', 'eater.net/clock ↗'], ['#/lab/transistor-gates', 'eater.net/8bit ↗'], ['#/lab/tvt-timing', 'Lancaster’s article ↗'], ['#/lab/vco-tuning', 'Moritz’s playlist ↗'], ['#/more/klein-beginners', 'Moritz’s playlist ↗'], ['#/more', null], ['#/video/2', 'Ben’s playlist ↗']]) {
+      loc.hash = hash!;
+      app.render();
+      expect(source.hasAttribute('hidden') ? null : source.textContent, hash!).toBe(text);
+    }
     // Ben's other videos, then other channels': every group with a card per video, the group's sidebar link lit
     loc.hash = '#/more/clock';
     app.render();
@@ -1077,7 +1096,7 @@ describe('shared UI pieces (fake DOM)', () => {
     expect(host.querySelector('.more-group .video-card a')?.attributes.href).toBe(`https://www.youtube.com/watch?v=${MORE_VIDEOS[0].youtubeId}`);
     expect(host.querySelectorAll('.sidebar a.active').map((a) => a.textContent)).toEqual([expect.stringContaining('Build a digital clock')]);
     expect(doc.title).toContain('More videos');
-    loc.hash = '#/';
+    loc.hash = '#/computer';
     app.render();
     frames(2);
     expect(host.querySelector('.lab-root')).toBeNull();

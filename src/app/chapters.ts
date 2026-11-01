@@ -150,6 +150,14 @@ export interface MoreVideo {
   lab?: string;
 }
 
+/** Where videos are listed or a design was published, linked from its pages. */
+export interface Source {
+  href: string;
+  label: string;
+  /** Its name where `label` is too long or reads only in a sentence, as on the top bar's link ("Moritz’s playlist"). */
+  short?: string;
+}
+
 export interface MoreGroup {
   id: string;
   title: string;
@@ -158,7 +166,7 @@ export interface MoreGroup {
   /** What these videos are and how they relate to the series. */
   text: string;
   /** Where Ben (or `by`) lists them. */
-  source: { href: string; label: string };
+  source: Source;
   /** A series in parts, numbered in the list. */
   numbered?: boolean;
   videos: MoreVideo[];
@@ -222,7 +230,7 @@ export const OTHER_GROUPS: MoreGroup[] = [
     title: 'For Beginners',
     by: 'Moritz Klein',
     text: 'Moritz Klein designs analog synthesizer circuits on a breadboard and explains them from scratch. His “For Beginners” playlist starts with a guide to the breadboard itself, then builds a voltage-controlled oscillator in four parts: a sawtooth core, an exponential converter for 1 V per octave, keeping it in tune, and shaping the sawtooth into a square.',
-    source: { href: 'https://www.youtube.com/playlist?list=PLHeL0JWdJLvRv-r0TTjWxegtBha0ajdYh', label: 'his “For Beginners” playlist' },
+    source: { href: 'https://www.youtube.com/playlist?list=PLHeL0JWdJLvRv-r0TTjWxegtBha0ajdYh', label: 'his “For Beginners” playlist', short: 'Moritz’s playlist' },
     numbered: true,
     videos: [
       m('XpMZoR3fgd0', "Complete beginner's guide to using a breadboard", '21:22', '2021-03-29', 'using-a-breadboard'),
@@ -264,7 +272,7 @@ export interface Project {
   /** What it is, for the lab pages. */
   text: string;
   /** The source to read alongside. */
-  source: { href: string; label: string };
+  source: Source;
   parts: ProjectPart[];
 }
 
@@ -274,7 +282,7 @@ export const PROJECTS: Project[] = [
     title: 'TV Typewriter',
     by: 'Don Lancaster',
     text: 'Don Lancaster’s TV Typewriter, from Radio-Electronics in September 1973: 16 lines of 32 characters on a television, typed on a keyboard, from standard TTL and Signetics’ MOS memories, on boards that plug into one stack. Built here from his schematics, board by board.',
-    source: { href: 'https://archive.org/details/donlancaster_tv_typewriter_9_73', label: 'Radio-Electronics, September 1973' },
+    source: { href: 'https://archive.org/details/donlancaster_tv_typewriter_9_73', label: 'Radio-Electronics, September 1973', short: 'Lancaster’s article' },
     parts: [
       { title: 'The timing chain', lab: 'tvt-timing', where: 'the timing board, Figs. 6 and 7' },
       { title: 'The character generator', lab: 'tvt-chargen', where: 'page A, Fig. 5, with the derived timing, Fig. 7' },

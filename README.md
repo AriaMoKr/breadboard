@@ -8,7 +8,10 @@ video by video; Don Lancaster's TV Typewriter, from his article in
 and Moritz Klein's synth, from his
 ["For Beginners" playlist](https://www.youtube.com/playlist?list=PLHeL0JWdJLvRv-r0TTjWxegtBha0ajdYh).
 
-* **The finished computer** (`#/`): the SAP-1-style machine as it stands at the end of
+* **The home page** (`#/`): the three builds, each with its stages (their labs), where to start
+  and its source. The top bar's link follows the page: Ben's playlist on his pages, a group's list
+  of videos on its labs (eater.net/clock, Moritz's playlist), the article on the TV Typewriter's.
+* **The finished computer** (`#/computer`): the SAP-1-style machine as it stands at the end of
   the series. It has 16 bytes of RAM, A/B registers, an adder/subtractor ALU with carry
   and zero flags, a microcoded control unit and a decimal display. You can pulse the
   clock by hand or let it run, and watch every control signal and bus transfer. It

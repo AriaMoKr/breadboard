@@ -83,7 +83,7 @@ try {
   console.log('Desktop (1280 x 800, mouse)');
   await page.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
   await page.goto(base);
-  const routes = await page.evaluate(`['#/', '#/breadboard', '#/sandbox', '#/more', ...new Set([...document.querySelectorAll('.sidebar a[href^="#/lab/"]')].map((a) => a.getAttribute('href').split('/').slice(0, 3).join('/')))]`);
+  const routes = await page.evaluate(`['#/', '#/computer', '#/breadboard', '#/sandbox', '#/more', ...new Set([...document.querySelectorAll('.sidebar a[href^="#/lab/"]')].map((a) => a.getAttribute('href').split('/').slice(0, 3).join('/')))]`);
 
   await check(`every page renders without errors (${routes.length} pages)`, async () => {
     const problems = await visitAll(routes, `() => {
@@ -104,7 +104,7 @@ try {
   await check('computer page and breadboard view share one computer', async () => {
     const r = await page.evaluate(`(async () => {
       const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-      location.hash = '#/'; await wait(800);
+      location.hash = '#/computer'; await wait(800);
       const step = [...document.querySelectorAll('.toolbar button')].find((b) => b.textContent.includes('Step instruction'));
       step.click(); step.click();
       const cycles = (s) => Number(s.match(/cycles (\\d+)/)[1]);
@@ -964,7 +964,7 @@ try {
     // A contrast theme (Windows') replaces background colours, which is how the simulator draws its
     // state: the hardware keeps its own colours there and the marks of state take Highlight (styles.css).
     await page.send('Emulation.setEmulatedMedia', { features: [{ name: 'forced-colors', value: 'active' }, { name: 'prefers-color-scheme', value: 'dark' }] });
-    await page.goto(`${base}#/`, 300);
+    await page.goto(`${base}#/computer`, 300);
     await page.send('Page.reload');
     await sleep(2000);
     const r = await page.evaluate(`(async () => {
@@ -1011,7 +1011,7 @@ try {
     // panel and in its Comfort settings. The choice is taken off again after.
     const before = errors.length;
     await page.evaluate(`localStorage.setItem('hallway.access', JSON.stringify({ motion: 'reduce', vignette: true, seated: true }))`);
-    await page.goto(`${base}#/`, 300);
+    await page.goto(`${base}#/computer`, 300);
     await page.send('Page.reload'); // the page may only have changed its #hash: load it again, to read the setting
     await sleep(2000);
     const flat = await page.evaluate(`(() => { const t = (sel) => getComputedStyle(document.querySelector(sel)).transitionDuration; return { cls: document.documentElement.classList.contains('reduce-motion'), btn: t('.btn'), led: t('.led') }; })()`);
@@ -1111,7 +1111,7 @@ try {
 
   await check('phones: the computer toolbar stays under the top bar', async () => {
     const r = await page.evaluate(`(async () => {
-      location.hash = '#/'; await new Promise((r) => setTimeout(r, 800));
+      location.hash = '#/computer'; await new Promise((r) => setTimeout(r, 800));
       scrollTo(0, 1500); await new Promise((r) => setTimeout(r, 200));
       const top = document.querySelector('.workbench-toolbar').getBoundingClientRect().top;
       const bar = document.querySelector('.topbar').getBoundingClientRect().bottom;
