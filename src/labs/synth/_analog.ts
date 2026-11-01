@@ -2,9 +2,10 @@
  * Analog models for Moritz Klein's "For Beginners" videos (docs/research/moritz-klein.md), with his
  * parts and values: 9 V batteries, LEDs with 1k, and a TL074 on ±9 V, from the op-amp inverter to
  * the square-wave oscillator of his breadboard guide; then DIY VCO part 1's oscillator core, a
- * 40106 with a diode, 2.2 nF and 100k, and what follows it. Time is in seconds, voltages in volts.
- * Plain arithmetic, as src/labs/dclock/_analog.ts does for Ben's clock, so the labs and the tests
- * share it.
+ * 40106 with a diode, 2.2 nF and 100k, and what follows it; then part 2's exponential converter, a
+ * BC548C in the 100k's place with a pot and a sequencer at its base. Time is in seconds, voltages
+ * in volts, currents in amps. Plain arithmetic, as src/labs/dclock/_analog.ts does for Ben's clock,
+ * so the labs and the tests share it.
  */
 
 import { rng } from '../dclock/_analog';
@@ -228,12 +229,20 @@ export function coreTimes(r = 100e3, c = 2.2e-9, vdd = VBAT, vp = VP, vn = VN): 
   return { rise, fall, period: rise + fall, mean: area / (rise + fall) };
 }
 
+/** What `sampleCore` needs of a core: part 1's, or part 2's with a transistor draining it. */
+export interface Core {
+  vc: number;
+  high: boolean;
+  readonly vdd: number;
+  step(dt: number): number;
+}
+
 /**
  * `n` readings of the core, `dt` apart, moving it on: the capacitor at each reading, and the output
  * as a scope's peak detect shows it, high if it was high at any moment since the last reading. (It
  * is high only for the fraction of a microsecond each jump takes.)
  */
-export function sampleCore(core: SchmittCore, dt: number, n: number): { vc: number[]; out: number[] } {
+export function sampleCore(core: Core, dt: number, n: number): { vc: number[]; out: number[] } {
   const vc: number[] = [], out: number[] = [];
   for (let i = 0; i < n; i++) {
     const was = core.high;
@@ -278,4 +287,199 @@ export class Coupling {
   step(dt: number, mean: number) {
     this.vcap = mean + (this.vcap - mean) * Math.exp(-dt / this.tau);
   }
+}
+
+// ---------------------------------------------------------------------------
+// DIY VCO part 2: a transistor drains the core, its base set by a pot and a sequencer
+
+/** Part 2's supply: the 12 V rail of a bench supply (part 1 ran on 9 V batteries). */
+export const V12 = 12;
+
+/** TI's typical CD40106B thresholds at 25 °C, at 5, 10 and 15 V (its datasheet, SCHS097F). */
+const TYPICAL = [
+  { vdd: 5, vp: 2.9, vn: 1.9 },
+  { vdd: 10, vp: 5.9, vn: 3.9 },
+  { vdd: 15, vp: 8.8, vn: 5.8 },
+];
+
+/**
+ * A CD40106's thresholds at `vdd`, interpolated between TI's typical values: 5.3 and 3.5 V on 9 V
+ * (`VP` and `VN`), about 7.06 and 4.66 V on 12 V. Both move with the supply, nearly in proportion,
+ * so the part 1 core's pitch hardly changes with it.
+ */
+export function thresholds(vdd: number): { vp: number; vn: number } {
+  const a = TYPICAL[vdd <= 10 ? 0 : 1], b = TYPICAL[vdd <= 10 ? 1 : 2];
+  const t = (vdd - a.vdd) / (b.vdd - a.vdd);
+  return { vp: a.vp + t * (b.vp - a.vp), vn: a.vn + t * (b.vn - a.vn) };
+}
+
+/** Room temperature here, and the datasheets': 25 °C. */
+export const ROOM = 25;
+
+/** Boltzmann's constant over the electron's charge, in volts per kelvin. */
+const K_Q = 8.617333e-5;
+
+/** The thermal voltage kT/q at `celsius`: about 25.7 mV at 25 °C. */
+export const thermalVoltage = (celsius: number) => K_Q * (celsius + 273.15);
+
+/**
+ * The BC548C of the exponential converter. Its datasheets give a typical base-emitter voltage of
+ * 660 mV at 2 mA (25 °C), between 580 and 700 mV, and a current gain (β) of 420 to 800 for the C
+ * grade, taken as 520.
+ */
+export const BC548C = { vbe: 0.66, at: 2e-3, beta: 520 };
+
+/**
+ * The transistor's saturation current I_S at `celsius`, the scale of its exponential: from the
+ * datasheet's typical base voltage at 25 °C, growing with temperature as SPICE's model has it, with
+ * T³ and silicon's band gap (1.11 eV).
+ */
+export function saturationCurrent(celsius = ROOM): number {
+  const t = celsius + 273.15, t0 = ROOM + 273.15;
+  const is0 = BC548C.at / Math.exp(BC548C.vbe / thermalVoltage(ROOM));
+  return is0 * (t / t0) ** 3 * Math.exp((1.11 / K_Q) * (1 / t0 - 1 / t));
+}
+
+/**
+ * The collector current with `vbe` on the base: I_S (e^(V_BE / V_T) − 1), ten times as much for every
+ * 59 mV at 25 °C, from picoamps to milliamps. The video splits this into a "linear region" above
+ * 0.7 V and a "not really on, not really off" state under it; its description's update says that's
+ * wrong, and it is: the current depends exponentially on the base voltage throughout. Left out: the
+ * Early effect (the collector's own small say in it), and what happens at tens of milliamps.
+ */
+export const collectorCurrent = (vbe: number, celsius = ROOM) => saturationCurrent(celsius) * Math.expm1(vbe / thermalVoltage(celsius));
+
+/** A voltage `v` behind `r` ohms, feeding the base's node: the pot's wiper or the CV jack, each through its 100k. */
+export interface Feed {
+  v: number;
+  r: number;
+}
+
+/** A pot's wiper as a source: `turn` of the way up a `pot` across `vtop`, behind its two parts in parallel. */
+export const wiper = (turn: number, vtop = V12, pot = 100e3): Feed => ({ v: turn * vtop, r: turn * (1 - turn) * pot });
+
+/**
+ * The base's voltage: where what flows in from the `feeds` balances what flows out, through `shunt`
+ * (the 4k) to ground and into the base itself (the collector current over β). Found by bisection,
+ * since each moves one way with it.
+ */
+export function baseVoltage(feeds: readonly Feed[], shunt = Infinity, celsius = ROOM): number {
+  if (!feeds.length) return 0;
+  const net = (vb: number) => feeds.reduce((sum, f) => sum + (f.v - vb) / f.r, 0) - vb / shunt - collectorCurrent(vb, celsius) / BC548C.beta;
+  let lo = Math.min(0, ...feeds.map((f) => f.v)), hi = Math.max(0, ...feeds.map((f) => f.v));
+  for (let k = 0; k < 80; k++) {
+    const mid = (lo + hi) / 2;
+    if (net(mid) > 0) lo = mid;
+    else hi = mid;
+  }
+  return (lo + hi) / 2;
+}
+
+/** How far down a saturated transistor pulls its collector. */
+export const VCE_SAT = 0.1;
+
+/**
+ * VCO part 2's core: the 40106 inverter, the diode and 2.2 nF as before, with a transistor in the
+ * 100k's place, its collector on the capacitor and its emitter to ground. It drains a steady current
+ * `i`, whatever the capacitor's voltage, so the capacitor falls in a straight line rather than the
+ * 100k's curve: C (VP − VN) / i from one threshold to the other, the pitch following the current.
+ * While the output is high it fills the capacitor through the diode against that current. If the
+ * transistor drains more than the output can give, the capacitor never reaches the upper
+ * threshold: the core stops, its output high.
+ */
+export class SinkCore implements Core {
+  vc: number;
+  high = false;
+  /** The current the transistor drains. */
+  i = 0;
+  readonly vp: number;
+  readonly vn: number;
+  constructor(
+    readonly c = 2.2e-9,
+    readonly vdd = V12,
+  ) {
+    ({ vp: this.vp, vn: this.vn } = thresholds(vdd));
+    this.vc = this.vp;
+  }
+  /** Where the output, through the diode, would hold the capacitor against the transistor. */
+  get held(): number {
+    return Math.max(VCE_SAT, this.vdd - VDIODE - Math.max(0, this.i) * R_OUT);
+  }
+  /** Whether the core has stopped: the output can't get the capacitor up to the upper threshold. */
+  get stalled(): boolean {
+    return this.held <= this.vp;
+  }
+  /** Move on `dt` seconds, switching wherever the capacitor crosses a threshold: exact for any `dt`. Returns how often the output switched. */
+  step(dt: number): number {
+    const i = Math.max(0, this.i);
+    let left = dt, flips = 0;
+    while (left > 0 && flips < 1e6) {
+      if (this.high && this.vc >= this.vp) {
+        this.high = false;
+        flips++;
+        continue;
+      }
+      if (!this.high && this.vc <= this.vn) {
+        this.high = true;
+        flips++;
+        continue;
+      }
+      if (this.high) {
+        // towards `held`, with the time constant of the output's resistance and C
+        const v = this.held, tau = R_OUT * this.c;
+        const k = (v - this.vc) / (v - this.vp);
+        const cross = v > this.vp && k > 1 ? tau * Math.log(k) : Infinity;
+        if (cross >= left) {
+          this.vc = v + (this.vc - v) * Math.exp(-left / tau);
+          break;
+        }
+        this.vc = this.vp;
+        left -= cross;
+      } else {
+        // down in a straight line, i / C volts a second
+        const cross = i > 0 ? ((this.vc - this.vn) * this.c) / i : Infinity;
+        if (cross >= left) {
+          this.vc -= (i * left) / this.c;
+          break;
+        }
+        this.vc = this.vn;
+        left -= cross;
+      }
+    }
+    return flips;
+  }
+}
+
+/**
+ * `SinkCore`'s jump (through the diode, against the transistor), its fall (a straight line), the
+ * period and the pitch, with the transistor draining `i`; once the core has stopped, or with no
+ * current at all, the period is Infinity and the pitch 0.
+ */
+export function sinkTimes(i: number, c = 2.2e-9, vdd = V12): { rise: number; fall: number; period: number; hz: number; stalled: boolean } {
+  const { vp, vn } = thresholds(vdd);
+  const held = Math.max(VCE_SAT, vdd - VDIODE - Math.max(0, i) * R_OUT);
+  if (held <= vp) return { rise: Infinity, fall: 0, period: Infinity, hz: 0, stalled: true };
+  const rise = R_OUT * c * Math.log((held - vn) / (held - vp));
+  if (!(i > 0)) return { rise, fall: Infinity, period: Infinity, hz: 0, stalled: false };
+  const fall = (c * (vp - vn)) / i;
+  return { rise, fall, period: rise + fall, hz: 1 / (rise + fall), stalled: false };
+}
+
+/** C0, the lowest C, as the video gives it: 16.35 Hz. Each octave up doubles it. */
+export const C0 = 16.3516;
+
+const NOTE_NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
+
+/** The nearest note to `hz` (equal temperament, A4 at 440 Hz), and how many cents off it is. */
+export function noteOf(hz: number): { name: string; cents: number } {
+  const n = 12 * Math.log2(hz / C0), k = Math.round(n);
+  // cents from whole numbers, so a note dead on is 0 cents, not −0
+  return { name: `${NOTE_NAMES[((k % 12) + 12) % 12]}${Math.floor(k / 12)}`, cents: Math.round(100 * n) - 100 * k };
+}
+
+/** A note's frequency from its name in `noteOf`'s form: "C2", "G♯3". */
+export function noteHz(name: string): number {
+  const m = /^([A-G]♯?)(-?\d+)$/.exec(name);
+  if (!m) return NaN;
+  return C0 * 2 ** (Number(m[2]) + NOTE_NAMES.indexOf(m[1]) / 12);
 }

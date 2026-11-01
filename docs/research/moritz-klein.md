@@ -8,7 +8,7 @@ cover which videos could make a section here, starting with his "For Beginners" 
 breadboard guide, then DIY VCO parts 1-4), and what the simulator needs for them. The playlist is
 a group on the site (`OTHER_GROUPS` in `src/app/chapters.ts`), and its labs are in
 `src/labs/synth/`: the breadboard guide's (`using-a-breadboard`), then VCO part 1's
-(`oscillator-core`).
+(`oscillator-core`) and part 2's (`exponential-converter`).
 
 Labels: [V] his own words in the video, from YouTube's auto-generated transcript, read in the
 browser (summarised here, not quoted). [D] from the video's description: his bill of materials,
@@ -131,14 +131,70 @@ panel works in the in-app browser.
     about ten times faster, above 100 kHz.
   - After the 1 µF, the wave settles on its average, about 4.34 V, not on the middle of its swing.
 
-### Parts 2-4 (from the descriptions)
+### DIY VCO Part 2: The simplest exponential converter
 
-- [D] Part 2:
-  - parts: a BC548C, 4k, two 10k, two 100k, a 100k pot, and a jack for a sequencer's CV;
-  - topics: NPN basics, the pot, adding voltages, scaling and offset, and temperature dependence.
-  - He later added a correction: his account of a linear region versus a half-on state is wrong,
-    because the collector current always depends exponentially on the base voltage. The circuit
-    still works. [Lab] Show it as corrected.
+- [D] Parts: a BC548C, a 4k, two 10k, two 100k, a 100k pot, and a jack for a sequencer's CV.
+  Topics: NPN basics, the pot, adding voltages, scaling and offset, and temperature dependence.
+- [D] He later added a correction: his account of a linear region versus a half-on state is wrong,
+  because the collector current always depends exponentially on the base voltage. The circuit
+  still works.
+- [V] He starts by fixing part 1's output stage. The top of the wave looked odd, which he puts down
+  to the 100k/100k divider making an accidental band-pass filter, so two 10k replace the two 100k.
+- [V] To bring the pitch down, the fall has to slow:
+  - 1 µF for the 2.2 nF (about 450 times) makes it almost an LFO, and 1M for the 100k (10 times)
+    lowers it less;
+  - but a capacitor can only be swapped by hand, and a big one bends the quick first phase, so the
+    wave turns into an odd, triangle-like shape;
+  - a resistance can be controlled: an LDR, a thermistor, or a transistor used as a
+    voltage-controlled resistor.
+- [V] He explains an NPN transistor as water pipes: a T joint, a seal and a spring. From about
+  0.7 V up it is in its linear region, a current amplifier with a gain of 100 to 900, until it
+  saturates. For a VCO that has three drawbacks: it is too open, it answers to current, and it is
+  linear.
+- [V] 1 V per octave: C0 is 16.35 Hz, and each octave doubles the frequency.
+- [V] Below 0.7 V he describes a "semi-active" region (the description's update corrects the
+  split): barely open, voltage-controlled and exponential, which suits 1 V per octave.
+- [V] The circuit:
+  - a BC548 takes the drain resistor's place, its collector on the capacitor (with the diode and
+    the Schmitt trigger's input) and its emitter on ground;
+  - a 100k pot across the 12 V rail is a variable divider, 0 to 12 V on his multimeter;
+  - a 100k between the wiper and the base keeps a turn too far from destroying the transistor.
+- [V] Most of the pot's range is dead. The core starts around 550 mV and is finicky: from about
+  550 to 350 mV it goes from a high pitch to periodic clicks.
+- [V] Scaling for his SQ-1 sequencer:
+  - it puts out 0 to 5 V, 0 V being a low C;
+  - the transistor's window of about 200 mV is 25 times smaller, so 100k with about 4k to ground,
+    roughed in, to be tuned later.
+- [V] The offset is a passive mixer, two resistors into one point, with the pot as the offset; with
+  the 4k it makes a divider with two inputs. With the pot turned down the sequence only clicks
+  oddly; opening it slides the sequence into hearing, but it isn't harmonious.
+- [V] Touching the transistor makes the pitch drift dramatically. The next part deals with
+  temperature and tunes the scaling.
+- [I] Why it isn't harmonious: the 4k gives the base about 1/27 of each input's voltage, about
+  37 mV a volt, where 1 V per octave wants VT ln 2, about 17.8 mV at 25 °C (a little under 2k to
+  ground instead of the 4k): about two octaves a volt.
+- [Lab] The lab (`exponential-converter`) has five steps: a bigger R or C; the transistor with the
+  pot; the sequencer scaled down alone (the lab's own step, to show why the offset is needed); the
+  offset; a finger on the transistor. Its estimates, said on the page:
+  - the whole circuit runs on the 12 V rail. The 40106's thresholds there are interpolated from
+    TI's typical values, 7.06 and 4.66 V: nearly the ratio of 9 V's, so part 1's core still
+    plays about 10.9 kHz.
+  - The BC548C follows I_S (e^(V_BE/V_T) − 1), with I_S from its datasheets' typical 660 mV at
+    2 mA (about 1.4 × 10⁻¹⁴ A), a current gain of 520, and SPICE's temperature law (T³ and
+    1.11 eV). The Early effect is left out. This puts 350 mV at about 2 Hz and 550 mV at about
+    5 kHz, as he finds. Past about 4 V on the pot (about 0.71 V at the base and 14 mA through the
+    transistor) the 40106 can't put back what it drains, and the core stops.
+  - The datasheets allow 580 to 700 mV at 2 mA, a factor of about 100 in current, so another
+    transistor's window can sit tens of millivolts away.
+  - The sequence, C2 G2 C3 G3 C4 G4 C5 C6 for 0 to 4 V, is the lab's own. With the pot near the top
+    (about 11.6 V) it plays from about 29 Hz to 9 kHz.
+  - A finger warms the transistor towards 32 °C with a time constant of 6 s, both made up: about
+    1.6 semitones a degree.
+  - The model doesn't show the big capacitor's bent jump: its 40106 fills even 1 µF in about
+    0.14 ms. Listen plays the browser's own sawtooth at the pitch, the core's upside down.
+
+### Parts 3 and 4 (from the descriptions)
+
 - [D] Part 3:
   - parts: a BC558C, 1M, 1.5k and a 1k precision trimmer;
   - topics: less temperature dependence, then fine-tuning, with PNP transistors, an emitter
@@ -152,8 +208,11 @@ panel works in the in-app browser.
   - links: the Ebers-Moll model on Wikipedia, and René Schmitz's pages.
 - [I] Why temperature matters: the collector current goes up by a factor of e for every VT (about
   26 mV at room temperature), so 1 V per octave needs the CV scaled to about 18 mV per volt
-  (VT ln 2). VT grows with absolute temperature, which is the drift parts 3 and 4 fight. [Lab] A
-  temperature slider that shows the pitch drifting, with and without the thermistors.
+  (VT ln 2). At a fixed base voltage the current grows with temperature mostly through I_S: the
+  base voltage for a given current falls about 2.4 mV a degree in the converter's window, about
+  1.6 semitones in part 2's lab. VT grows with absolute temperature too, which changes the scale. That is the drift parts 3
+  and 4 fight. [Lab] A temperature slider that shows the pitch drifting, with and without the
+  thermistors.
 - [D] "How to build a DIY 3X VCO module from scratch" (OCAb2UoSPs0, 16:17, 2020-09-28) ends the
   series: three VCOs on stripboard, behind a panel.
 
@@ -281,7 +340,7 @@ kit", 3-8 minutes each) are left out.
 - [Lab] Labs, in order:
   - "Using a breadboard": the guide's four circuits;
   - "The oscillator core" (VCO part 1);
-  - the exponential converter (part 2);
+  - "The exponential converter" (part 2);
   - tuning and temperature (part 3);
   - sawtooth to square (part 4).
 

@@ -3,8 +3,8 @@ import type { Kit } from '../clock/_draw';
 
 /**
  * Symbols the synth labs' schematics need beyond the clock labs' `Kit`: a battery, a supply rail
- * pointing down (for −9 V), a jack socket, an LED turned round, a diode and a Schmitt-trigger
- * inverter.
+ * pointing down (for −9 V), a jack socket, an LED turned round, a diode, a Schmitt-trigger
+ * inverter, a pot wired as a divider and an NPN transistor facing the other way.
  */
 
 type P = [number, number];
@@ -31,20 +31,35 @@ export function railDown(kit: Kit, x: number, y: number, label: string) {
   kit.text(label, [x, y + 18], { size: 10, class: 'dim' });
 }
 
-/** A jack socket: its tip contact at (x, y), its sleeve 17 below, the body to the right. */
-export function jack(kit: Kit, x: number, y: number): { tip: P; sleeve: P } {
+/** A jack socket: its tip contact at (x, y), its sleeve 17 below, the body to the right (or to the left, `facing` left), with `name` over it. */
+export function jack(kit: Kit, x: number, y: number, facing: 'right' | 'left' = 'right', name = 'jack'): { tip: P; sleeve: P } {
+  const d = facing === 'right' ? 1 : -1, anchor = facing === 'right' ? 'start' : 'end';
   const g = s('g', { class: 'jack' });
   g.append(
-    s('rect', { x: x + 18, y: y - 13, width: 26, height: 40, rx: 3, class: 'part-fill' }),
+    s('rect', { x: facing === 'right' ? x + 18 : x - 44, y: y - 13, width: 26, height: 40, rx: 3, class: 'part-fill' }),
     // the tip's spring contact, and the sleeve's
-    s('path', { d: `M${x},${y} h18 l7,-5 l7,5`, class: 'part' }),
-    s('path', { d: `M${x},${y + 17} h30`, class: 'part' }),
+    s('path', { d: `M${x},${y} h${18 * d} l${7 * d},-5 l${7 * d},5`, class: 'part' }),
+    s('path', { d: `M${x},${y + 17} h${30 * d}`, class: 'part' }),
   );
   kit.over.appendChild(g);
-  kit.text('jack', [x + 31, y - 21], { size: 10, class: 'dim' });
-  kit.text('tip', [x + 48, y], { anchor: 'start', size: 10, class: 'dim' });
-  kit.text('sleeve', [x + 48, y + 17], { anchor: 'start', size: 10, class: 'dim' });
+  kit.text(name, [x + 31 * d, y - 21], { size: 10, class: 'dim' });
+  kit.text('tip', [x + 48 * d, y], { anchor, size: 10, class: 'dim' });
+  kit.text('sleeve', [x + 48 * d, y + 17], { anchor, size: 10, class: 'dim' });
   return { tip: [x, y], sleeve: [x, y + 17] };
+}
+
+/** A pot wired as a divider: its track a resistor 30 long, upright, centred on (x, y), and its wiper an arrow from the right onto the middle of it. */
+export function potDivider(kit: Kit, x: number, y: number): { top: P; bottom: P; wiper: P } {
+  kit.resistor(x, y, 'v');
+  kit.over.appendChild(s('path', { d: `M${x + 22},${y} H${x + 8} M${x + 8},${y} l6,-4 M${x + 8},${y} l6,4`, class: 'part' }));
+  return { top: [x, y - 15], bottom: [x, y + 15], wiper: [x + 22, y] };
+}
+
+/** `Kit.npn` the other way round: its base on the left at (x − 18, y), its collector up to the right and its emitter down to the right. */
+export function npnLeft(kit: Kit, x: number, y: number): { base: P; collector: P; emitter: P } {
+  const grp = kit.group(() => kit.npn(x, y));
+  for (const el of grp.els) el.setAttribute('transform', `translate(${2 * x} 0) scale(-1 1)`);
+  return { base: [x - 18, y], collector: [x + 15, y - 18], emitter: [x + 15, y + 18] };
 }
 
 /** A diode 24 long centred on (x, y), pointing from its anode to its cathode (the bar) `dir`. Returns its two ends. */

@@ -256,6 +256,8 @@ export interface SliderOptions {
   value: number;
   /** Logarithmic scale (min must be > 0). */
   log?: boolean;
+  /** How many steps the track has from end to end (1000 by default), each an arrow key's worth: more for a fine control. */
+  positions?: number;
   format?: (v: number) => string;
   onInput?: (v: number) => void;
 }
@@ -264,14 +266,16 @@ export class Slider {
   readonly el: HTMLLabelElement;
   private input: HTMLInputElement;
   private out: HTMLSpanElement;
+  private readonly positions: number;
   value: number;
   constructor(private opts: SliderOptions) {
     this.value = opts.value;
-    this.input = h('input', { type: 'range', min: 0, max: 1000, step: 1 });
+    this.positions = opts.positions ?? 1000;
+    this.input = h('input', { type: 'range', min: 0, max: this.positions, step: 1 });
     this.out = h('span', { class: 'slider-value' });
     this.input.addEventListener('input', () => {
       this.value = this.fromPos(Number(this.input.value));
-      setText(this.out, this.fmt(this.value));
+      this.show();
       opts.onInput?.(this.value);
     });
     this.el = h('label', { class: 'slider' }, opts.label ? h('span', { class: 'slider-label' }, opts.label) : null, this.input, this.out);
@@ -283,11 +287,11 @@ export class Slider {
   private toPos(v: number) {
     const { min, max, log } = this.opts;
     const t = log ? Math.log(v / min) / Math.log(max / min) : (v - min) / (max - min);
-    return Math.round(Math.max(0, Math.min(1, t)) * 1000);
+    return Math.round(Math.max(0, Math.min(1, t)) * this.positions);
   }
   private fromPos(p: number) {
     const { min, max, log, step } = this.opts;
-    const t = p / 1000;
+    const t = p / this.positions;
     let v = log ? min * Math.pow(max / min, t) : min + (max - min) * t;
     if (step) v = Math.round(v / step) * step;
     return Math.max(min, Math.min(max, v));
@@ -295,7 +299,13 @@ export class Slider {
   set(v: number) {
     this.value = v;
     this.input.value = String(this.toPos(v));
-    setText(this.out, this.fmt(v));
+    this.show();
+  }
+  /** The value as text, beside the track and for screen readers (which would otherwise read the track's position). */
+  private show() {
+    const text = this.fmt(this.value);
+    setText(this.out, text);
+    this.input.setAttribute('aria-valuetext', text);
   }
 }
 

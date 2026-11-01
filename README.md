@@ -137,17 +137,22 @@ video by video.
   gives Lancaster's 60. Its sync jumpers move the picture. The second adds the character generator:
   the 2518 line register, the 2513, the 74165 that shifts the dots out and the 7401 that makes the
   video, with a stand-in for the memory board that you type into, and the TV draws the text.
-* **Moritz Klein's labs** (`#/lab/using-a-breadboard`, `#/lab/oscillator-core`): his synthesizer
-  videos, from his "For Beginners" playlist on. The first lab is his complete beginner's guide to
-  using a breadboard: four circuits on one board, a TL074 on two 9 V batteries, with his parts and
-  values. They are an LED, a crude op-amp inverter (its − input on the + rail, the − rail or left
-  floating), an oscillator that flashes the LED, and one you can hear through a jack. Each has its
-  schematic, and the strips inside the board can be shown. A scope shows the oscillators, and
-  WebAudio plays the audible one quietly. The second is part 1 of his DIY VCO, the oscillator
-  core: a 40106 Schmitt trigger with a diode, 2.2 nF and 100k makes a sawtooth of about 11 kHz.
-  Headphones straight on it stop it, so a TL074 follower buffers it, AC coupling centres it on
-  0 V and a divider halves it for the jack, step by step with a scope, and the last step plays it.
-  The analog parts are small per-lab models with his values (`src/labs/synth/_analog.ts`).
+* **Moritz Klein's labs** (`#/lab/using-a-breadboard`, `#/lab/oscillator-core`,
+  `#/lab/exponential-converter`): his synthesizer videos, from his "For Beginners" playlist on.
+  The first lab is his complete beginner's guide to using a breadboard: four circuits on one
+  board, a TL074 on two 9 V batteries, with his parts and values. They are an LED, a crude op-amp
+  inverter (its − input on the + rail, the − rail or left floating), an oscillator that flashes
+  the LED, and one you can hear through a jack. Each has its schematic, and the strips inside the
+  board can be shown. A scope shows the oscillators, and WebAudio plays the audible one quietly.
+  The second is part 1 of his DIY VCO, the oscillator core: a 40106 Schmitt trigger with a diode,
+  2.2 nF and 100k makes a sawtooth of about 11 kHz. Headphones straight on it stop it, so a TL074
+  follower buffers it, AC coupling centres it on 0 V and a divider halves it for the jack, step by
+  step with a scope, and the last step plays it. The third is part 2, the exponential converter:
+  a BC548C in the 100k's place, its base set by a pot, then by a sequencer's CV scaled down and
+  offset in a passive mixer. A chart shows its current growing ten times for every 59 mV at the
+  base, a table what each note of a sequence plays (about two octaves a volt, not one), and a
+  finger on the transistor detunes it. The analog parts are small per-lab models with his values
+  (`src/labs/synth/_analog.ts`).
 * **More videos** (`#/more`): Ben's videos outside the playlist that go with it. These are his first
   build running programs and his introduction to transistors and logic gates (both from 2015 and
   linked from eater.net/8bit), plus his digital clock series (2026, eater.net/clock). Then other

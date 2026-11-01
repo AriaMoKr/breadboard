@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { ANALOG_CHIPS, CHIPS, CHIP_IDS, chipDef } from '../src/breadboard/catalog';
 import { validateLayout } from '../src/breadboard/layout';
-import { Coupling, FloatingInput, PHONES, Relaxation, SchmittCore, VN, VP, VSAT, comparator, coreTimes, coreWave, divide, ledCurrent, par, relaxationPeriod, sampleCore } from '../src/labs/synth/_analog';
+import {
+  BC548C, Coupling, FloatingInput, PHONES, R_OUT, Relaxation, SchmittCore, SinkCore, V12, VDIODE, VN, VP, VSAT, baseVoltage, collectorCurrent, comparator, coreTimes, coreWave,
+  divide, ledCurrent, noteHz, noteOf, par, relaxationPeriod, sampleCore, saturationCurrent, sinkTimes, thermalVoltage, thresholds, wiper,
+} from '../src/labs/synth/_analog';
 import { guideLayout, guideNets, type Setup } from '../src/labs/synth/_board';
 import { periodicWave } from '../src/labs/synth/_sound';
 
@@ -254,5 +257,161 @@ describe('synth: DIY VCO part 1’s oscillator core', () => {
     expect(cw.real[1]).toBeCloseTo(1, 6);
     expect([cw.real[0], cw.imag[0]]).toEqual([0, 0]);
     for (const x of [cw.real[2], cw.real[3], cw.imag[1], cw.imag[2]]) expect(Math.abs(x)).toBeLessThan(1e-6);
+  });
+});
+
+describe('synth: DIY VCO part 2’s exponential converter', () => {
+  const { vp: VP12, vn: VN12 } = thresholds(V12);
+  /** The pitch with `v` on the pot's wiper, through 100k into the base, as in the second step. */
+  const fromPot = (v: number) => {
+    const w = wiper(v / V12);
+    return sinkTimes(collectorCurrent(baseVoltage([{ v: w.v, r: 100e3 + w.r }])));
+  };
+
+  it('the 40106 on 12 V switches at about 7.06 and 4.66 V: nearly the same ratio as on 9 V, so part 1’s core plays the same', () => {
+    expect(thresholds(9).vp).toBeCloseTo(VP, 9);
+    expect(thresholds(9).vn).toBeCloseTo(VN, 9);
+    expect(VP12).toBeCloseTo(7.06, 9);
+    expect(VN12).toBeCloseTo(4.66, 9);
+    expect(thresholds(5)).toEqual({ vp: 2.9, vn: 1.9 });
+    expect(thresholds(15).vp).toBeCloseTo(8.8, 9);
+    const on12 = 1 / coreTimes(100e3, 2.2e-9, V12, VP12, VN12).period;
+    expect(Math.abs(on12 / (1 / coreTimes().period) - 1)).toBeLessThan(0.01);
+  });
+
+  it('a bigger part lowers the core: ten times the resistance ten times, a capacitor 450 times as big about 450 times', () => {
+    const hz = (r: number, c: number) => 1 / coreTimes(r, c, V12, VP12, VN12).period;
+    expect(hz(100e3, 2.2e-9) / hz(1e6, 2.2e-9)).toBeCloseTo(10, 1);
+    expect(hz(100e3, 2.2e-9) / hz(100e3, 1e-6)).toBeGreaterThan(440);
+    expect(hz(100e3, 2.2e-9) / hz(100e3, 1e-6)).toBeLessThan(460);
+    expect(hz(100e3, 1e-6)).toBeCloseTo(24, 0);
+  });
+
+  it('the BC548C: 660 mV for 2 mA, ten times the current for every 59 mV, exponential all the way down', () => {
+    expect(thermalVoltage(25)).toBeCloseTo(0.02569, 5);
+    expect(collectorCurrent(0.66)).toBeCloseTo(2e-3, 6);
+    const decade = thermalVoltage(25) * Math.LN10;
+    expect(decade * 1e3).toBeCloseTo(59.2, 1);
+    for (const v of [0.3, 0.45, 0.6]) expect(collectorCurrent(v + decade) / collectorCurrent(v)).toBeCloseTo(10, 3);
+    expect(collectorCurrent(0)).toBe(0);
+    expect(collectorCurrent(0.35) * 1e9).toBeCloseTo(11.5, 0);
+    expect(collectorCurrent(0.55) * 1e6).toBeCloseTo(27.7, 0);
+  });
+
+  it('warmer, more current for the same base: the base falls about 2.4 mV a degree for the same current, and the pitch climbs over 1.5 semitones', () => {
+    expect(saturationCurrent(25)).toBeCloseTo(BC548C.at / Math.exp(BC548C.vbe / thermalVoltage(25)), 25);
+    expect(saturationCurrent(32) / saturationCurrent(25)).toBeGreaterThan(2.5);
+    const vbe = (i: number, celsius: number) => thermalVoltage(celsius) * Math.log(i / saturationCurrent(celsius) + 1);
+    const perK = (vbe(1e-6, 26) - vbe(1e-6, 25)) * 1e3;
+    expect(perK).toBeLessThan(-2.2);
+    expect(perK).toBeGreaterThan(-2.6);
+    const semitones = 12 * Math.log2(sinkTimes(collectorCurrent(0.45, 32)).hz / sinkTimes(collectorCurrent(0.45, 25)).hz);
+    expect(semitones / 7).toBeGreaterThan(1.5);
+    expect(semitones / 7).toBeLessThan(1.8);
+  });
+
+  it('the pot: its wiper behind its two halves in parallel', () => {
+    expect(wiper(0)).toEqual({ v: 0, r: 0 });
+    expect(wiper(0.5)).toEqual({ v: 6, r: 25e3 });
+    expect(wiper(1).r).toBe(0);
+  });
+
+  it('the base: a little under the wiper, by the base current through the 100k; the mixer gives each input about 1/27', () => {
+    expect(baseVoltage([])).toBe(0);
+    const vb = baseVoltage([{ v: 0.5, r: 100e3 }]);
+    expect(vb).toBeLessThan(0.5);
+    expect(vb).toBeGreaterThan(0.498);
+    expect((0.5 - vb) / 100e3).toBeCloseTo(collectorCurrent(vb) / BC548C.beta, 15);
+    // at a few hundred millivolts and less the base takes next to nothing: plain dividers
+    expect(baseVoltage([{ v: 1, r: 100e3 }, { v: 2, r: 100e3 }], 4e3)).toBeCloseTo(3 / 27, 4);
+    expect(baseVoltage([{ v: 4, r: 100e3 }], 4e3)).toBeCloseTo(4 / 26, 4);
+  });
+
+  it('a transistor for the 100k: from a couple of clicks a second at 350 mV to 5 kHz at 550 mV, as Moritz finds', () => {
+    for (const [v, lo, hi] of [[0.35, 1, 5], [0.45, 50, 200], [0.55, 4e3, 7e3]]) {
+      const { hz } = sinkTimes(collectorCurrent(v));
+      expect(hz, `${v} V`).toBeGreaterThan(lo);
+      expect(hz, `${v} V`).toBeLessThan(hi);
+    }
+    // through 100k from the pot: the base a little under the wiper; dead past about 4 V
+    expect(fromPot(0.5).hz).toBeGreaterThan(600);
+    expect(fromPot(0.5).hz).toBeLessThan(900);
+    expect(fromPot(3.5).stalled).toBe(false);
+    expect(fromPot(4.5).stalled).toBe(true);
+    expect(fromPot(12).stalled).toBe(true);
+    expect(fromPot(0)).toMatchObject({ hz: 0, stalled: false });
+  });
+
+  it('its fall is a straight line, C (VP − VN) / i, exact at any step', () => {
+    const i = 5e-6, t = sinkTimes(i);
+    expect(t.fall).toBeCloseTo((2.2e-9 * (VP12 - VN12)) / i, 15);
+    expect(t.rise * 1e6).toBeGreaterThan(0.2);
+    expect(t.rise * 1e6).toBeLessThan(0.4);
+    expect(t.hz).toBeCloseTo(946.7, 0);
+    const total = 20 * t.period + t.rise + t.fall / 2;
+    for (const dt of [1e-7, 3.3e-6, 1e-4, total]) {
+      const core = new SinkCore();
+      core.i = i;
+      core.vc = VN12;
+      core.high = true;
+      let flips = 0, left = total;
+      while (left > 1e-15) {
+        const d = Math.min(dt, left);
+        flips += core.step(d);
+        left -= d;
+      }
+      // 21 times low at the top, 20 times high at the bottom; halfway down the 21st fall
+      expect(flips, `dt ${dt}`).toBe(41);
+      expect(core.high).toBe(false);
+      expect(core.vc).toBeCloseTo((VP12 + VN12) / 2, 6);
+    }
+    // readings: never outside the thresholds, a jump each period
+    const core = new SinkCore();
+    core.i = i;
+    const { vc, out } = sampleCore(core, t.period / 50, 500);
+    expect(Math.min(...vc)).toBeGreaterThanOrEqual(VN12 - 1e-9);
+    expect(Math.max(...vc)).toBeLessThanOrEqual(VP12 + 1e-9);
+    expect(out.filter((v, k) => v > 0 && !(out[k - 1] > 0)).length).toBe(10);
+  });
+
+  it('drains more than the 40106 can put back, and the core stops, its output high', () => {
+    const stop = (V12 - VDIODE - VP12) / R_OUT;
+    expect(stop * 1e3).toBeCloseTo(14.13, 2);
+    expect(sinkTimes(stop * 0.99).stalled).toBe(false);
+    expect(sinkTimes(stop * 1.01)).toEqual({ rise: Infinity, fall: 0, period: Infinity, hz: 0, stalled: true });
+    expect(sinkTimes(0)).toMatchObject({ fall: Infinity, period: Infinity, hz: 0, stalled: false });
+    const core = new SinkCore();
+    core.i = stop * 1.5;
+    core.step(1e-3);
+    expect(core.stalled).toBe(true);
+    expect(core.step(1e-3)).toBe(0);
+    expect(core.high).toBe(true);
+    expect(core.vc).toBeCloseTo(core.held, 6);
+    expect(core.held).toBeLessThan(VP12);
+  });
+
+  it('the mixer: about 37 mV at the base for each volt of CV, two octaves a volt where 1 V per octave wants one', () => {
+    const w = wiper(11.6 / V12);
+    const base = (cv: number) => baseVoltage([{ v: w.v, r: 100e3 + w.r }, { v: cv, r: 100e3 }], 4e3);
+    expect((base(2) - base(1)) * 1e3).toBeCloseTo(37, 0);
+    const octaves = Math.log2(sinkTimes(collectorCurrent(base(2))).hz / sinkTimes(collectorCurrent(base(1))).hz);
+    expect(octaves).toBeGreaterThan(1.9);
+    expect(octaves).toBeLessThan(2.2);
+    expect(thermalVoltage(25) * Math.LN2 * 1e3).toBeCloseTo(17.8, 1);
+    // scaled down alone, the sequence's 0 to 4 V never gets the core going
+    expect(sinkTimes(collectorCurrent(baseVoltage([{ v: 4, r: 100e3 }], 4e3))).hz).toBeLessThan(0.01);
+  });
+
+  it('notes: C0 is 16.35 Hz and A4 440 Hz, an octave doubles, and cents count from the nearest note', () => {
+    expect(noteHz('C0')).toBeCloseTo(16.35, 2);
+    expect(noteHz('A4')).toBeCloseTo(440, 1);
+    expect(noteHz('C3') / noteHz('C2')).toBeCloseTo(2, 12);
+    expect(noteOf(440)).toEqual({ name: 'A4', cents: 0 });
+    expect(noteOf(noteHz('G♯3'))).toEqual({ name: 'G♯3', cents: 0 });
+    expect(noteOf(440 * 2 ** (30 / 1200))).toEqual({ name: 'A4', cents: 30 });
+    expect(noteOf(440 * 2 ** (-60 / 1200))).toEqual({ name: 'G♯4', cents: 40 });
+    expect(noteOf(noteHz('C2') * 0.999).name).toBe('C2');
+    expect(noteOf(noteHz('B1') * 1.001).name).toBe('B1');
+    expect(noteHz('H2')).toBeNaN();
   });
 });

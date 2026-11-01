@@ -54,6 +54,17 @@ export class Tone {
     osc.frequency.value = hz;
   }
 
+  /**
+   * Play (or retune) a sawtooth at `hz`: the browser's own, which rises slowly and drops at once
+   * and keeps all its harmonics at any pitch, so a few hertz come out as clicks.
+   */
+  saw(hz: number) {
+    const osc = this.start();
+    if (!osc) return;
+    if (osc.type !== 'sawtooth') osc.type = 'sawtooth';
+    osc.frequency.value = hz;
+  }
+
   /** The oscillator, started (fading in) if it isn't playing; null where there is no WebAudio. */
   private start(): OscillatorNode | null {
     if (typeof AudioContext === 'undefined') return null;
