@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { ANALOG_CHIPS, CHIPS, CHIP_IDS, chipDef } from '../src/breadboard/catalog';
 import { validateLayout } from '../src/breadboard/layout';
 import {
-  BC548C, Coupling, FloatingInput, PHONES, R_OUT, Relaxation, SchmittCore, SinkCore, V12, VDIODE, VN, VP, VSAT, baseVoltage, collectorCurrent, comparator, coreTimes, coreWave,
-  divide, ledCurrent, noteHz, noteOf, par, relaxationPeriod, sampleCore, saturationCurrent, sinkTimes, thermalVoltage, thresholds, wiper,
+  BC548C, Coupling, FloatingInput, PHONES, R_FOLLOW, R_OUT, Relaxation, SchmittCore, SinkCore, TUNING, V12, VDIODE, VN, VP, VSAT, baseVoltage, collectorCurrent, comparator, converter,
+  coreTimes, coreWave, divide, follower, ledCurrent, mixer, noteHz, noteOf, offsetFor, par, pnpSaturationCurrent, relaxationPeriod, sampleCore, saturationCurrent, sinkTimes,
+  thermalVoltage, thresholds, tune, wiper,
 } from '../src/labs/synth/_analog';
 import { guideLayout, guideNets, type Setup } from '../src/labs/synth/_board';
 import { periodicWave } from '../src/labs/synth/_sound';
@@ -413,5 +414,111 @@ describe('synth: DIY VCO part 2’s exponential converter', () => {
     expect(noteOf(noteHz('C2') * 0.999).name).toBe('C2');
     expect(noteOf(noteHz('B1') * 1.001).name).toBe('B1');
     expect(noteHz('H2')).toBeNaN();
+  });
+});
+
+describe('synth: DIY VCO part 3’s follower and tuning', () => {
+  const C2 = noteHz('C2');
+  const cents = (hz: number, ref: number) => 1200 * Math.log2(hz / ref);
+  /** The second step: the follower on the BC548C's base, its own base on ground, the two at these temperatures. */
+  const onBase = (pnp = 25, npn = 25) => sinkTimes(collectorCurrent(follower(0, pnp, npn).ve, npn)).hz;
+  const semitones = (pnp: number, npn: number) => 12 * Math.log2(onBase(pnp, npn) / onBase());
+  const tuned = tune();
+  const shunt = TUNING.fixed + tuned.trim;
+
+  it('the follower: its emitter 480 mV above its base, wherever the base is, and the BC548C on it hardly changes that', () => {
+    const alone = follower(0, 25, null);
+    expect(alone.ve).toBeCloseTo(0.48, 6);
+    expect(alone.ic * 1e6).toBeCloseTo(11.5, 1);
+    expect((V12 - alone.ve) / R_FOLLOW).toBeCloseTo(alone.ic + alone.ib, 12);
+    for (const v of [-1, -0.5, 0.5, 1]) {
+      expect(follower(v, 25, null).ve - v, `${v} V`).toBeGreaterThan(0.475);
+      expect(follower(v, 25, null).ve - v, `${v} V`).toBeLessThan(0.485);
+    }
+    expect(Math.abs(follower(0).ve - alone.ve) * 1e3).toBeLessThan(0.1);
+  });
+
+  it('warmer, the BC558C lets its emitter down about 2.4 mV a degree, by the BC548C’s law', () => {
+    const perK = (follower(0, 26, null).ve - follower(0, 25, null).ve) * 1e3;
+    expect(perK).toBeLessThan(-2.25);
+    expect(perK).toBeGreaterThan(-2.5);
+    expect(pnpSaturationCurrent(32) / pnpSaturationCurrent(25)).toBeCloseTo(saturationCurrent(32) / saturationCurrent(25), 9);
+  });
+
+  it('on the BC548C’s base, its own base on ground: about 343 Hz, an F4, too high a baseline', () => {
+    expect(onBase()).toBeGreaterThan(340);
+    expect(onBase()).toBeLessThan(347);
+    expect(noteOf(onBase()).name).toBe('F4');
+  });
+
+  it('a finger on either sends the pitch the other way, by over ten semitones; on both, they cancel', () => {
+    expect(semitones(32, 25)).toBeLessThan(-10);
+    expect(semitones(25, 32)).toBeGreaterThan(10);
+    expect(Math.abs(semitones(32, 32))).toBeLessThan(0.1);
+    // the warmer one wins
+    expect(semitones(28, 30)).toBeGreaterThan(0);
+    expect(semitones(30, 28)).toBeLessThan(0);
+  });
+
+  it('the 1M holds the BC548C under 6.5 mA, so the core can no longer stop', () => {
+    const top = follower(V12);
+    expect(top.ve).toBeLessThan(0.7);
+    const most = collectorCurrent(top.ve);
+    expect(most * 1e3).toBeGreaterThan(5);
+    expect(most * 1e3).toBeLessThan(6.5);
+    expect(sinkTimes(most).stalled).toBe(false);
+    expect(converter(5, 0, 1e6).t.stalled).toBe(false);
+  });
+
+  it('the mixer: the follower’s base current, out of its base, lifts it a little', () => {
+    const g = 2 / 100e3 + 1 / 4e3, plain = (-1.26 + 2) / 100e3 / g;
+    const m = mixer([{ v: -1.26, r: 100e3 }, { v: 2, r: 100e3 }], 4e3);
+    expect(m.vm).toBeGreaterThan(plain);
+    expect((m.vm - plain) * 1e3).toBeLessThan(0.2);
+    expect(m.vm - plain).toBeCloseTo(m.ib / g, 12);
+  });
+
+  it('subtracting: the pot towards −12 V puts 0 V on C2, but with the 4k at about two octaves a volt', () => {
+    const turn = offsetFor(4e3);
+    const at = (cv: number) => converter(cv, turn, 4e3);
+    expect(Math.abs(cents(at(0).t.hz, C2))).toBeLessThan(1);
+    expect(at(0).vm).toBeLessThan(0);
+    expect(at(0).w.v).toBeCloseTo(-12 * turn, 9);
+    const perVolt = Math.log2(at(1).t.hz / at(0).t.hz);
+    expect(perVolt).toBeGreaterThan(2);
+    expect(perVolt).toBeLessThan(2.15);
+  });
+
+  it('tuned: 1.5k and about 346 Ω of the trimmer, for 17.8 mV a volt at the BC548C; 0 to 5 V then within 4 cents', () => {
+    expect(tuned.trim).toBeGreaterThan(300);
+    expect(tuned.trim).toBeLessThan(400);
+    const at = (cv: number) => converter(cv, tuned.turn, shunt);
+    expect((at(1).ve - at(0).ve) * 1e3).toBeCloseTo(thermalVoltage(25) * Math.LN2 * 1e3, 1);
+    for (const cv of [0, 1, 2, 3, 4, 5]) expect(Math.abs(cents(at(cv).t.hz, C2 * 2 ** cv)), `${cv} V`).toBeLessThan(4);
+    expect(Math.abs(cents(at(1).t.hz, 2 * C2))).toBeLessThan(0.01);
+  });
+
+  it('a warmer room: cents off, sharp below the note of the first steps and flat above, where part 2’s would be semitones off; retuning puts it right', () => {
+    const warm = { pnp: 30, npn: 30 };
+    const off = (cv: number) => cents(converter(cv, tuned.turn, shunt, warm).t.hz, converter(cv, tuned.turn, shunt).t.hz);
+    expect(off(0)).toBeGreaterThan(30);
+    expect(off(0)).toBeLessThan(60);
+    expect(off(5)).toBeLessThan(-30);
+    expect(off(5)).toBeGreaterThan(-60);
+    expect(Math.abs(off(Math.log2(onBase() / C2)))).toBeLessThan(3);
+    // part 2's converter, its base held where it was at 25 °C
+    const part2 = cents(sinkTimes(collectorCurrent(converter(0, tuned.turn, shunt).ve, 30)).hz, C2);
+    expect(part2 / 100).toBeGreaterThan(7);
+    const re = tune(C2, 30);
+    for (const cv of [0, 1, 2, 3, 4, 5]) expect(Math.abs(cents(converter(cv, re.turn, TUNING.fixed + re.trim, warm).t.hz, C2 * 2 ** cv)), `${cv} V`).toBeLessThan(4);
+    // warmer, the octaves narrow, and a bigger shunt widens them again
+    expect(re.trim).toBeGreaterThan(tuned.trim);
+  });
+
+  it('a sagging supply moves every note alike: about 23 cents for both rails 0.1 V low, an offset rather than the scale', () => {
+    const sag = (cv: number) => cents(converter(cv, tuned.turn, shunt, { pnp: 25, npn: 25 }, 11.9).t.hz, converter(cv, tuned.turn, shunt).t.hz);
+    expect(sag(0)).toBeGreaterThan(20);
+    expect(sag(0)).toBeLessThan(27);
+    for (const cv of [1, 2, 5]) expect(Math.abs(sag(cv) - sag(0)), `${cv} V`).toBeLessThan(1);
   });
 });

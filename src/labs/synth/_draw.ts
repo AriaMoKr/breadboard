@@ -4,7 +4,7 @@ import type { Kit } from '../clock/_draw';
 /**
  * Symbols the synth labs' schematics need beyond the clock labs' `Kit`: a battery, a supply rail
  * pointing down (for −9 V), a jack socket, an LED turned round, a diode, a Schmitt-trigger
- * inverter, a pot wired as a divider and an NPN transistor facing the other way.
+ * inverter, a pot wired as a divider, an NPN transistor facing the other way, and a PNP one.
  */
 
 type P = [number, number];
@@ -60,6 +60,21 @@ export function npnLeft(kit: Kit, x: number, y: number): { base: P; collector: P
   const grp = kit.group(() => kit.npn(x, y));
   for (const el of grp.els) el.setAttribute('transform', `translate(${2 * x} 0) scale(-1 1)`);
   return { base: [x - 18, y], collector: [x + 15, y - 18], emitter: [x + 15, y + 18] };
+}
+
+/** A PNP transistor drawn as `npnLeft` is, but with its emitter up to the right and its collector down to the right, the emitter's arrow pointing in. */
+export function pnpLeft(kit: Kit, x: number, y: number): { base: P; emitter: P; collector: P } {
+  const g = s('g', { class: 'pnp' });
+  g.append(
+    s('line', { x1: x, y1: y - 12, x2: x, y2: y + 12, class: 'part' }),
+    s('line', { x1: x - 18, y1: y, x2: x, y2: y, class: 'part' }),
+    s('line', { x1: x, y1: y - 6, x2: x + 15, y2: y - 18, class: 'part' }),
+    s('line', { x1: x, y1: y + 6, x2: x + 15, y2: y + 18, class: 'part' }),
+    // the arrow, partway along the emitter, pointing towards the bar
+    s('path', { d: `M${x + 6},${y - 10.8} l2,-7 M${x + 6},${y - 10.8} l7,-1`, class: 'part' }),
+  );
+  kit.over.appendChild(g);
+  return { base: [x - 18, y], emitter: [x + 15, y - 18], collector: [x + 15, y + 18] };
 }
 
 /** A diode 24 long centred on (x, y), pointing from its anode to its cathode (the bar) `dir`. Returns its two ends. */

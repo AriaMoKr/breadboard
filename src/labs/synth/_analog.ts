@@ -3,7 +3,8 @@
  * parts and values: 9 V batteries, LEDs with 1k, and a TL074 on ±9 V, from the op-amp inverter to
  * the square-wave oscillator of his breadboard guide; then DIY VCO part 1's oscillator core, a
  * 40106 with a diode, 2.2 nF and 100k, and what follows it; then part 2's exponential converter, a
- * BC548C in the 100k's place with a pot and a sequencer at its base. Time is in seconds, voltages
+ * BC548C in the 100k's place with a pot and a sequencer at its base; then part 3's BC558C emitter
+ * follower in front of that base, and the scale tuned with a trimmer. Time is in seconds, voltages
  * in volts, currents in amps. Plain arithmetic, as src/labs/dclock/_analog.ts does for Ben's clock,
  * so the labs and the tests share it.
  */
@@ -329,15 +330,18 @@ export const thermalVoltage = (celsius: number) => K_Q * (celsius + 273.15);
  */
 export const BC548C = { vbe: 0.66, at: 2e-3, beta: 520 };
 
+/** How much a junction's I_S grows from 25 °C to `celsius`, as SPICE's model has it: with T³ and silicon's band gap (1.11 eV). */
+function growth(celsius: number): number {
+  const t = celsius + 273.15, t0 = ROOM + 273.15;
+  return (t / t0) ** 3 * Math.exp((1.11 / K_Q) * (1 / t0 - 1 / t));
+}
+
 /**
  * The transistor's saturation current I_S at `celsius`, the scale of its exponential: from the
- * datasheet's typical base voltage at 25 °C, growing with temperature as SPICE's model has it, with
- * T³ and silicon's band gap (1.11 eV).
+ * datasheet's typical base voltage at 25 °C, growing with temperature by `growth`.
  */
 export function saturationCurrent(celsius = ROOM): number {
-  const t = celsius + 273.15, t0 = ROOM + 273.15;
-  const is0 = BC548C.at / Math.exp(BC548C.vbe / thermalVoltage(ROOM));
-  return is0 * (t / t0) ** 3 * Math.exp((1.11 / K_Q) * (1 / t0 - 1 / t));
+  return (BC548C.at / Math.exp(BC548C.vbe / thermalVoltage(ROOM))) * growth(celsius);
 }
 
 /**
@@ -482,4 +486,113 @@ export function noteHz(name: string): number {
   const m = /^([A-G]♯?)(-?\d+)$/.exec(name);
   if (!m) return NaN;
   return C0 * 2 ** (Number(m[2]) + NOTE_NAMES.indexOf(m[1]) / 12);
+}
+
+// ---------------------------------------------------------------------------
+// DIY VCO part 3: a PNP emitter follower at the base against the drift, and the scale tuned
+
+/** The 1M from +12 V to the emitter of part 3's follower. */
+export const R_FOLLOW = 1e6;
+
+/**
+ * The BC558C of part 3's emitter follower, the BC548C's PNP twin, with the same law for
+ * temperature. Its emitter sits above its base by what its junction needs for the current the 1M
+ * lets through, about 11.5 µA: Moritz's multimeter read 480 mV. (onsemi's typical 620 mV at 2 mA
+ * would make it about 487 mV, Fairchild's 660 mV about 527 mV.) Its current gain is onsemi's
+ * typical for the C grade at 10 µA, 270.
+ */
+export const BC558C = { veb: 0.48, beta: 270 };
+
+/** The BC558C's I_S at `celsius`: 480 mV for the 1M's current at 25 °C, with nothing else on its emitter. */
+export function pnpSaturationCurrent(celsius = ROOM): number {
+  const ie = (V12 - BC558C.veb) / R_FOLLOW, ic = (ie * BC558C.beta) / (BC558C.beta + 1);
+  return (ic / Math.exp(BC558C.veb / thermalVoltage(ROOM))) * growth(celsius);
+}
+
+/**
+ * Part 3's emitter follower: the BC558C with `vin` on its base, its emitter up through the 1M to
+ * `vpos` and its collector on −12 V, far enough down that it never saturates here. With `npn` set,
+ * the BC548C's base hangs on the emitter, at that temperature. The emitter settles where the 1M's
+ * current balances what the transistors take (found by bisection): about 480 mV above the base,
+ * wherever the base is, and lower as the BC558C warms. Returns the emitter's voltage, the BC558C's
+ * collector current, and its base current, which comes out of its base.
+ */
+export function follower(vin: number, pnp = ROOM, npn: number | null = ROOM, vpos = V12): { ve: number; ic: number; ib: number } {
+  const is = pnpSaturationCurrent(pnp), vt = thermalVoltage(pnp), k = 1 + 1 / BC558C.beta;
+  const net = (ve: number) => (vpos - ve) / R_FOLLOW - is * k * Math.expm1((ve - vin) / vt) - (npn === null ? 0 : collectorCurrent(ve, npn) / BC548C.beta);
+  let lo = Math.min(vin, 0) - 1, hi = vpos;
+  for (let n = 0; n < 60; n++) {
+    const mid = (lo + hi) / 2;
+    if (net(mid) > 0) lo = mid;
+    else hi = mid;
+  }
+  const ve = (lo + hi) / 2, ic = is * Math.expm1((ve - vin) / vt);
+  return { ve, ic, ib: ic / BC558C.beta };
+}
+
+/**
+ * Part 3's passive mixer, now at the BC558C's base: the `feeds` (the offset pot's wiper and the CV,
+ * each through 100k) against `shunt` to ground (the 4k, then 1.5k and the trimmer), with the
+ * follower's base current coming out into it. A linear node but for that small current, so a few
+ * rounds settle it. Returns the mixer's voltage, and the follower's with the BC548C on its emitter.
+ */
+export function mixer(feeds: readonly Feed[], shunt: number, pnp = ROOM, npn = ROOM, vpos = V12): { vm: number; ve: number; ic: number; ib: number } {
+  const g = feeds.reduce((sum, f) => sum + 1 / f.r, 0) + 1 / shunt;
+  const i = feeds.reduce((sum, f) => sum + f.v / f.r, 0);
+  let vm = i / g, f = follower(vm, pnp, npn, vpos);
+  for (let k = 0; k < 3; k++) {
+    vm = (i + f.ib) / g;
+    f = follower(vm, pnp, npn, vpos);
+  }
+  return { vm, ...f };
+}
+
+/** Part 3's values around the mixer: the offset pot from ground to −12 V, 100k from its wiper and from the CV jack, and 1.5k with a 1k ten-turn trimmer to ground. */
+export const TUNING = { pot: 100e3, r: 100e3, fixed: 1.5e3, trimmer: 1e3 };
+
+/** The two transistors' temperatures, in °C. */
+export interface Temps {
+  pnp: number;
+  npn: number;
+}
+
+/**
+ * Part 3's converter with `cv` on the jack, the offset pot `turn` of the way from ground to −12 V and
+ * `shunt` from the mixer to ground, both rails at ±`supply`: the pot's wiper, the mixer, the follower's
+ * emitter (the BC548C's base), the BC548C's current and the core's times.
+ */
+export function converter(cv: number, turn: number, shunt: number, temps: Temps = { pnp: ROOM, npn: ROOM }, supply = V12) {
+  const w = wiper(turn, -supply, TUNING.pot);
+  const m = mixer([{ v: w.v, r: TUNING.r + w.r }, { v: cv, r: TUNING.r }], shunt, temps.pnp, temps.npn, supply);
+  const i = collectorCurrent(m.ve, temps.npn);
+  return { ...m, w, i, t: sinkTimes(i, 2.2e-9, supply) };
+}
+
+/** The offset pot's turn that makes 0 V on the jack play `low`, with `shunt` to ground: by bisection, since the pitch falls as the pot turns towards −12 V. */
+export function offsetFor(shunt: number, low = noteHz('C2'), temps: Temps = { pnp: ROOM, npn: ROOM }): number {
+  let lo = 0, hi = 1;
+  for (let k = 0; k < 40; k++) {
+    const mid = (lo + hi) / 2;
+    if (converter(0, mid, shunt, temps).t.hz > low) lo = mid;
+    else hi = mid;
+  }
+  return (lo + hi) / 2;
+}
+
+/**
+ * Where the offset pot and the trimmer go for 1 V per octave, with 0 V on the jack playing `low`, both
+ * transistors at `celsius`: what Moritz finds by ear, but exact. For each trimmer setting, the pot
+ * that puts 0 V on the note (`offsetFor`); then the trimmer that makes 1 V play the octave above, by
+ * bisection, since the octave widens as the trimmer grows.
+ */
+export function tune(low = noteHz('C2'), celsius = ROOM): { turn: number; trim: number } {
+  const temps = { pnp: celsius, npn: celsius };
+  let lo = 0, hi = TUNING.trimmer;
+  for (let k = 0; k < 40; k++) {
+    const mid = (lo + hi) / 2, shunt = TUNING.fixed + mid;
+    if (converter(1, offsetFor(shunt, low, temps), shunt, temps).t.hz < 2 * low) lo = mid;
+    else hi = mid;
+  }
+  const trim = (lo + hi) / 2;
+  return { turn: offsetFor(TUNING.fixed + trim, low, temps), trim };
 }

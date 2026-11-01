@@ -8,7 +8,7 @@ cover which videos could make a section here, starting with his "For Beginners" 
 breadboard guide, then DIY VCO parts 1-4), and what the simulator needs for them. The playlist is
 a group on the site (`OTHER_GROUPS` in `src/app/chapters.ts`), and its labs are in
 `src/labs/synth/`: the breadboard guide's (`using-a-breadboard`), then VCO part 1's
-(`oscillator-core`) and part 2's (`exponential-converter`).
+(`oscillator-core`), part 2's (`exponential-converter`) and part 3's (`vco-tuning`).
 
 Labels: [V] his own words in the video, from YouTube's auto-generated transcript, read in the
 browser (summarised here, not quoted). [D] from the video's description: his bill of materials,
@@ -193,26 +193,115 @@ panel works in the in-app browser.
   - The model doesn't show the big capacitor's bent jump: its 40106 fills even 1 µF in about
     0.14 ms. Listen plays the browser's own sawtooth at the pitch, the core's upside down.
 
-### Parts 3 and 4 (from the descriptions)
+### DIY VCO Part 3: Tuning your VCO (and making sure it stays in tune)
 
-- [D] Part 3:
-  - parts: a BC558C, 1M, 1.5k and a 1k precision trimmer;
-  - topics: less temperature dependence, then fine-tuning, with PNP transistors, an emitter
-    follower and subtracting voltages.
-- [D] Part 4:
-  - parts: two 100k linear pots, 1 µF, a 1N4148, 1M, 200k, three 100k, 33k, 20k and three 10k
-    NTC thermistors;
-  - topics: thermistors against drift, a fine-tune knob from a weighted divider, a 40106 turning
-    the sawtooth into a variable pulse, op-amp basics and the non-inverting amplifier, and
-    modular levels (10 V peak to peak);
-  - links: the Ebers-Moll model on Wikipedia, and René Schmitz's pages.
+- [D] Parts: a BC558C, 1M, 1.5k and a 1k precision trimmer. Topics: less temperature dependence,
+  then fine-tuning, with PNP transistors, an emitter follower and subtracting voltages.
+- [V] Two problems are left from part 2. The transistor opens up as it warms, so the VCO would
+  need retuning whenever the room changes. And the scaling was only roughed in, so sequences
+  sound out of tune.
+- [V] The PNP transistor, the NPN's "bizarro twin", in his water pipes, upside down:
+  - the emitter on top, the collector below; water flows from the emitter to the collector only
+    if it can also flow from the emitter out of the base;
+  - so it opens as its base drops below its emitter, once by about 0.7 V, when its spring (which
+    pulls, where the NPN's pushes) is overpowered;
+  - warmth opens it, just as it opens the NPN, and by about as much.
+- [V] The emitter follower: the PNP with a resistor from the positive rail to its emitter. It
+  copies the base's voltage to the emitter, a buffer. It is also a voltage divider, with the
+  transistor as a voltage-controlled resistor.
+  - On the NPN's base, warmth opens the NPN, which raises the pitch. It also opens the PNP, which
+    lets the emitter down and closes the NPN. That's a negative feedback loop that cancels the
+    drift, as long as the two are at the same temperature, so they should sit close together.
+- [V] Biasing: a follower needs its transistor in its linear region. His rule of thumb is half
+  the supply on the base (6 V, or 4.5 V on 9 V batteries), which would push the output far above
+  550 mV. So the collector goes to the negative rail instead. The range is then 24 V, +12 to
+  −12 V, centred on 0 V, and the base can stay at 0 V.
+- [V] The output is always a small fixed amount above the input (the spring again): about
+  500 mV in his experiments. So where part 2 added an offset, this one has to subtract it.
+- [V] The resistor's value hardly matters to the voltage: a wider pipe lets more water in, but the
+  transistor opens to let it through ("negative current feedback"). It sets the most current the
+  output can give. A base needs little, so 1M.
+- [V] On the breadboard: a BC558 (the BC548's pinout: collector, base, emitter), its emitter
+  through 1M to +12 V, its base on ground and its collector on −12 V. His multimeter reads about
+  480 mV on the emitter.
+  - On the BC548's base, 480 mV is far too high a baseline, and the pitch is piercing.
+  - Touching the PNP lowers the pitch and touching the NPN raises it. Left alone at the same
+    temperature, they balance.
+- [V] The offset pot's top end goes to −12 V instead of +12 V. The two-input divider works the
+  same with negative voltages, so it subtracts. The pot through 100k into the follower's base,
+  with the 4k to ground for rough scaling, brings the pitch down to a reasonable baseline, and
+  the sequencer comes in through another 100k.
+- [V] Scaling: the 4k is swapped out. The value could be worked out, but a pot is better, because
+  the supply is hardly ever exactly ±12 V and may sag as modules are added. He uses a 1k precision
+  trimmer (ten turns end to end) in series with 1.5k, since the right value is between 1.5k and
+  2.5k: finer control.
+- [V] Tuning:
+  - four of the sequencer's steps at its lowest level (0 V) and four at its highest (1, 2 or 5 V,
+    as it is set), starting with 1 V;
+  - Ableton's tuner plugin, since by ear he finds it hard;
+  - the offset pot puts the low note on a C, then the trimmer brings the high note to the octave
+    above; the trimmer moves the low note too, so it's trial and error.
+
+  The 2 V and 5 V ranges then check out, and in major mode a sequence sounds harmonious.
+- [V] Part 4 will add a second, fine-tune pot and a square-wave output.
+- [I] Why it cancels. With both transistors at one temperature, the BC548C's current is
+  I_P (I_SN / I_SP) e^(V_mix / V_T), where I_P is the follower's current and V_mix the voltage
+  at the BC558C's base. The ratio of the two I_S doesn't change with temperature, so the drift
+  cancels at V_mix = 0. Elsewhere, V_T still grows with the absolute temperature, about 0.34% a
+  degree at 25 °C, which narrows the scale.
+  - In the model, tuned at 25 °C, a room at 30 °C puts 0 V about 49 cents sharp and 5 V about
+    50 cents flat. Part 2's converter, tuned the same, would be about 8 semitones sharp.
+  - The note at V_mix = 0 moves under 2 cents, since the 1M's current changes a little.
+  - That is the drift part 4's thermistors are for.
+- [I] His reason for a trimmer, in the model: a sagging supply moves every note alike, about
+  23 cents for both rails 0.1 V low. Nearly all of that comes through the offset pot's −12 V end;
+  the +12 V rail's effect on the follower's current and on the 40106's thresholds about cancel.
+  So a sag is an offset, which the offset pot puts back. The scale depends only on the 100k
+  against the 1.5k and trimmer, and on V_T. The trimmer is still needed, since the resistors'
+  tolerance and the room's temperature decide where it goes: about 346 Ω at 25 °C, 378 Ω at
+  30 °C in the model.
+- [I] His reason for the −12 V collector: with the collector on ground instead, a base near 0 V
+  would still leave the emitter about 0.44 to 0.53 V above the collector, which looks enough to
+  keep it out of saturation at 11.5 µA. Not checked. −12 V leaves room to spare, as he says.
+- [Lab] The lab (`vco-tuning`) has five steps:
+  - the follower alone: the base on a slider, a multimeter on the emitter, and a finger on the
+    transistor;
+  - on the BC548C's base, with a finger on either transistor, and a chart recorder of both
+    temperatures and the pitch;
+  - subtracting the offset, with the 4k;
+  - tuning with the 1.5k and the trimmer against a tuner, four steps at 0 V and four at 1, 2 or
+    5 V;
+  - the room's temperature, with a major arpeggio, beside part 2's converter tuned the same.
+
+  Its estimates, said on the page:
+  - The BC558C's I_S is set so that its emitter sits 480 mV above its base for the 1M's 11.5 µA,
+    as his multimeter read. Its datasheets' typical V_BE(on) at 2 mA is 620 mV (onsemi; 550 to
+    700) or 660 mV (Fairchild; 600 to 750), which would put it at about 487 or 527 mV.
+  - Its current gain is 270, onsemi's typical for the C grade at 10 µA. It follows the same law
+    for temperature as the BC548C: its emitter falls about 2.4 mV a degree.
+  - Only the transistors warm: the 40106, the capacitor and the resistors don't. The finger's
+    32 °C and 6 s are made up, as in part 2's lab.
+  - The rails are exactly ±12 V, 0 V on the jack is meant as C2, and the sequences are the lab's
+    own.
+  - The tuning is exact, by bisection, not by ear. The trimmer is at about 346 Ω and the pot about
+    23.6% of the way to −12 V. 0 to 5 V then come out within 4 cents.
+
+### Part 4 (from the description)
+
+- [D] Parts: two 100k linear pots, 1 µF, a 1N4148, 1M, 200k, three 100k, 33k, 20k and three 10k
+  NTC thermistors.
+- [D] Topics: thermistors against drift, a fine-tune knob from a weighted divider, a 40106 turning
+  the sawtooth into a variable pulse, op-amp basics and the non-inverting amplifier, and modular
+  levels (10 V peak to peak).
+- [D] Links: the Ebers-Moll model on Wikipedia, and René Schmitz's pages.
 - [I] Why temperature matters: the collector current goes up by a factor of e for every VT (about
   26 mV at room temperature), so 1 V per octave needs the CV scaled to about 18 mV per volt
   (VT ln 2). At a fixed base voltage the current grows with temperature mostly through I_S: the
   base voltage for a given current falls about 2.4 mV a degree in the converter's window, about
-  1.6 semitones in part 2's lab. VT grows with absolute temperature too, which changes the scale. That is the drift parts 3
-  and 4 fight. [Lab] A temperature slider that shows the pitch drifting, with and without the
-  thermistors.
+  1.6 semitones in part 2's lab. VT grows with absolute temperature too, which changes the scale.
+  That is the drift parts 3 and 4 fight: part 3's follower takes out the first, and the second is
+  left for the thermistors. [Lab] Part 3's lab has a temperature slider for the room; part 4's
+  could add the thermistors.
 - [D] "How to build a DIY 3X VCO module from scratch" (OCAb2UoSPs0, 16:17, 2020-09-28) ends the
   series: three VCOs on stripboard, behind a panel.
 
@@ -341,7 +430,7 @@ kit", 3-8 minutes each) are left out.
   - "Using a breadboard": the guide's four circuits;
   - "The oscillator core" (VCO part 1);
   - "The exponential converter" (part 2);
-  - tuning and temperature (part 3);
+  - "Tuning the VCO" (part 3);
   - sawtooth to square (part 4).
 
   The embeds and links work as Ben's do (youtube-nocookie), with the playlist or his channel as
@@ -370,6 +459,7 @@ kit", 3-8 minutes each) are left out.
 | Capacitors as timing parts | everything | — (the sandbox's capacitors only make edge pulses) |
 
 _Sources: his channel and its playlists on YouTube (the watch pages' details and descriptions; the
-transcripts of the guide and VCO part 1); his CircuitJS links (tinyurl.com, decoded); Erica
-Synths' kit pages; CDM, 3 January 2022; the Mixer kit's manual as rendered on manualsdir.com; the
-parts in src/breadboard/catalog.ts._
+transcripts of the guide and VCO parts 1-3); his CircuitJS links (tinyurl.com, decoded); Erica
+Synths' kit pages; CDM, 3 January 2022; the Mixer kit's manual as rendered on manualsdir.com;
+onsemi's BC556B/BC557/BC558B datasheet (Rev. 3, 2007) and Fairchild's BC556-BC560 (Rev. 1.7,
+2016); the parts in src/breadboard/catalog.ts._

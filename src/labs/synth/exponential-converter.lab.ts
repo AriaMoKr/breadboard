@@ -5,8 +5,9 @@ import { Schematic } from '../../ui/schematic';
 import { Kit, kitCss } from '../clock/_draw';
 import { callout, injectStyle } from '../latches/_shared';
 import { defineLab } from '../types';
-import { R_OUT, ROOM, SchmittCore, SinkCore, V12, VDIODE, baseVoltage, collectorCurrent, coreTimes, noteHz, noteOf, sampleCore, sinkTimes, thermalVoltage, thresholds, wiper, type Feed } from './_analog';
+import { R_OUT, ROOM, SchmittCore, SinkCore, V12, VDIODE, baseVoltage, collectorCurrent, coreTimes, noteHz, sampleCore, sinkTimes, thermalVoltage, thresholds, wiper, type Feed } from './_analog';
 import { diode, jack, npnLeft, potDivider, schmitt } from './_draw';
+import { HEARING, fmtA, fmtCv, fmtHz, fmtT, fmtV, mV, pitchText, playsText } from './_shared';
 import { Tone } from './_sound';
 
 const SCOPE_CLASS = 'synth-expo';
@@ -23,7 +24,6 @@ const PRE = 12; // readings before the jump the scope triggers on
 const NOTE_S = 1 / 3; // the sequencer moves on three times a second
 const FINGER = 32; // °C: a finger warms the transistor towards this (an estimate)
 const WARM_TAU = 6; // s: and this fast (an estimate)
-const HEARING = 20e3;
 
 /** The lab's sequence: eight notes for 1 V per octave, 0 V being C2. */
 const MEANT = ['C2', 'G2', 'C3', 'G3', 'C4', 'G4', 'C5', 'C6'];
@@ -98,52 +98,6 @@ const STEPS: { value: `${Step}`; label: string }[] = [
   { value: '4', label: '4. An offset from the pot' },
   { value: '5', label: '5. A warm finger' },
 ];
-
-// ---- formatting
-
-const fmtV = (v: number) => `${v.toFixed(3)} V`;
-const mV = (v: number) => `${Math.round(v * 1e3)} mV`;
-const fmtHz = (hz: number) => (hz >= 1e3 ? `${+(hz / 1e3).toPrecision(3)} kHz` : `${+hz.toPrecision(3)} Hz`);
-function fmtT(t: number): string {
-  if (t >= 2 * 86400) return `${Math.round(t / 86400)} days`;
-  if (t >= 2 * 3600) return `${Math.round(t / 3600)} hours`;
-  if (t >= 120) return `${Math.round(t / 60)} minutes`;
-  if (t >= 1) return `${+t.toPrecision(3)} s`;
-  if (t >= 1e-3) return `${+(t * 1e3).toPrecision(3)} ms`;
-  return `${+(t * 1e6).toPrecision(3)} µs`;
-}
-function fmtA(i: number): string {
-  if (i >= 1e-3) return `${+(i * 1e3).toPrecision(3)} mA`;
-  if (i >= 1e-6) return `${+(i * 1e6).toPrecision(3)} µA`;
-  if (i >= 1e-9) return `${+(i * 1e9).toPrecision(3)} nA`;
-  if (i >= 1e-12) return `${+(i * 1e12).toPrecision(3)} pA`;
-  if (i >= 1e-15) return `${+(i * 1e15).toPrecision(3)} fA`;
-  return i > 0 ? 'under a femtoamp' : 'none';
-}
-const fmtCv = (v: number) => `${+v.toFixed(2)} V`;
-
-type Pitch = { hz: number; stalled: boolean };
-
-/** The core's pitch, in words: a note, clicks, out of hearing, or stopped. */
-function pitchText(t: Pitch): string {
-  if (t.stalled) return 'none: the core has stopped';
-  if (!(t.hz > 0) || 1 / t.hz > 86400) return 'none to speak of: under a click a day';
-  if (t.hz < 1) return `a click every ${fmtT(1 / t.hz)}`;
-  if (t.hz < 20) return `${fmtHz(t.hz)}: clicks, not a note`;
-  if (t.hz > HEARING) return `${fmtHz(t.hz)}, above hearing`;
-  const n = noteOf(t.hz);
-  return `${fmtHz(t.hz)} (${n.name} ${n.cents < 0 ? '−' : '+'}${Math.abs(n.cents)}¢)`;
-}
-
-/** The same, short, for the sequence's table. */
-function playsText(t: Pitch): string {
-  if (t.stalled) return 'stopped';
-  if (!(t.hz > 0) || 1 / t.hz > 86400) return 'nothing';
-  if (t.hz < 0.1) return `once in ${fmtT(1 / t.hz)}`;
-  if (t.hz < 20) return `${fmtHz(t.hz)}, clicks`;
-  if (t.hz > HEARING) return `${fmtHz(t.hz)}, too high`;
-  return `${noteOf(t.hz).name}, ${fmtHz(t.hz)}`;
-}
 
 /** The schematic's words, per step. */
 function schematicLabel(step: Step): string {
