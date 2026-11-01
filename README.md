@@ -186,8 +186,9 @@ npm run dev
 Then open http://localhost:5173. Other scripts: `npm test` (vitest), `npm run typecheck`,
 `npm run build` (static site in `dist/`, see [Deploying](#deploying)), `npm run icons` (renders
 the app icons from `public/icons/icon.svg`), `npm run preview-image` (renders the pictures that
-show the site elsewhere: `public/social-preview.jpg`, the breadboard view close up, and
-`public/hallway-preview.jpg`, the VR room for the Hallway's door; see [Link previews](#link-previews)).
+show the site elsewhere: `public/social-preview.jpg`, the site's name over its three builds as
+their pages show them, and `public/hallway-preview.jpg`, the VR room for the Hallway's door; see
+[Link previews](#link-previews)).
 
 Vite stays on version 7 for now. Vite 8's bundler, Rolldown, has no native build for the
 MinGW-built Node in MSYS2's UCRT64 shell, so Vite 8 doesn't start there.
