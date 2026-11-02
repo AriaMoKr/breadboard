@@ -6,6 +6,12 @@ import type { Level } from '../src/logic/circuit';
 import { VIDEO_VOLTS, charGen, type CharGen } from '../src/labs/tvt/_chargen';
 import { SAMPLE_TEXT } from '../src/labs/tvt/tvt-chargen.lab';
 
+/**
+ * Run chip by chip, a frame is some 80,000 dots, and the slowest tests here run several: up to 5 s
+ * on a quiet machine, past Vitest's 5 s default on a busy one. Every suite here allows 30 s.
+ */
+const SLOW = { timeout: 30_000 };
+
 /** Dots until `cond` holds after a dot (at most `max`). */
 function until(b: TimingBoard, cond: () => boolean, max = 200_000) {
   for (let k = 0; k < max; k++) {
@@ -38,7 +44,7 @@ function frameLines(b: TimingBoard) {
   return lines;
 }
 
-describe('TV Typewriter: the timing board (Figs. 6 and 7)', () => {
+describe('TV Typewriter: the timing board (Figs. 6 and 7)', SLOW, () => {
   it("divides the dot clock as Lancaster's waveform page has it", () => {
     const b = timingBoard({ t: 'Q' });
     const want: Partial<Record<TestPoint, number>> = { B: 2, C: 6, D: 6, E: 12, F: 24, G: 48, H: 96, I: 288, J: 288, K: 576, L: 1152, M: 3456, N: 3456, O: 6912 };
@@ -141,7 +147,7 @@ function feed(scan: TvScan, lines: number, frames: number) {
       }
 }
 
-describe('TV Typewriter: the TV', () => {
+describe('TV Typewriter: the TV', SLOW, () => {
   it('holds 60 Hz still with the vertical hold where a set leaves it', () => {
     const scan = new TvScan();
     feed(scan, 264, 4);
@@ -213,7 +219,7 @@ const glyphRow = (code: number, r: number) => FONT_2513_CHART[(code >> 3) * 8 + 
 /** Where a column's five dots are in frameArt's lines: after the gap dot of character time col + 1. */
 const COL0 = 9;
 
-describe('TV Typewriter: the character generator (page A, Fig. 5)', () => {
+describe('TV Typewriter: the character generator (page A, Fig. 5)', SLOW, () => {
   it('draws the memory: each column in the next character time, a gap dot and five dots, rows 1-7 of the 2513 on lines 2-8 of each row', () => {
     const g = charGen();
     g.setText(SAMPLE_TEXT);
