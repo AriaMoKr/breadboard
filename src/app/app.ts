@@ -239,7 +239,7 @@ export class App {
       build(
         'yellow',
         'Moritz Klein’s synth',
-        [h('p', { class: 'lede' }, 'Analog synthesizer circuits on a breadboard, explained from scratch. His “For Beginners” videos start with a guide to the breadboard itself, then build a voltage-controlled oscillator part by part: a sawtooth core, an exponential converter for 1 V per octave, and keeping it in tune. The labs show each stage on a scope and play it.')],
+        [h('p', { class: 'lede' }, 'Analog synthesizer circuits on a breadboard, explained from scratch. His “For Beginners” videos start with a guide to the breadboard itself, then build a voltage-controlled oscillator part by part: a sawtooth core, an exponential converter for 1 V per octave, keeping it in tune, and shaping the sawtooth into a square. The labs show each stage on a scope and play it.')],
         synth.videos.filter((v) => v.lab).map((v) => stage(labHref(v.lab!), String(synth.videos.indexOf(v) + 1), shortTitle(v.title))),
         start(labHref(groupLabs(synth)[0]), 'Start with the breadboard guide'),
         h('a', { class: 'btn btn-ghost', href: `#/more/${synth.id}` }, 'All his videos'),

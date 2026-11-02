@@ -3,8 +3,9 @@ import { ANALOG_CHIPS, CHIPS, CHIP_IDS, chipDef } from '../src/breadboard/catalo
 import { validateLayout } from '../src/breadboard/layout';
 import {
   BC548C, CLAMP_IN, Coupling, FloatingInput, PHONES, R_FOLLOW, R_OUT, Relaxation, SAW_AMP, SQUARE_DIV, SchmittCore, SinkCore, TUNING, V12, VDIODE, VD_PULL, VN, VP, VSAT, VSAT12, amplify,
-  baseVoltage, collectorCurrent, comparator, converter, coreTimes, coreWave, coupled, divide, follower, gainOf, ledCurrent, mixer, noteHz, noteOf, offsetFor, par, pickupTau,
-  pnpSaturationCurrent, potForPulse, pulse, pulseWidth, relaxationPeriod, sampleCore, saturationCurrent, sawOut, sawWave, schmittOut, shaperIn, sinkTimes, squareOut, thermalVoltage,
+  baseVoltage, collectorCurrent, comparator, converter, coreTimes, coreWave, coupled, coupledSaw, divide, follower, gainOf, ledCurrent, mixer, noteHz, noteOf, offsetFor, par,
+  pickupTau, pnpSaturationCurrent, potForPulse, pulse, pulseWidth, relaxationPeriod, sampleCore, saturationCurrent, sawOut, sawTop, sawWave, schmittOut, shaperIn, sinkTimes, squareOut,
+  thermalVoltage,
   thermistor, thresholds, tune, wiper,
 } from '../src/labs/synth/_analog';
 import { guideLayout, guideNets, type Setup } from '../src/labs/synth/_board';
@@ -534,8 +535,8 @@ describe('synth: DIY VCO part 4’s thermistors, fine tuning and pulse', () => {
   const retuned = tune(C2, 25, ntc(25));
   const SEQ = ['C3', 'E3', 'G3', 'C4', 'E4', 'G4', 'C5', 'G4'];
   const cvOf = (name: string) => Math.log2(noteHz(name) / C2);
-  /** The sawtooth after the 1 µF at C3, with part 2's two 10k still on it or not. */
-  const sawAt = (hz: number, divider = true) => coupled(sawWave(512), 1 / hz, pickupTau(divider));
+  /** The sawtooth after the 1 µF at `hz`, with part 2's two 10k still on it or not. */
+  const sawAt = (hz: number, divider = true) => coupledSaw(512, 1 / hz, pickupTau(divider));
 
   it('the thermistors: 10k at 25 °C, about 4.3% less for each degree warmer', () => {
     expect(thermistor(25)).toBeCloseTo(10e3, 6);
@@ -574,6 +575,21 @@ describe('synth: DIY VCO part 4’s thermistors, fine tuning and pulse', () => {
     }
     expect(Math.max(...offs) - Math.min(...offs)).toBeLessThan(2);
     expect(Math.max(...was) - Math.min(...was)).toBeGreaterThan(35);
+  });
+
+  it('a room 5 °C cooler: with them, about 2 to 15 cents flat, not quite an offset (an NTC goes with 1/T, V_T with T)', () => {
+    const cool = { pnp: 20, npn: 20 };
+    const offs = SEQ.map((n) => cents(converter(cvOf(n), retuned.turn, TUNING.fixed + retuned.trim, cool, V12, ntc(20)).t.hz, noteHz(n)));
+    expect(Math.max(...offs)).toBeLessThan(-1.5);
+    expect(Math.max(...offs)).toBeGreaterThan(-3);
+    expect(Math.min(...offs)).toBeLessThan(-14);
+    expect(Math.min(...offs)).toBeGreaterThan(-16);
+  });
+
+  it('warmer thermistors take the BC558C’s base down for the notes below about C♯4, and lift it a little from there to F4', () => {
+    const base = (n: string, celsius: number) => converter(cvOf(n), retuned.turn, TUNING.fixed + retuned.trim, room, V12, ntc(celsius)).vm;
+    for (const n of ['C3', 'G3', 'C4']) expect(base(n, 26), n).toBeLessThan(base(n, 25));
+    for (const n of ['D4', 'E4']) expect(base(n, 26), n).toBeGreaterThan(base(n, 25));
   });
 
   it('fingers on both transistors, the thermistors at the room: just as part 3’s circuit, since they don’t feel it', () => {
@@ -616,10 +632,17 @@ describe('synth: DIY VCO part 4’s thermistors, fine tuning and pulse', () => {
   });
 
   it('after the 1 µF: the sawtooth about ±1.2 V around 0 V, its top higher at low notes while part 2’s two 10k are on it', () => {
-    const c3 = sawAt(C3);
-    expect(c3.reduce((a, b) => a + b) / c3.length).toBeCloseTo(0, 9);
-    expect(Math.max(...c3)).toBeGreaterThan(1.26);
-    expect(Math.max(...c3)).toBeLessThan(1.32);
+    const c3 = sawAt(C3), tau = pickupTau(true), { vp, vn } = thresholds(V12);
+    // its average is 0 V; its readings', each just after the last's fall, half a reading's fall above that
+    expect(Math.abs(c3.reduce((a, b) => a + b) / c3.length - (vp - vn) / (2 * 512))).toBeLessThan(1e-5);
+    expect(c3[0]).toBe(Math.max(...c3));
+    expect(c3[0]).toBeCloseTo(1.2914, 4);
+    expect(sawTop(1 / C3, tau)).toBe(c3[0]);
+    // settled: a reading's fall after the last, and the jump, come back round to the top
+    const dt = 1 / C3 / 512, s = (vp - vn) * C3;
+    expect(-s * tau + (c3[511] + s * tau) * Math.exp(-dt / tau) + (vp - vn)).toBeCloseTo(c3[0], 12);
+    // the same as the wave through the filter a step at a time, finely enough that the jump is nearly instant
+    expect(c3[0]).toBeCloseTo(Math.max(...coupled(sawWave(65536), 1 / C3, tau)), 4);
     expect(Math.max(...sawAt(noteHz('C1')))).toBeGreaterThan(1.5);
     const plain = sawAt(C3, false);
     expect(Math.max(...plain)).toBeGreaterThan(1.19);
@@ -646,7 +669,7 @@ describe('synth: DIY VCO part 4’s thermistors, fine tuning and pulse', () => {
     expect(shaperIn(VSAT12, 'diode', 6.2)).toBeCloseTo(VSAT12 - VD_PULL, 9);
   });
 
-  it('a pulse: about 52% at the most gain, wider as the pot turns up, gone past about 20.5k (with the 200k, about 41k)', () => {
+  it('a pulse: about 52% at the most gain, wider as the pot turns up, gone past about 20.6k (with the 200k, about 41k)', () => {
     const width = (rf: number, r: number, divider = true) => pulse(C3, rf, r, pickupTau(divider)).width;
     expect(width(100e3, 0)).toBeGreaterThan(0.5);
     expect(width(100e3, 0)).toBeLessThan(0.54);
@@ -661,8 +684,20 @@ describe('synth: DIY VCO part 4’s thermistors, fine tuning and pulse', () => {
     expect(width(100e3, 1.02 * r100)).toBe(1);
     expect(width(200e3, 0.98 * r200)).toBeLessThan(1);
     expect(width(200e3, 1.02 * r200)).toBe(1);
+    // the sawtooth's top is exact, so where the pulse ends doesn't depend on the readings
+    for (const n of [256, 512, 2048]) {
+      expect(pulse(C3, 100e3, 0.999 * r100, pickupTau(true), n).width, `${n}`).toBeLessThan(1);
+      expect(pulse(C3, 100e3, 1.001 * r100, pickupTau(true), n).width, `${n}`).toBe(1);
+    }
     // not the whole turn
     expect(width(200e3, 100e3)).toBe(1);
+    // TI's lowest upper threshold on 12 V (4.6 V at 10 V, 6.8 V at 15 V): about 27.5k; at C1, its top
+    // higher, his third, then two thirds; the whole turn would need a threshold lower still
+    const lowest = 4.6 + (2 / 5) * (6.8 - 4.6), c1 = Math.max(...sawAt(noteHz('C1')));
+    expect(potForPulse(100e3, peak, lowest) / 1e3).toBeCloseTo(27.5, 0);
+    expect(potForPulse(100e3, c1, lowest) / 100e3).toBeGreaterThan(1 / 3);
+    expect(potForPulse(200e3, c1, lowest) / 100e3).toBeGreaterThan(2 / 3);
+    expect(3 * peak - VD_PULL).toBeLessThan(lowest);
     // a sawtooth so big that no gain is too little
     expect(potForPulse(100e3, 10)).toBe(Infinity);
   });

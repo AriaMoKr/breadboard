@@ -37,7 +37,7 @@ export function pitchText(t: Pitch): string {
   if (t.hz < 20) return `${fmtHz(t.hz)}: clicks, not a note`;
   if (t.hz > HEARING) return `${fmtHz(t.hz)}, above hearing`;
   const n = noteOf(t.hz);
-  return `${fmtHz(t.hz)} (${n.name} ${n.cents < 0 ? '−' : '+'}${Math.abs(n.cents)}¢)`;
+  return `${fmtHz(t.hz)} (${n.name} ${n.cents < 0 ? '−' : n.cents > 0 ? '+' : '±'}${Math.abs(n.cents)}¢)`;
 }
 
 /** The same, short, for a sequence's table. */

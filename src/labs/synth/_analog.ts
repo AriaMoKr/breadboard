@@ -612,7 +612,7 @@ export function tune(low = noteHz('C2'), celsius = ROOM, extras: Extras = PART3)
 /**
  * Part 4's NTC thermistors, one in series with each of the mixer's inputs: 10k at 25 °C, as René
  * Schmitz's VCO has them with its 100k, which Moritz follows. Their B value isn't given: 3950 K, a
- * common one for 10k beads, makes them about 4.4% less for each degree warmer.
+ * common one for 10k beads, makes them about 4.3% less for each degree warmer.
  */
 export const NTC = { r25: 10e3, b: 3950 };
 
@@ -663,6 +663,24 @@ export function coupled(wave: readonly number[], period: number, tau: number): n
   return Array.from({ length: n }, (_, k) => (y = a * y + step(k)));
 }
 
+/**
+ * The core's sawtooth on `vdd` after a capacitor in series, with `tau` to ground after it, once
+ * settled: its top, just after each jump. From there it falls at the core's rate, S = (VP − VN) ÷
+ * `period`, heading for −S `tau`, until the jump puts back what the period took off; its bottom,
+ * just before the jump, is the jump below its top.
+ */
+export function sawTop(period: number, tau: number, vdd = V12): number {
+  const { vp, vn } = thresholds(vdd);
+  return (vp - vn) / -Math.expm1(-period / tau) - ((vp - vn) / period) * tau;
+}
+
+/** The same sawtooth, one period of `n` readings from its top: exact, the jump instant, where `coupled` on `sawWave` spreads it over a reading. */
+export function coupledSaw(n: number, period: number, tau: number, vdd = V12): number[] {
+  const { vp, vn } = thresholds(vdd), s = (vp - vn) / period, top = sawTop(period, tau, vdd);
+  // −S tau + (top + S tau) e^(−t/tau), written so that the first reading is the top itself
+  return Array.from({ length: n }, (_, k) => top + (top + s * tau) * Math.expm1((-k / n) * (period / tau)));
+}
+
 /** Where part 4 picks up the sawtooth: after part 1's 1 µF, into its 100k, with part 2's two 10k to the jack beside it until Moritz takes them out. */
 export const pickupTau = (divider: boolean) => 1e-6 * (divider ? par(100e3, 20e3) : 100e3);
 
@@ -710,7 +728,7 @@ export const pulseWidth = (out: readonly boolean[]) => out.filter(Boolean).lengt
  * of `n` readings, the gain, and the pulse width: how much of the time the inverter's output is high.
  */
 export function pulse(hz: number, rf: number, rpot: number, tau: number, n = 512) {
-  const saw = coupled(sawWave(n), 1 / hz, tau), g = gainOf(rf, rpot);
+  const saw = coupledSaw(n, 1 / hz, tau), g = gainOf(rf, rpot);
   const op = saw.map((v) => amplify(v, g));
   const input = op.map((v) => shaperIn(v, 'pulldown'));
   const { vp, vn } = thresholds(V12);
@@ -739,7 +757,7 @@ export function squareOut(out: readonly boolean[], hz: number): number[] {
   return coupled(out.map((v) => (v ? V12 : 0)), 1 / hz, tau).map((v) => v * k);
 }
 
-/** The saw out's amplifier, the TL074's last op amp: 100k from its output to its − input and 33k from there to ground, a gain of about 4. */
+/** The saw out's amplifier, another of the TL074's op amps: 100k from its output to its − input and 33k from there to ground, a gain of about 4. */
 export const SAW_AMP = { rf: 100e3, rg: 33e3 };
 
 /** Part 4's saw out, from the sawtooth after the 1 µF: amplified about four times, about ±4.8 V. */

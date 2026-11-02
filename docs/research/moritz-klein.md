@@ -302,11 +302,11 @@ panel works in the in-app browser.
   1.6 semitones in part 2's lab. VT grows with absolute temperature too, which changes the scale.
   That is the drift parts 3 and 4 fight: part 3's follower takes out the first, and the second is
   left for the thermistors.
-- [V] A viewer suggested thermistors. He calls part 3's "the NPN and the PNP react alike to
+- [V] A viewer reminded him of thermistors. He calls part 3's "the NPN and the PNP react alike to
   warmth" a broad generalisation, points to the Ebers-Moll equation, which he says he can't
   really get his head round, and tries a primitive experiment instead: a finger on both
   transistors at once. In a perfect world the pitch wouldn't move. It goes down before it
-  settles, so the PNP wins, and he deduces that its response needs taming: its base should rise
+  settles, "the PNP wins", and he deduces that its response needs taming: its base should rise
   as it warms.
 - [V] An NTC thermistor's resistance falls as it warms. In series with the 100k, it makes the
   divider's ratio depend on the temperature, its output rising as it warms, and every input
@@ -342,9 +342,12 @@ panel works in the in-app browser.
   move evenly from 50 to 100% over one turn, and it seems to work nicely.
 - [V] The outputs: AC coupling as in part 1, 1 µF and 100k after the inverter. Modules often
   expect 10 V peak to peak, ±5 V, and the square is ±6 V, so 20k and 100k after the capacitor
-  take roughly 17% off. The sawtooth, 2.4 V peak to peak, needs a gain a bit over four: the last
-  op amp with 100k and "32k" (the parts list has 33k), its + input on the sawtooth once part 2's
-  divider is out.
+  take roughly 17% off: he puts in "the cap and resistor", then adds the divider, so the 100k
+  after the capacitor and the divider's are two. The sawtooth, 2.4 V peak to peak, needs a gain a
+  bit over four: "one of the remaining" op amps with 100k and "32k", which the description
+  corrects to 33k, its + input on the sawtooth once part 2's divider is out. Which op amp, he
+  doesn't say, for this one or the pulse's. With the pull-down that makes four 100k, where the
+  parts list has three.
 - [V] Through a jack, the square at 50% is very round and heavy, and more and more nasal as the
   pot turns. Next comes the module: panel, stripboard and soldering, with full schematics on his
   Patreon.
@@ -362,20 +365,25 @@ panel works in the in-app browser.
     with both transistors equally warm, the note at V_mix = 0 (about F4) stays put, those below it
     go sharp and those above flat. The dip he hears fits the BC558C warming first.
   - With the offset on the negative side, warmer thermistors let the BC558C's base further down
-    for the notes below that F4, not up. What they do is scale every input's share, as V_T needs.
+    for the notes below about C♯4, not up. From there to F4 it rises a little: the offset's path
+    has the pot's wiper in it too, so its share grows a little slower than the CV's. What they do
+    is scale every input's share, as V_T needs.
 - [I] The pulse's range in the model. After the 1 µF, the sawtooth's top is about 1.29 V at C3
   while part 2's two 10k still load it (its coupling's time constant about 17 ms instead of 0.1 s),
-  and higher at low notes, 1.54 V at C1. A pulse needs that top, amplified, to reach the upper
+  and higher at low notes, 1.55 V at C1. A pulse needs that top, amplified, to reach the upper
   threshold (TI's typical 7.06 V on 12 V) plus the diode's drop: a gain over about 5.9, so the pot
-  under 20.5k with the 100k (21% of its turn) and 41.1k with the 200k. A 40106 at the low end of
-  TI's range (its upper threshold about 5.5 V on 12 V) gives 27.5k and 54.9k, and at C1 about 35k
-  and 69k: a third, then two thirds. The whole turn would need a gain of 3 to be enough, an upper
-  threshold under about 3.4 V, below TI's range.
+  under 20.6k with the 100k (21% of its turn) and 41.2k with the 200k. A 40106 at the low end of
+  TI's range (its upper threshold about 5.5 V on 12 V) gives 27.5k and 55.1k, and at C1 about 35k
+  and 70k: a third, then two thirds. The whole turn would need a gain of 3 to be enough, an upper
+  threshold under about 3.4 V, below TI's range. The top is the settled wave's, in closed form,
+  with the core's jump taken as instant: it falls at the core's rate towards −S τ (S the jump over
+  the period) and the jump puts back what the period took off, so it is ΔV ÷ (1 − e^(−T/τ)) − S τ.
 - [I] The TL074 on ±12 V, from TI's datasheet (SLOS080W): the original swings to about ±13.5 V on
   ±15 V, so about 1.5 V short of each rail; the newer TL074H gets within about 0.1 V. Its output
   is short-circuit protected, about 26 mA for the H, more than the 10 mA a 40106 input is rated
   for, and the 40106's inputs are rated from −0.5 V to its supply plus 0.5 V (SCHS097F).
-- [I] In the model, the square out at 50% is about +5.1 and −5.2 V, and the saw out about ±4.8 V.
+- [I] In the model, at C3, the square out at 50% is about ±5.2 V, and the saw out about +4.9 and
+  −4.8 V.
 - [D] "How to build a DIY 3X VCO module from scratch" (OCAb2UoSPs0, 16:17, 2020-09-28) ends the
   series: three VCOs on stripboard, behind a panel.
 - [Lab] The lab (`sawtooth-to-square`) has six steps:
@@ -388,10 +396,13 @@ panel works in the in-app browser.
   - 10 V peak to peak: the square and saw outputs with the sequencer.
 
   Its estimates, said on the page: the thermistors' B value of 3950 K, common for 10k ones (the
-  video gives none), and the thermistors at the room's temperature; the TL074's swing, 1.5 V
-  short of the rails; the 1N4148's 0.5 V with the pull-down; the 40106's protection diode at
-  0.7 V; TI's typical thresholds; the floating input, made up; the note C3 from the third step to
-  the fifth; the finger's 32 °C and 6 s, as in parts 2 and 3; and the sequence, the lab's own.
+  video gives none); the TL074's swing, 1.5 V short of the rails; the 1N4148's 0.5 V with the
+  pull-down; the 40106's protection diode at 0.7 V; TI's typical thresholds; the floating input,
+  made up (so Listen stays quiet there); the note C3 from the third step to the fifth; which
+  spare op amps the amplifiers use (the pulse's pins 5 to 7, the saw's 8 to 10); what warms: the
+  transistors and the thermistors only, the thermistors with the room alone, out of a finger's
+  reach (the video doesn't say where they sit); the finger's 32 °C and 6 s, as in parts 2 and 3;
+  the sequence, the lab's own; and the core's jump, instant.
 
 ## The other series
 

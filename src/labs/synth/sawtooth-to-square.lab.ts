@@ -15,8 +15,8 @@ import {
   V12,
   VD_PULL,
   VSAT12,
+  amplify,
   converter,
-  coupled,
   gainOf,
   noteHz,
   noteOf,
@@ -25,7 +25,7 @@ import {
   pulse,
   pulseWidth,
   sawOut,
-  sawWave,
+  sawTop,
   schmittOut,
   shaperIn,
   squareOut,
@@ -38,11 +38,11 @@ import {
   type Temps,
 } from './_analog';
 import { diode, jack, npnLeft, ntc, pnpLeft, potDivider, railDown, schmitt } from './_draw';
-import { HEARING, cents, fmtCv, offText, pitchText, playsText, sMV, sV, tunerCss, tunerRow } from './_shared';
+import { HEARING, cents, fmtCv, fmtHz, offText, pitchText, playsText, sMV, sV, tunerCss, tunerRow } from './_shared';
 import { Tone } from './_sound';
 
 const SCOPE_CLASS = 'synth-square';
-const FINGER = 32; // °C: a finger warms a transistor towards this (an estimate, as in parts 2 and 3)
+const FINGER = 32; // °C: a finger warms a transistor towards this, or leaves it at a warmer room's (an estimate, as in parts 2 and 3)
 const WARM_TAU = 6; // s: and this fast (an estimate)
 const NOTE_S = 1 / 3; // the sequencer moves on three times a second
 const PERIOD_N = 512; // readings in one period of a wave
@@ -70,33 +70,57 @@ const withNtc = (celsius: number, fine: number | null = null): Extras => ({ ntc:
 
 // ---- numbers the texts quote, from the models
 
-/** Part 3's tuning, exact at 25 °C; with the thermistors added, where 0 V lands and how much of an octave a volt plays. */
-const P3 = tune(LOW);
-const p3With = (cv: number) => converter(cv, P3.turn, TUNING.fixed + P3.trim, AT_ROOM, V12, withNtc(ROOM));
-const OUT0 = cents(p3With(0).t.hz, LOW);
-const OUT_OCT = Math.log2(p3With(1).t.hz / p3With(0).t.hz);
-/** Retuned with the thermistors in. */
-const T1 = tune(LOW, ROOM, withNtc(ROOM));
 /** How much further the CV gets through its 100k and thermistor for each degree warmer, and how much more each octave needs (V_T's growth), in %. */
 const NTC_PER_K = (100 * (thermistor(ROOM) - thermistor(ROOM + 1))) / (TUNING.r + thermistor(ROOM));
 const VT_PER_K = 100 / (ROOM + 273.15);
-/** The note with the BC558C's base at 0 V, which both transistors warming together leave alone. */
-const STILL = noteOf(converter(0, 0, TUNING.fixed + T1.trim, AT_ROOM, V12, withNtc(ROOM)).t.hz).name;
-/** Retuned with the fine-tune knob halfway, and the two knobs' whole turns, in octaves. */
-const T2 = tune(LOW, ROOM, withNtc(ROOM, 0.5));
-const knobs = (turn: number, fine: number) => converter(0, turn, TUNING.fixed + T2.trim, AT_ROOM, V12, withNtc(ROOM, fine)).t.hz;
-const FINE_OCT = Math.log2(knobs(T2.turn, 0) / knobs(T2.turn, 1));
-const COARSE_OCT = Math.log2(knobs(0, 0.5) / knobs(1, 0.5));
+
+/**
+ * The tunings the texts quote: part 3's, exact at 25 °C, then with the thermistors added (where 0 V
+ * lands, and how much of an octave a volt plays); retuned with them, and the notes that tell what
+ * warmth does there; and retuned with the fine-tune knob halfway, with each knob's whole turn.
+ * Worked out when the lab first opens, not with the module: each tuning is some 1,700 runs of the
+ * converter, and the build runs every lab's module on every page.
+ */
+function tunings() {
+  const P3 = tune(LOW), T1 = tune(LOW, ROOM, withNtc(ROOM)), T2 = tune(LOW, ROOM, withNtc(ROOM, 0.5));
+  const p3With = (cv: number) => converter(cv, P3.turn, TUNING.fixed + P3.trim, AT_ROOM, V12, withNtc(ROOM));
+  const knobs = (turn: number, fine: number) => converter(0, turn, TUNING.fixed + T2.trim, AT_ROOM, V12, withNtc(ROOM, fine)).t.hz;
+  /** The note with the BC558C's base at 0 V, which both transistors warming together leave alone. */
+  const still = noteOf(converter(0, 0, TUNING.fixed + T1.trim, AT_ROOM, V12, withNtc(ROOM)).t.hz).name;
+  // where a degree's warmer thermistors stop taking the base down and start lifting it: below that note,
+  // since the offset's share grows a little slower than the CV's, the pot's wiper being in its path too
+  const base = (cv: number, celsius: number) => converter(cv, T1.turn, TUNING.fixed + T1.trim, AT_ROOM, V12, withNtc(celsius)).vm;
+  let lo = 0, hi = cvOf(still);
+  for (let k = 0; k < 30; k++) {
+    const mid = (lo + hi) / 2;
+    if (base(mid, ROOM + 1) < base(mid, ROOM)) lo = mid;
+    else hi = mid;
+  }
+  return {
+    P3,
+    T1,
+    T2,
+    OUT0: cents(p3With(0).t.hz, LOW),
+    OUT_OCT: Math.log2(p3With(1).t.hz / p3With(0).t.hz),
+    STILL: still,
+    DOWN: noteOf(LOW * 2 ** lo).name,
+    FINE_OCT: Math.log2(knobs(T2.turn, 0) / knobs(T2.turn, 1)),
+    COARSE_OCT: Math.log2(knobs(0, 0.5) / knobs(1, 0.5)),
+  };
+}
+type Tunings = ReturnType<typeof tunings>;
+let worked: Tunings | undefined;
 
 /** Where the sawtooth is picked up: with part 2's two 10k to the jack still on it (the third to fifth steps), then without. */
 const TAU_DIV = pickupTau(true), TAU = pickupTau(false);
 /** The sawtooth's top after the 1 µF at C3, and at C1, where it droops more. */
-const PEAK = Math.max(...coupled(sawWave(PERIOD_N), 1 / NOTE, TAU_DIV));
-const PEAK_C1 = Math.max(...coupled(sawWave(PERIOD_N), 1 / noteHz('C1'), TAU_DIV));
-/** The gain a pulse needs, and the most the pot can be for it: with the 100k, the 200k, and both with TI's lowest threshold. */
+const PEAK = sawTop(1 / NOTE, TAU_DIV);
+const PEAK_C1 = sawTop(1 / noteHz('C1'), TAU_DIV);
+/** The gain a pulse needs, and the most the pot can be for it: with the 100k, the 200k, both with TI's lowest threshold, and those at C1. */
 const G_MIN = (VP12 + VD_PULL) / PEAK;
 const R100 = potForPulse(100e3, PEAK), R200 = potForPulse(200e3, PEAK);
 const R100_LOW = potForPulse(100e3, PEAK, VP_LOWEST), R200_LOW = potForPulse(200e3, PEAK, VP_LOWEST);
+const R100_C1 = potForPulse(100e3, PEAK_C1, VP_LOWEST), R200_C1 = potForPulse(200e3, PEAK_C1, VP_LOWEST);
 /** The upper threshold a gain of 3 (the 200k against the whole 100k) would need. */
 const VP_WHOLE = 3 * PEAK - VD_PULL;
 
@@ -106,8 +130,8 @@ const kOhm = (r: number) => (r >= 1e3 ? `${(r / 1e3).toFixed(1)}k` : `${Math.rou
 const pct = (x: number) => `${Math.round(100 * x)}%`;
 /** Volts with a sign, to a hundredth. */
 const pm = (v: number) => `${v >= 0.005 ? '+' : v <= -0.005 ? '−' : ''}${Math.abs(v).toFixed(2)} V`;
-const span = (w: readonly number[]) => `${pm(Math.max(...w))} to ${pm(Math.min(...w))}`;
-const gainText = (g: number) => (Number.isFinite(g) ? `${g.toFixed(2)} times` : 'no end: the op amp alone, a comparator');
+const span = (top: number, bottom: number) => `${pm(top)} to ${pm(bottom)}`;
+const gainText = (g: number) => (Number.isFinite(g) ? `${g.toFixed(2)} times` : 'no end (the op amp alone, a comparator)');
 const tempText = (t: number, finger: boolean) => `${t.toFixed(1)} °C${finger ? ', fingers on them' : ''}`;
 
 const CSS = `
@@ -143,7 +167,7 @@ function schematicLabel(step: Step, how: Shaper): string {
     `The BC558C’s base is a passive mixer: the coarse tuning pot’s wiper, from ground to −12 V, through 100k and a 10k NTC thermistor; the CV jack through another 100k and 10k NTC thermistor;${fine ? ' the fine-tune pot’s wiper, also from ground to −12 V, through 1M and a third 10k NTC thermistor;' : ''} and 1.5k with a 1k trimmer to ground.`;
   const pickup = `the VCO’s sawtooth after part 1’s buffer and 1 µF, with 100k to ground${step <= 5 ? ' and part 2’s two 10k to the jack beside it' : ''}`;
   const amp = `another of the TL074’s op amps as a non-inverting amplifier: the sawtooth on its + input, ${step >= 5 ? '200k' : '100k'} from its output to its − input, and a 100k pot from there to ground`;
-  const shaper = (w: Shaper) => (w === 'wire' ? 'wired straight to' : w === 'diode' ? 'through a 1N4148 to' : 'through a 1N4148, with 100k from there to ground, to');
+  const shaper = (w: Shaper) => (w === 'wire' ? 'straight to' : w === 'diode' ? 'through a 1N4148 to' : 'through a 1N4148, with 100k from there to ground, to');
   switch (step) {
     case 1:
       return `Schematic: ${vco}. ${mixer(false)}`;
@@ -153,27 +177,27 @@ function schematicLabel(step: Step, how: Shaper): string {
       return `Schematic: ${pickup}, into ${amp}. Its output goes to the scope.`;
     case 4:
     case 5:
-      return `Schematic: ${pickup}, into ${amp}. Its output goes ${shaper(step === 4 ? how : 'pulldown')} the input of a second inverter of the 40106 (pin 3), whose output (pin 4) goes to the scope.`;
+      return `Schematic: ${pickup}, into ${amp}. Its output goes ${shaper(step === 4 ? how : 'pulldown')} the input of a second inverter of the 40106 (pin 3), whose output (pin 4) goes to the scope.${step === 4 && how === 'diode' ? ' While the diode blocks, that input is left floating.' : ''}`;
     case 6:
-      return `Schematic: ${pickup}, into ${amp}. Its output goes ${shaper('pulldown')} a second inverter of the 40106, whose output goes through 1 µF, with 100k to ground, then 20k, with 100k to ground, to the square out jack. The sawtooth also goes to the TL074’s last op amp, a non-inverting amplifier with 100k from its output to its − input and 33k from there to ground, to the saw out jack.`;
+      return `Schematic: ${pickup}, into ${amp}. Its output goes ${shaper('pulldown')} a second inverter of the 40106, whose output goes through 1 µF, with 100k to ground, then 20k, with 100k to ground, to the square out jack. The sawtooth also goes to another of the TL074’s op amps, a non-inverting amplifier with 100k from its output to its − input and 33k from there to ground, to the saw out jack.`;
   }
 }
 
 /** What the callout says, per step. */
-function stepText(step: Step): string {
+function stepText(step: Step, tn: Tunings): string {
   switch (step) {
     case 1:
-      return `Part 3’s follower cancels most of the drift, but not the scale: V_T, in the exponent, grows about ${VT_PER_K.toFixed(2)}% a degree, so warmth narrows the octaves. A viewer suggested thermistors, and Moritz adds NTC ones, which lose resistance as they warm: 10k in series with each of the mixer’s 100k, as René Schmitz has them. Warmer, they let each input a little further through, about ${NTC_PER_K.toFixed(2)}% a degree for the CV’s, about what the scale needs. But they add 10k to each input, so part 3’s tuning is off: 0 V now plays ${(OUT0 / 100).toFixed(1)} semitones above C2, and a volt only ${OUT_OCT.toFixed(2)} of an octave. Retune, then warm or cool the room beside part 3’s circuit, tuned at the same time. Fingers on both transistors warm only them: the thermistors sit away from them, at the room’s temperature.`;
+      return `Part 3’s follower cancels most of the drift, but not the scale: V_T, in the exponent, grows about ${VT_PER_K.toFixed(2)}% a degree, so warmth narrows the octaves. A viewer reminded Moritz of thermistors, and he adds NTC ones, which lose resistance as they warm: 10k in series with each of the mixer’s 100k, as René Schmitz has them. Warmer, they let each input a little further through, about ${NTC_PER_K.toFixed(2)}% a degree for the CV’s, about what the scale needs. But they add 10k to each input, so part 3’s tuning is off: 0 V now plays ${(tn.OUT0 / 100).toFixed(1)} semitones above C2, and a volt only ${tn.OUT_OCT.toFixed(2)} of an octave. Retune, then warm or cool the room beside part 3’s circuit, tuned at the same time. Fingers on both transistors warm only them, towards a finger’s ${FINGER} °C: here the thermistors sit away from them, at the room’s temperature.`;
     case 2:
-      return `The coarse knob picks 0 to −12 V, which the mixer divides by about 50, Moritz reckons: up to about −240 mV at the BC558C’s base, some ${Math.round(COARSE_OCT)} octaves for its whole turn here. A fine-tune knob takes a smaller share: a second 100k pot, also from ground to −12 V, but through 1M where the others have 100k, dividing by about 500, with a thermistor of its own. Its whole turn is about ${FINE_OCT.toFixed(1)} octaves here, a tenth of the coarse knob’s: easier tuning, and room to detune one VCO a little against another. Tuned here with it halfway, so that it goes either way.`;
+      return `The coarse knob picks 0 to −12 V, which the mixer divides by about 50, Moritz reckons: up to about −240 mV at the BC558C’s base, some ${Math.round(tn.COARSE_OCT)} octaves for its whole turn here. A fine-tune knob takes a smaller share: a second 100k pot, also from ground to −12 V, but through 1M where the others have 100k, dividing by about 500, with a thermistor of its own. Its whole turn is about ${tn.FINE_OCT.toFixed(1)} octaves here, a tenth of the coarse knob’s: easier tuning, and room to detune one VCO a little against another. Tuned here with it halfway, so that it goes either way.`;
     case 3:
       return `For a square, Moritz turns to the 40106’s five spare inverters: making pulses out of a signal is what a Schmitt trigger is for. Its output switches off once its input passes the upper threshold, about 7 V, and on again under the lower one. But after the 1 µF the sawtooth is only about ±1.2 V, so it needs amplifying first, by one of the TL074’s three spare op amps. The sawtooth goes to its + input, and its − input sits on a divider of its own output: 100k down to the pot. With that negative feedback the output rises until the divider’s middle matches the + input, 1 + 100k ÷ the pot times as high. Turn the pot down: the sawtooth grows until it clips, about 1.5 V short of the ±12 V rails, and at 0 Ω it is a square.`;
     case 4:
       return `A wire from the op amp to the inverter would let the sawtooth’s lower half through, below 0 V, which would probably fry the 40106, Moritz says: its inputs have to stay between 0 and 12 V. A 1N4148 pointing at the inverter lets only the upper half through, but while it blocks the input is connected to nothing and picks up noise: 100k pulls it down to 0 V then. Try all three. With the pull-down, the output goes low as each jump passes the upper threshold and high again once the fall gets under the lower one: a pulse, out of phase with the sawtooth, which doesn’t change its sound. Turning the gain down (the pot up from 0 Ω) widens the high part, until past about ${kOhm(R100)} the sawtooth’s top misses the upper threshold and the output stays high: only the first ${pct(R100 / POT)} of the pot’s turn makes a pulse here.`;
     case 5:
-      return `Moritz finds the pulse over only the first third of the pot’s turn (here ${pct(R100 / POT)}), the rest useless: the amplifier needs a touch more gain. A bigger resistor from the output to the − input makes the op amp work harder, and by trial and error he settles on 200k for the 100k, doubling the gain above 1. He hopes to sweep from 50 to 100% with one turn; here the pulse now lasts to about ${kOhm(R200)}, the first ${pct(R200 / POT)} of the turn. The chart shows both, the 100k dashed.`;
+      return `Moritz finds the pulse over only the first third of the pot’s turn (here ${pct(R100 / POT)}), the rest useless: the amplifier needs a touch more gain. A bigger resistor from the output to the − input makes the op amp work harder, and by trial and error he settles on 200k for the 100k, doubling the gain above 1. Now it should move evenly from 50 to 100% over one turn, and it seems to work nicely, he finds; here the pulse lasts only to about ${kOhm(R200)}, the first ${pct(R200 / POT)} of the turn (see the notes below). The chart shows both, the 100k dashed.`;
     case 6:
-      return `Two problems left, both solved before. The pulse sits between 0 and 12 V: part 1’s 1 µF and 100k centre it on 0 V, ±6 V at 50%. And it’s loud: many modules follow and expect 10 V peak to peak, ±5 V, so 20k and 100k after the 1 µF take a sixth off. The sawtooth, 2.4 V peak to peak, needs the opposite: the TL074’s last op amp, with 100k and 33k for a gain of about 4 (he says 32k; the parts list has 33k), once part 2’s two 10k are out. A jack for each. At 50% the square sounds round and heavy; turning the pot makes it more and more nasal.`;
+      return `Two problems left, both solved before. The pulse sits between 0 and 12 V: a 1 µF and 100k, as in part 1, centre it on 0 V, ±6 V at 50%. And it’s loud: many modules follow and expect 10 V peak to peak, ±5 V, so 20k and 100k after the 1 µF take a sixth off. The sawtooth, 2.4 V peak to peak, needs the opposite: another of the TL074’s op amps, with 100k and 33k for a gain of about 4 (he says 32k, and puts it right in the description), once part 2’s two 10k are out. A jack for each. At 50% the square sounds round and heavy; turning the pot makes it more and more nasal.`;
   }
 }
 
@@ -195,6 +219,8 @@ export default defineLab({
     const wrap = h('div', { class: SCOPE_CLASS });
     root.appendChild(wrap);
     d.add(injectStyle(wrap, kitCss(SCOPE_CLASS) + CSS));
+    const tn = (worked ??= tunings());
+    const { P3, T2 } = tn;
 
     let step: Step = 1, listen = false, running = true, fingers = false, how: Shaper = 'pulldown';
     let hear: 'square' | 'saw' = 'square';
@@ -496,7 +522,7 @@ export default defineLab({
     }
     const scopeHost = h('div');
     const scopeNote = h('p', { class: 'note' });
-    const chartOf = (rf: number) => Array.from({ length: CHART_N }, (_, k) => 100 * pulse(NOTE, rf, (k / (CHART_N - 1)) * POT, TAU_DIV, 256).width);
+    const chartOf = (rf: number) => Array.from({ length: CHART_N }, (_, k) => 100 * pulse(NOTE, rf, (k / (CHART_N - 1)) * POT, TAU_DIV, PERIOD_N).width);
     const chart100 = chartOf(100e3), chart200 = chartOf(200e3);
     const chart = new Scope([{ label: 'pulse width, 45 to 100%', kind: 'analog', min: 45, max: 102, guides: [50, 100], color: '#f59e0b', overlayColor: '#60a5fa' }], { width: 640, laneHeight: 80 });
     chart.canvas.setAttribute('role', 'img');
@@ -641,14 +667,19 @@ export default defineLab({
           // each knob's wiper, loaded by its path into the mixer, and what it adds there: its path's share of all the mixer's paths to ground, the thermistors at 25 °C
           const rt = thermistor(ROOM), wc = wiper(coarse[2], -V12, TUNING.pot), wf = wiper(fine, -V12, FINE.pot);
           const rCoarse = TUNING.r + rt + wc.r, rFine = FINE.r + rt + wf.r, sum = 1 / rCoarse + 1 / (TUNING.r + rt) + 1 / rFine + 1 / (TUNING.fixed + trims[2]);
-          const knob = (w: { v: number; r: number }, r: number) => `${sV(w.v - (w.r * (w.v - n.vm)) / r)} on its wiper, adding ${sMV(w.v / r / sum)} at the mixer`;
+          const knob = (w: { v: number; r: number }, r: number) => {
+            const loaded = w.v - (w.r * (w.v - n.vm)) / r;
+            return `${sV(loaded)} on its wiper${Math.abs(loaded - w.v) > 5e-4 ? ` (${sV(w.v)} with nothing on it)` : ''}, adding ${sMV(w.v / r / sum)} at the mixer`;
+          };
           kv[2].set('the coarse knob', knob(wc, rCoarse));
           kv[2].set('the fine knob', knob(wf, rFine));
           kv[2].set('the trimmer', `${Math.round(trims[2])} Ω`);
           kv[2].set('the sequencer now', sequencerNow());
           kv[2].set('pitch', pitchText(n.t));
           kv[2].set('off the note meant', offText(cents(n.t.hz, meant)));
-          kv[2].set('a whole turn', `the fine knob’s ${FINE_OCT.toFixed(2)} octaves, the coarse knob’s ${COARSE_OCT.toFixed(1)}`);
+          // each knob's whole turn with the trimmer as it is now: the scale follows the shunt
+          const hzAt = (turn: number, f: number) => converter(0, turn, TUNING.fixed + trims[2], AT_ROOM, V12, withNtc(ROOM, f)).t.hz;
+          kv[2].set('a whole turn', `the fine knob’s ${Math.log2(hzAt(coarse[2], 0) / hzAt(coarse[2], 1)).toFixed(2)} octaves, the coarse knob’s ${Math.log2(hzAt(0, fine) / hzAt(1, fine)).toFixed(1)}`);
         }
         sound(n.t.hz);
         return;
@@ -658,33 +689,38 @@ export default defineLab({
       const p = pulse(hz, rf, r, step === 6 ? TAU : TAU_DIV, PERIOD_N);
       // a wire: the op amp's output held at the protection diode, the input with it
       const wire = step === 4 && how === 'wire';
+      const opOf = (v: number) => (wire ? shaperIn(amplify(v, p.g), 'wire') : amplify(v, p.g));
       const op = wire ? p.op.map((v) => shaperIn(v, 'wire')) : p.op;
       const out = wire ? schmittOut(op, VP12, VN12) : p.out;
       view = { hz, saw: p.saw, op, input: wire ? op : p.input, out, width: pulseWidth(out), square: [], sawOut: [] };
+      // the sawtooth's top and bottom, just after its jump and just before it (its readings stop a reading short of
+      // the bottom), and the same through each stage after it, none of which turns it upside down
+      const top = p.saw[0], bottom = top - (VP12 - VN12);
+      const ends = (f: (v: number) => number) => span(f(top), f(bottom));
       setText(potText, `at ${kOhm(r)}`);
       const rfName = `${rf / 1e3}k`;
       setText(rfText, rfName);
       const gain = `${gainText(p.g)}: 1 + ${rfName} ÷ ${kOhm(r)}`;
-      const pulseText = view.width >= 1 ? 'it stays high: no pulse' : `high ${pct(view.width)} of the time`;
+      const pulseText = view.width >= 1 ? 'it stays high, no pulse' : `high ${pct(view.width)} of the time`;
       const key = `${step}|${how}|${r}`;
       if (step === 3) {
         kv[3].set('the pot', kOhm(r));
         kv[3].set('the gain', gain);
-        kv[3].set('the note', `C3, ${hz.toFixed(1)} Hz, held there`);
-        kv[3].set('after the 1 µF', `${span(p.saw)}, drooping a little with part 2’s two 10k beside its 100k`);
-        kv[3].set('the op amp’s output', `${span(p.op)}${Math.max(...p.op) >= VSAT12 - 1e-9 ? ', clipped' : ''}`);
+        kv[3].set('the note', `C3, ${fmtHz(hz)}, held there`);
+        kv[3].set('after the 1 µF', `${ends((v) => v)}, drooping a little with part 2’s two 10k beside its 100k`);
+        kv[3].set('the op amp’s output', `${ends(opOf)}${opOf(top) >= VSAT12 - 1e-9 ? ', clipped' : ''}`);
         sound(hz, () => p.op, key);
       } else if (step === 4) {
         kv[4].set('the pot', kOhm(r));
         kv[4].set('the gain', gain);
-        kv[4].set('the op amp’s output', wire ? `${span(op)}: held there by the 40106’s protection diode` : span(op));
+        kv[4].set('the op amp’s output', wire ? `${ends(opOf)}: held there by the 40106’s protection diode` : ends(opOf));
         kv[4].set(
           'the 40106’s input',
           how === 'pulldown'
-            ? `${span(p.input)}: 0 V while the diode blocks`
+            ? `${ends((v) => shaperIn(opOf(v), 'pulldown'))}: 0 V while the diode blocks`
             : how === 'diode'
               ? 'whatever it picks up while the diode blocks: here a made-up drift and hum'
-              : `${span(op)}: below the −0.5 V TI allows, taking as much current as the op amp gives (a TL074H about 26 mA into a short; the 40106 is rated for 10 mA)`,
+              : `${ends(opOf)}: below the −0.5 V TI allows, taking as much current as the op amp gives (a TL074H about 26 mA into a short; the 40106 is rated for 10 mA)`,
         );
         kv[4].set('its output', how === 'diode' ? 'whatever the noise makes it' : pulseText);
         kv[4].set('a pulse with the pot under', `${kOhm(R100)}, the first ${pct(R100 / POT)} of its turn (with the diode and pull-down)`);
@@ -702,10 +738,11 @@ export default defineLab({
       } else {
         view.square = squareOut(out, hz);
         view.sawOut = sawOut(p.saw);
-        const pp = (w: readonly number[]) => `${span(w)}, ${(Math.max(...w) - Math.min(...w)).toFixed(1)} V peak to peak`;
+        const gSaw = gainOf(SAW_AMP.rf, SAW_AMP.rg);
+        const pp = (hi: number, lo: number) => `${span(hi, lo)}, ${(hi - lo).toFixed(1)} V peak to peak`;
         kv[6].set('the pot', `${kOhm(r)}: ${pulseText}`);
-        kv[6].set('the square out', view.width >= 1 ? '0 V: no pulse to pass' : pp(view.square));
-        kv[6].set('the saw out', `${pp(view.sawOut)}, a gain of ${gainOf(SAW_AMP.rf, SAW_AMP.rg).toFixed(2)}`);
+        kv[6].set('the square out', view.width >= 1 ? '0 V: no pulse to pass' : pp(Math.max(...view.square), Math.min(...view.square)));
+        kv[6].set('the saw out', `${pp(amplify(top, gSaw), amplify(bottom, gSaw))}, a gain of ${gSaw.toFixed(2)}`);
         kv[6].set('the sequencer now', sequencerNow());
         kv[6].set('pitch', playsText({ hz, stalled: false }));
         if (hear === 'square' && view.width >= 1) quiet();
@@ -774,7 +811,7 @@ export default defineLab({
       fingerToggle.set(false);
       tT = room;
       kvHost.replaceChildren(kv[step].el);
-      setText(status, stepText(step));
+      setText(status, stepText(step, tn));
       update();
     };
 
@@ -792,7 +829,7 @@ export default defineLab({
           }
         }
         if (step === 1) {
-          const target = fingers ? FINGER : room;
+          const target = fingers ? Math.max(FINGER, room) : room;
           const t = Math.abs(tT - target) < 0.005 ? target : target + (tT - target) * Math.exp(-dt / WARM_TAU);
           if (t !== tT) {
             tT = t;
@@ -814,7 +851,7 @@ export default defineLab({
         { class: 'lab-stack' },
         panel(
           'The circuit',
-          { accent: 'red', chips: 'three 10k NTC thermistors · a second 100k pot and 1M · the TL074’s three spare op amps · the 40106’s second inverter · 1N4148 · a 100k pot · 200k · 100k ×3 · 33k · 20k · 1 µF · two jacks · part 3’s VCO' },
+          { accent: 'red', chips: 'three 10k NTC thermistors · a second 100k pot and 1M · two of the TL074’s three spare op amps · the 40106’s second inverter · 1N4148 · a 100k pot · 200k · 100k ×4 · 33k · 20k · 1 µF · two jacks · part 3’s VCO' },
           row(stepSel, shaperSel, hearSel, fingerToggle.el, runToggle.el, nextBtn.el, retuneBtn.el, listenToggle.el),
           roomRow,
           coarseRow,
@@ -826,7 +863,7 @@ export default defineLab({
         ),
         tunerPanel,
         scopePanel,
-        notes(),
+        notes(tn),
       ),
     );
     apply();
@@ -834,22 +871,22 @@ export default defineLab({
   },
 });
 
-function notes(): HTMLElement {
+function notes(tn: Tunings): HTMLElement {
   return panel(
     'From the video',
     { accent: 'gray' },
-    note('A viewer reminded Moritz that thermistors could make the VCO steadier still. He admits that the NPN and the PNP reacting alike to warmth was a broad generalisation, points to the Ebers-Moll equation for the real thing, and tries a primitive experiment instead: a finger on both transistors at once. The pitch goes down before it settles, “the PNP wins”, so he deduces that its response needs taming: its base should rise as it warms. NTC thermistors in series with the 100k make the mixer’s ratio depend on the temperature, which he means to do that.'),
-    note(`In the model, both transistors follow the same law, so the follower cancels the drift of their I_S exactly, and what is left is V_T, the scale. With both equally warm, the note at 0 V on the BC558C’s base stays put (here about ${STILL}), those below it go sharp and those above flat: fingers on both raise most of the sequence. A BC558C that warms first would make the pitch dip before it settles, as he hears. The thermistors make up for V_T by scaling each input’s share with the temperature; with the offset on the negative side, that lets the BC558C’s base further down as they warm, not up, for the notes below ${STILL}.`),
-    note(`He takes their value from René Schmitz’s VCO, which he says he draws on heavily for this series: 10k with the 100k. They add 10k to each input, so the trimmer has to move, in the model from about ${Math.round(P3.trim)} Ω to about ${Math.round(T1.trim)} Ω. Here they follow the room with the transistors: a finger on the transistors doesn’t reach them.`),
+    note('A viewer reminded Moritz that thermistors could make the VCO steadier still. He admits that the NPN and the PNP reacting alike to warmth was a broad generalisation, points to the Ebers-Moll equation for the real thing, and tries a primitive experiment instead: a finger on both transistors at once. The pitch goes down before it settles, “the PNP wins”, so he deduces that its response needs taming: its base should rise as it warms. NTC thermistors in series with the 100k make the mixer’s ratio depend on the temperature: warmer, they let more through and raise its output, which is how he means to do it.'),
+    note(`In the model, both transistors follow the same law, so the follower cancels the drift of their I_S exactly, and what is left is V_T, the scale. With both equally warm, the note at 0 V on the BC558C’s base stays put (here about ${tn.STILL}), those below it go sharp and those above flat: fingers on both raise most of the sequence. A BC558C that warms first would make the pitch dip before it settles, as he hears. The thermistors make up for V_T by scaling each input’s share with the temperature; with the offset on the negative side, that lets the BC558C’s base further down as they warm, not up, for the notes below about ${tn.DOWN}. (From there to ${tn.STILL} it rises a little: the offset’s path has the pot’s wiper in it too, so its share grows a little slower than the CV’s.)`),
+    note(`He takes their value from René Schmitz’s VCO, which he says he draws on heavily for this series: 10k with the 100k. They add 10k to each input, so the trimmer has to move, in the model from about ${Math.round(tn.P3.trim)} Ω to about ${Math.round(tn.T1.trim)} Ω. Here they follow the room with the transistors: a finger on the transistors doesn’t reach them.`),
     note('The fine-tune knob: the coarse knob’s 0 to −12 V divided by about 50 is 0 to about −240 mV, a huge range. Through 1M instead of 100k the division is about 500 (the captions give 0 to −4 mV; 12 V over 500 is 24 mV), and a 10k thermistor goes with it, as with the others. Besides tuning, it makes it easier to detune one VCO slightly against others.'),
     note('The op amp, in his water pipes: both inputs are pressure sensors that let no water in, and the output is a pump that pushes out their difference times a huge gain, as far as its supply lets it, which is where it nearly always ends up. Negative feedback calms it. As a buffer, its output on its − input, it rises only until the difference times the gain is what it puts out, a hair under the input: a unity-gain amplifier, an amplifier that doesn’t amplify. Through a divider instead, the output has to work harder: two 100k double the input, and any divider gives a gain above 1, never below, since a divider can only reduce.'),
     note('The pulse is out of phase with the sawtooth, which doesn’t change its sound, and its width depends on the sawtooth’s size: the higher its peak, the later its fall crosses the lower threshold. Too small, and it never crosses the upper one: the output stays on. With a fixed 50% square all he wanted, the amplifier alone would do, its output scaled down.'),
     note(
-      `The pot’s range: here a pulse needs a gain of ${G_MIN.toFixed(1)}, which the pot gives up to ${kOhm(R100)} with the 100k (${pct(R100 / POT)} of its turn) and ${kOhm(R200)} with the 200k (${pct(R200 / POT)}). Moritz finds a third, then the whole turn. A 40106 at the bottom of TI’s range, its upper threshold about ${VP_LOWEST.toFixed(1)} V on 12 V, would give ${kOhm(R100_LOW)} and ${kOhm(R200_LOW)}. And while part 2’s two 10k are still on the 1 µF, the sawtooth droops, its top higher the lower the note: ${PEAK.toFixed(2)} V at C3, ${PEAK_C1.toFixed(2)} V at C1. The whole turn would need a gain of 3 to be enough, an upper threshold under ${VP_WHOLE.toFixed(1)} V, below TI’s range: the model can’t say how his got there.`,
+      `The pot’s range: here a pulse needs a gain of ${G_MIN.toFixed(1)}, which the pot gives up to ${kOhm(R100)} with the 100k (${pct(R100 / POT)} of its turn) and ${kOhm(R200)} with the 200k (${pct(R200 / POT)}). Moritz finds a third, then the whole turn. A 40106 at the bottom of TI’s range, its upper threshold about ${VP_LOWEST.toFixed(1)} V on 12 V, would give ${kOhm(R100_LOW)} and ${kOhm(R200_LOW)}. And while part 2’s two 10k are still on the 1 µF, the sawtooth droops, its top higher the lower the note: ${PEAK.toFixed(2)} V at C3, ${PEAK_C1.toFixed(2)} V at C1. Both together, that 40106 at C1, give ${kOhm(R100_C1)} and ${kOhm(R200_C1)}: his third, then two thirds. The whole turn would need a gain of 3 to be enough, an upper threshold under ${VP_WHOLE.toFixed(1)} V, below TI’s range: the model can’t say how his got there.`,
     ),
     note('Modular levels: many modules follow and expect 10 V peak to peak, a wave between +5 and −5 V. In part 1 a 50% divider was enough to listen with; now the square goes from ±6 V to ±5 V, and the sawtooth from ±1.2 V to about ±4.8 V. Next: getting it off the breadboard and into a module, panel, stripboard and all, with complete schematics on his Patreon.'),
     note(
-      `Estimates here: the thermistors’ B value, 3950 K, common for 10k ones (the video gives none); the TL074’s swing on ±12 V, 1.5 V short of either rail as on ±9 V (his scope shows the clipping near the rails, and TI’s newer TL074H gets within about 0.1 V); the 1N4148’s 0.5 V with the 100k after it; the 40106’s protection diode at 0.7 V; its thresholds, TI’s typical ones; the floating input, a made-up drift and mains hum around the middle of the thresholds; and the note, C3, from the third step to the fifth. The fingers’ ${FINGER} °C and ${WARM_TAU} s are made up, as in parts 2 and 3, the sequence is the lab’s own, and the core’s jump is taken as instant. Listen plays the browser’s sawtooth in the first two steps, then the waves the scope shows.`,
+      `Estimates here: the thermistors’ B value, 3950 K, common for 10k ones (the video gives none); the TL074’s swing on ±12 V, 1.5 V short of either rail as on ±9 V (his scope shows the clipping near the rails, and TI’s newer TL074H gets within about 0.1 V); the 1N4148’s 0.5 V with the 100k after it; the 40106’s protection diode at 0.7 V; its thresholds, TI’s typical ones; the floating input, a made-up drift and mains hum around the middle of the thresholds; the note, C3, from the third step to the fifth; and which of the TL074’s spare op amps each amplifier uses (he says only “one of the remaining”). Only the transistors and the thermistors warm here, the thermistors with the room alone, out of a finger’s reach (the video doesn’t say where they sit): the 40106, the capacitors and the other resistors don’t. The fingers’ ${FINGER} °C and ${WARM_TAU} s are made up, as in parts 2 and 3, the sequence is the lab’s own, and the core’s jump is taken as instant. Listen plays the browser’s sawtooth in the first two steps, then the waves the scope shows; with the 1N4148 alone it stays quiet, since that noise is made up.`,
     ),
   );
 }
