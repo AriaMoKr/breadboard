@@ -169,8 +169,13 @@ export interface MoreGroup {
   source: Source;
   /** A series in parts, numbered in the list. */
   numbered?: boolean;
+  /** The number of its first video, for a series that goes on from another group (1 if not given). */
+  first?: number;
   videos: MoreVideo[];
 }
+
+/** A group's number for its video at `i` (0-based), counting from its `first`. */
+export const videoNumber = (g: MoreGroup, i: number) => (g.first ?? 1) + i;
 
 const m = (youtubeId: string, title: string, duration: string, date: string, lab?: string): MoreVideo => ({ youtubeId, title, duration, date, lab });
 
@@ -240,6 +245,21 @@ export const OTHER_GROUPS: MoreGroup[] = [
       m('E76z9ZTc5po', 'DIY VCO Part 4: Shaping Sawtooth to Square', '27:11', '2020-08-17', 'sawtooth-to-square'),
     ],
   },
+  {
+    id: 'klein-vco',
+    title: 'DIY VCO Series',
+    by: 'Moritz Klein',
+    text: 'His “DIY VCO Series” playlist starts with VCO parts 1 to 4, the last four of For Beginners, and goes on: the VCO built as a module, three of them on stripboard behind a panel; a quick tip that turns its sawtooth into a triangle; voltage control of its pulse width; and the kit Erica Synths makes of it, the first of his mki x es.EDU kits.',
+    source: { href: 'https://www.youtube.com/playlist?list=PLHeL0JWdJLvTuGCyC3qvx0RM39YvopVQN', label: 'his “DIY VCO Series” playlist', short: 'Moritz’s playlist' },
+    numbered: true,
+    first: 5,
+    videos: [
+      m('OCAb2UoSPs0', 'How to build a DIY 3X VCO module from scratch', '16:17', '2020-09-28'),
+      m('4r3TTaUKNe0', 'DIY SYNTH Quick Tip: Sawtooth-to-Triangle Converter', '15:41', '2021-01-18', 'sawtooth-to-triangle'),
+      m('FUz3gFAh9pY', 'Adding voltage controlled PWM to my VCO', '17:25', '2021-04-18'),
+      m('8JuYLLpZzBs', 'Introducing the mki x es.edu DIY VCO kit', '7:23', '2022-01-09'),
+    ],
+  },
 ];
 
 export const OTHER_VIDEOS: MoreVideo[] = OTHER_GROUPS.flatMap((g) => g.videos);
@@ -252,6 +272,9 @@ export const groupTitle = (g: MoreGroup) => (g.by ? `${g.by}: ${g.title}` : g.ti
 
 /** The labs of a group's videos, in order. */
 export const groupLabs = (g: MoreGroup) => [...new Set(g.videos.flatMap((v) => (v.lab ? [v.lab] : [])))];
+
+/** The labs a group's lab steps through: Ben's group's own, or all the labs of the creator's groups, one series after the other. */
+export const seriesLabs = (g: MoreGroup) => (g.by ? [...new Set(OTHER_GROUPS.filter((x) => x.by === g.by).flatMap(groupLabs))] : groupLabs(g));
 
 /**
  * Designs from other sources than Ben's videos, built here as his are, part by part with a lab
@@ -300,9 +323,9 @@ export const projectForLab = (lab: string) =>
 /** Every lab: the playlist's, then those for Ben's other videos and other creators', then the projects'. */
 export const ALL_LAB_IDS: string[] = [...LAB_IDS, ...MORE_LAB_IDS, ...OTHER_LAB_IDS, ...PROJECT_LAB_IDS];
 
-/** The videos outside Ben's playlist (his other videos, then other creators') a lab covers, with their group and part number (1-based). */
+/** The videos outside Ben's playlist (his other videos, then other creators') a lab covers, with their group and part number (from the group's `first`). */
 export const moreVideosForLab = (lab: string) =>
-  [...MORE_GROUPS, ...OTHER_GROUPS].flatMap((group) => group.videos.flatMap((video, i) => (video.lab === lab ? [{ group, video, part: i + 1 }] : [])));
+  [...MORE_GROUPS, ...OTHER_GROUPS].flatMap((group) => group.videos.flatMap((video, i) => (video.lab === lab ? [{ group, video, part: videoNumber(group, i) }] : [])));
 
 /** A video's title without the series name ("Making a square wave square: Breadboard clock part 2" -> "Making a square wave square"). */
 export const shortTitle = (title: string) =>
@@ -310,7 +333,8 @@ export const shortTitle = (title: string) =>
     .replace(/ - (8[- ]bit (computer clock|register)|8-bit register) - [Pp]art \d/, '')
     .replace(/: Breadboard clock part \d+$/, '')
     .replace(/ (for my clock|on my breadboard clock)$/, '')
-    .replace(/^DIY VCO Part \d+: /, '');
+    .replace(/^DIY VCO Part \d+: /, '')
+    .replace(/^DIY SYNTH Quick Tip: /, '');
 
 export const watchUrl = (youtubeId: string) => `https://www.youtube.com/watch?v=${youtubeId}`;
 export const videoUrl = (vid: Video) => `https://www.youtube.com/watch?v=${vid.youtubeId}&list=${PLAYLIST_ID}&index=${vid.index}`;

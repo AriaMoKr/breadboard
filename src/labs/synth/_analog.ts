@@ -6,8 +6,10 @@
  * BC548C in the 100k's place with a pot and a sequencer at its base; then part 3's BC558C emitter
  * follower in front of that base, and the scale tuned with a trimmer; then part 4's thermistors and
  * fine-tune knob in its mixer, and the sawtooth amplified and shaped into a pulse by another of the
- * 40106's inverters. Time is in seconds, voltages in volts, currents in amps. Plain arithmetic, as
- * src/labs/dclock/_analog.ts does for Ben's clock, so the labs and the tests share it.
+ * 40106's inverters; then, from his "DIY VCO Series" after part 4, the quick tip's
+ * sawtooth-to-triangle converter, an inverting buffer and two 1N4148s. Time is in seconds, voltages
+ * in volts, currents in amps. Plain arithmetic, as src/labs/dclock/_analog.ts does for Ben's clock,
+ * so the labs and the tests share it.
  */
 
 import { rng } from '../dclock/_analog';
@@ -664,21 +666,32 @@ export function coupled(wave: readonly number[], period: number, tau: number): n
 }
 
 /**
- * The core's sawtooth on `vdd` after a capacitor in series, with `tau` to ground after it, once
- * settled: its top, just after each jump. From there it falls at the core's rate, S = (VP − VN) ÷
- * `period`, heading for −S `tau`, until the jump puts back what the period took off; its bottom,
- * just before the jump, is the jump below its top.
+ * A sawtooth that jumps up by `jump` and falls as far in a straight line over `period`, after a
+ * capacitor in series with `tau` to ground after it, once settled: its top, just after each jump.
+ * From there it falls at the same rate, S = `jump` ÷ `period`, heading for −S `tau`, until the jump
+ * puts back what the period took off; its bottom, just before the jump, is the jump below its top.
  */
-export function sawTop(period: number, tau: number, vdd = V12): number {
-  const { vp, vn } = thresholds(vdd);
-  return (vp - vn) / -Math.expm1(-period / tau) - ((vp - vn) / period) * tau;
+export function rampTop(period: number, tau: number, jump: number): number {
+  return jump / -Math.expm1(-period / tau) - (jump / period) * tau;
 }
 
-/** The same sawtooth, one period of `n` readings from its top: exact, the jump instant, where `coupled` on `sawWave` spreads it over a reading. */
-export function coupledSaw(n: number, period: number, tau: number, vdd = V12): number[] {
-  const { vp, vn } = thresholds(vdd), s = (vp - vn) / period, top = sawTop(period, tau, vdd);
+/** The same sawtooth, one period of `n` readings from its top: exact, the jump instant, where `coupled` spreads it over a reading. */
+export function coupledRamp(n: number, period: number, tau: number, jump: number): number[] {
+  const s = jump / period, top = rampTop(period, tau, jump);
   // −S tau + (top + S tau) e^(−t/tau), written so that the first reading is the top itself
   return Array.from({ length: n }, (_, k) => top + (top + s * tau) * Math.expm1((-k / n) * (period / tau)));
+}
+
+/** The core's sawtooth on `vdd` after a capacitor in series, with `tau` to ground after it, once settled: its top (`rampTop`). */
+export function sawTop(period: number, tau: number, vdd = V12): number {
+  const { vp, vn } = thresholds(vdd);
+  return rampTop(period, tau, vp - vn);
+}
+
+/** The same, one period of `n` readings from its top (`coupledRamp`): exact, where `coupled` on `sawWave` spreads the jump over a reading. */
+export function coupledSaw(n: number, period: number, tau: number, vdd = V12): number[] {
+  const { vp, vn } = thresholds(vdd);
+  return coupledRamp(n, period, tau, vp - vn);
 }
 
 /** Where part 4 picks up the sawtooth: after part 1's 1 µF, into its 100k, with part 2's two 10k to the jack beside it until Moritz takes them out. */
@@ -762,3 +775,142 @@ export const SAW_AMP = { rf: 100e3, rg: 33e3 };
 
 /** Part 4's saw out, from the sawtooth after the 1 µF: amplified about four times, about ±4.8 V. */
 export const sawOut = (saw: readonly number[]) => saw.map((v) => amplify(v, gainOf(SAW_AMP.rf, SAW_AMP.rg)));
+
+// ---------------------------------------------------------------------------
+// His quick tip after the VCO series: a sawtooth-to-triangle converter
+
+/**
+ * A 1N4148 by the Shockley law, I = I_S (e^(V ÷ n V_T) − 1), with the common SPICE model's I_S and
+ * n (its half an ohm in series left out): about 0.58 V at a milliamp, 0.48 V at a tenth of one,
+ * and about a third of a volt at the few microamps a scope's input takes.
+ */
+export const D1N4148 = { is: 2.52e-9, n: 1.752 };
+const NVT = D1N4148.n * thermalVoltage(ROOM);
+
+/** The converter's parts, from his bill of materials: two 10k, matched; 1 µF and 200k at the input, and again at the output; and 20k from the diodes' point. */
+export const TRI = { r: 10e3, c: 1e-6, rc: 200e3, pull: 20e3 };
+
+/** The sawtooth his simulation feeds it: ±5 V at 200 Hz. Here it falls, as in his drawings and from his VCO. */
+export const TRI_SAW = { amp: 5, hz: 200 };
+
+/** A scope's input, 1M: the only load on the diodes' point until the output stage (an estimate: his probe's setting isn't shown). */
+export const SCOPE_IN = 1e6;
+
+/** Where the 20k from the diodes' point goes: nowhere (no 20k), to ground, or to −12 V. */
+export type Pull = 'none' | 'ground' | 'negative';
+
+/** A resistor's conductance `g`, to the voltage `v` at its far end. */
+export interface Load {
+  g: number;
+  v: number;
+}
+
+/**
+ * The diodes' point: the voltage at which what the two 1N4148s let through from the op amps'
+ * outputs `a` and `b` (null for a diode left out) leaves through `loads`. The diodes let less
+ * through as it rises and the loads take more, so there is one answer: Newton's method, kept
+ * inside a bracket that narrows as it goes, from `guess` if it is given.
+ */
+export function diodePoint(a: number | null, b: number | null, loads: readonly Load[], guess?: number): number {
+  const is = D1N4148.is;
+  let g = 0, gv = 0, lo = Infinity, hi = -Infinity;
+  for (const l of loads) {
+    g += l.g;
+    gv += l.g * l.v;
+    lo = Math.min(lo, l.v);
+    hi = Math.max(hi, l.v);
+  }
+  for (const v of [a, b]) {
+    if (v === null) continue;
+    lo = Math.min(lo, v);
+    hi = Math.max(hi, v);
+  }
+  lo -= 2;
+  hi += 2;
+  const f = (x: number) => (a === null ? 0 : is * Math.expm1((a - x) / NVT)) + (b === null ? 0 : is * Math.expm1((b - x) / NVT)) - (g * x - gv);
+  const df = (x: number) => -(a === null ? 0 : (is / NVT) * Math.exp((a - x) / NVT)) - (b === null ? 0 : (is / NVT) * Math.exp((b - x) / NVT)) - g;
+  // without a guess, start where the higher diode carries what the loads would take 0.6 V under it
+  const top = Math.max(a ?? -Infinity, b ?? -Infinity);
+  const i0 = g * (top - 0.6) - gv;
+  let x = guess !== undefined && guess > lo && guess < hi ? guess : top === -Infinity ? gv / g : i0 > 0 ? top - NVT * Math.log1p(i0 / is) : top;
+  for (let k = 0; k < 200; k++) {
+    const fx = f(x);
+    if (fx === 0) return x;
+    if (fx > 0) lo = x;
+    else hi = x;
+    let next = x - fx / df(x);
+    if (!(next > lo && next < hi)) next = (lo + hi) / 2;
+    if (Math.abs(next - x) < 1e-10) return next;
+    x = next;
+  }
+  return x;
+}
+
+/** The converter's setup: what is in it, step by step in the video. */
+export interface TriSetup {
+  /** The sawtooth's offset: 0 V when it is centred. */
+  offset: number;
+  /** The input's 1 µF and 200k, and the buffer after them. */
+  inCap: boolean;
+  /** The inverter's resistor from its input, and the one from its output back. */
+  rIn: number;
+  rFb: number;
+  /** The 1N4148 from the sawtooth (or the buffer), and the one from the inverter. */
+  d1: boolean;
+  d2: boolean;
+  /** The output's 1 µF and 200k. Without them, the scope on the diodes' point is its only load. */
+  outCap: boolean;
+  /** Where the 20k from the diodes' point goes. */
+  pull: Pull;
+}
+
+/** As built at the end of the video. */
+export const TRI_BUILT: TriSetup = { offset: 0, inCap: true, rIn: TRI.r, rFb: TRI.r, d1: true, d2: true, outCap: true, pull: 'negative' };
+
+/** His first, basic converter: the sawtooth straight into the inverter and a diode, the scope on the diodes' point. */
+export const TRI_BASIC: TriSetup = { ...TRI_BUILT, inCap: false, outCap: false, pull: 'none' };
+
+/**
+ * The converter at `hz` over one period of `n` readings from the sawtooth's jump: the sawtooth;
+ * `a`, what the inverter gets (the sawtooth itself, or after the input's 1 µF, 200k and buffer);
+ * `b`, the inverter's output (both op amps clip about 1.5 V short of the ±12 V rails); the diodes'
+ * point; and `out`, what the scope sees at the end. The output's 1 µF is taken to hold its charge
+ * over a period (its 200 ms against 5 ms at 200 Hz), at `vc`, where no current flows through it on
+ * average. `ends` is the diodes' point just after the jump and just before it, exactly, and
+ * `cross` where in the period `a` falls through 0 V, if it does.
+ */
+export function sawToTriangle(t: TriSetup, hz = TRI_SAW.hz, n = 512) {
+  const period = 1 / hz, { amp } = TRI_SAW, gain = t.rFb / t.rIn, tau = TRI.c * TRI.rc;
+  const clip = (v: number) => Math.max(-VSAT12, Math.min(VSAT12, v));
+  const saw = Array.from({ length: n }, (_, k) => t.offset + amp - (2 * amp * k) / n);
+  // the sawtooth itself (a generator's output), or buffered after the 1 µF, which takes out the offset
+  const a = t.inCap ? coupledRamp(n, period, tau, 2 * amp).map(clip) : saw;
+  const b = a.map((v) => clip(-gain * v));
+  const top = t.inCap ? clip(rampTop(period, tau, 2 * amp)) : t.offset + amp, bottom = t.inCap ? clip(top - 2 * amp) : t.offset - amp;
+  const pull: Load[] = t.pull === 'none' ? [] : [{ g: 1 / TRI.pull, v: t.pull === 'ground' ? 0 : -V12 }];
+  const point = (av: number, bv: number, loads: Load[], guess?: number) => diodePoint(t.d1 ? av : null, t.d2 ? bv : null, loads, guess);
+  const points = (loads: Load[]) => {
+    let x: number | undefined;
+    return a.map((av, k) => (x = point(av, b[k], loads, x)));
+  };
+  let vc = 0, loads: Load[];
+  if (t.outCap) {
+    // the 1 µF's charge: the point's average less it falls as it rises, through 0 where it belongs
+    const via = (v: number): Load[] => [...pull, { g: 1 / TRI.rc, v }];
+    let lo = Math.min(-V12, ...a, ...b) - 1, hi = Math.max(0, ...a, ...b) + 1;
+    for (let k = 0; k < 40 && hi - lo > 1e-7; k++) {
+      const mid = (lo + hi) / 2;
+      if (points(via(mid)).reduce((sum, v) => sum + v, 0) / n > mid) lo = mid;
+      else hi = mid;
+    }
+    vc = (lo + hi) / 2;
+    loads = via(vc);
+  } else loads = [...pull, { g: 1 / SCOPE_IN, v: 0 }];
+  const node = points(loads);
+  const out = t.outCap ? node.map((v) => v - vc) : node;
+  const after = point(top, clip(-gain * top), loads), before = point(bottom, clip(-gain * bottom), loads);
+  // where `a` falls through 0 V: in a straight line, or along the 1 µF's curve
+  const s = (2 * amp) / period;
+  const at = t.inCap ? (-tau * Math.log1p(-top / (top + s * tau))) / period : top / (2 * amp);
+  return { saw, a, b, node, out, vc, gain, ends: { after, before }, cross: top > 0 && bottom < 0 ? at : null };
+}

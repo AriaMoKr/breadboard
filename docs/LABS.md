@@ -14,9 +14,12 @@ Such labs are in `MORE_LAB_IDS`, and every lab is in `ALL_LAB_IDS`. The sidebar 
 group's title, and their prev/next links stay within the series.
 
 Other creators' videos are in `OTHER_GROUPS`, groups like those with a `by`: Moritz Klein's "For
-Beginners" playlist, with its labs in `src/labs/synth/`, is the first. Their labs are in
-`OTHER_LAB_IDS`. The sidebar heads each group with whose it is ("Moritz Klein: For Beginners"),
-and the More videos page lists their videos after Ben's.
+Beginners" playlist, with its labs in `src/labs/synth/`, is the first, and his "DIY VCO Series"
+the second. Their labs are in `OTHER_LAB_IDS`. The sidebar heads each group with whose it is
+("Moritz Klein: For Beginners"), and the More videos page lists their videos after Ben's. A
+group that goes on from another, as the DIY VCO Series does from part 4, numbers its videos from
+`first` (`videoNumber`), and a creator's labs run prev/next through all of their groups
+(`seriesLabs`).
 
 Designs from other sources, such as a magazine article, are in `PROJECTS` (also in `chapters.ts`),
 part by part, each part with its lab and where it is in the source: Lancaster's TV Typewriter in
@@ -56,9 +59,9 @@ body.
 | Microcode | `buildMicrocode`, `MICROCODE_VERSIONS` (`control-logic` v38, `arduino` v40 (+SUB), `more-instructions` v41, `flags` v44), `microcodeEepromImage`, `Machine.editMicrocode` — `src/sim/microcode.ts`; `MicrocodePanel` (`editable`, `highlightOpcodes`; `setHighlight(opcodes)`, `rowEl(op)`) |
 | Programs | `assemble`, `disassemble` — `src/sim/assembler.ts` (also Ben's on-screen binary notation: `1110: 0001 1100`, `LDA 1110`); `PROGRAMS` / `PROGRAM_BY_ID` — `src/sim/programs.ts`; `ProgramPanel.setSource(src)`, `selectProgram(id)` (the panel also follows any `machine.loadSource()` call) |
 | 7-segment / display EEPROM | `HEX_DIGITS`, `DEC_DIGITS`, `displayEepromImage`, `displaySegments` — `src/sim/display.ts` |
-| Analog parts | Small models of a group's own, with the circuit's equations: `src/labs/dclock/_analog.ts` (Ben's clock: the supply, the LM339 with hysteresis, the square-wave chain, switch bounce), `src/labs/synth/_analog.ts` (Moritz Klein's: the op-amp relaxation oscillator and the 40106 sawtooth core, each stepped exactly from one threshold crossing to the next, AC coupling, a floating input, and a BC548C as an exponential converter, with its temperature, a pot's wiper and a passive mixer at its base, then a BC558C emitter follower in front of that base, warming as the BC548C does, the mixer at its base subtracting an offset, and the scale tuned with a trimmer by bisection; then NTC thermistors and a fine-tune knob in that mixer, a non-inverting op amp clipping short of its rails, AC coupling as a filter over one period, a diode and a pull-down into another 40106 inverter for a pulse, and the outputs scaled to 10 V peak to peak); the symbols are `src/labs/clock/_draw.ts`'s kit, with the synth's own in `src/labs/synth/_draw.ts` (a PNP and an NTC thermistor among them) |
+| Analog parts | Small models of a group's own, with the circuit's equations: `src/labs/dclock/_analog.ts` (Ben's clock: the supply, the LM339 with hysteresis, the square-wave chain, switch bounce), `src/labs/synth/_analog.ts` (Moritz Klein's: the op-amp relaxation oscillator and the 40106 sawtooth core, each stepped exactly from one threshold crossing to the next, AC coupling, a floating input, and a BC548C as an exponential converter, with its temperature, a pot's wiper and a passive mixer at its base, then a BC558C emitter follower in front of that base, warming as the BC548C does, the mixer at its base subtracting an offset, and the scale tuned with a trimmer by bisection; then NTC thermistors and a fine-tune knob in that mixer, a non-inverting op amp clipping short of its rails, AC coupling as a filter over one period, a diode and a pull-down into another 40106 inverter for a pulse, and the outputs scaled to 10 V peak to peak; then a 1N4148 by the Shockley law, and the sawtooth-to-triangle converter, its diodes' point solved by Newton's method and its output's AC coupling settled by bisection); the symbols are `src/labs/clock/_draw.ts`'s kit, with the synth's own in `src/labs/synth/_draw.ts` (a PNP and an NTC thermistor among them) |
 | A breadboard in a lab | `LayoutView` (`src/breadboard/render.ts`) draws a `Layout` built for the lab, as `src/labs/synth/_board.ts` does: `buildNets` checks its wiring in the tests, and `ANALOG_CHIPS` has chips to draw that the engine doesn't simulate |
-| Sound | `Tone` (`src/labs/synth/_sound.ts`): a quiet tone through WebAudio, a square wave, a sawtooth (`saw`: the browser's own, all its harmonics at any pitch, so a few hertz click), or any wave from one period of it (`wave`, through `periodicWave`'s Fourier series), started only by a control (a browser won't play before a click) and closed in cleanup |
+| Sound | `Tone` (`src/labs/synth/_sound.ts`): a quiet tone through WebAudio, a square wave, a sawtooth (`saw`: the browser's own, all its harmonics at any pitch, so a few hertz click), or any wave from one period of it (`wave`, through `periodicWave`'s Fourier series, which `harmonics` also gives as each harmonic's size, for a chart), started only by a control (a browser won't play before a click) and closed in cleanup |
 
 ### The Computer model in one paragraph
 

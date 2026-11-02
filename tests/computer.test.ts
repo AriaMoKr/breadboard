@@ -690,7 +690,7 @@ describe('integration: chapter map', () => {
   it('every lab id in chapters.ts has a *.lab.ts that registers it, and vice versa', () => {
     expect(MORE_LAB_IDS).toEqual(['transistor-gates', 'mains-60hz', 'square-wave', 'divide-by-60', 'minutes-seconds', 'setting-time']);
     expect(MORE_LAB_IDS.filter((id) => LAB_IDS.includes(id))).toEqual([]);
-    expect(OTHER_LAB_IDS).toEqual(['using-a-breadboard', 'oscillator-core', 'exponential-converter', 'vco-tuning', 'sawtooth-to-square']);
+    expect(OTHER_LAB_IDS).toEqual(['using-a-breadboard', 'oscillator-core', 'exponential-converter', 'vco-tuning', 'sawtooth-to-square', 'sawtooth-to-triangle']);
     expect(OTHER_LAB_IDS.filter((id) => LAB_IDS.includes(id) || MORE_LAB_IDS.includes(id))).toEqual([]);
     const missing = ALL_LAB_IDS.filter((id) => !LABS.has(id));
     expect(missing, `labs without a *.lab.ts: ${missing.join(', ')}`).toEqual([]);
@@ -1088,6 +1088,15 @@ describe('shared UI pieces (fake DOM)', () => {
       app.render();
       expect(source.hasAttribute('hidden') ? null : source.textContent, hash!).toBe(text);
     }
+    // Moritz's second playlist goes on from part 4: numbered as his playlist has it, its lab next after part 4's, its own playlist in the top bar
+    loc.hash = '#/lab/sawtooth-to-square';
+    app.render();
+    expect(host.querySelectorAll('.lab-nav a').map((a) => a.attributes.href)).toEqual(['#/lab/vco-tuning', '#/lab/sawtooth-to-triangle']);
+    loc.hash = '#/lab/sawtooth-to-triangle';
+    app.render();
+    expect(host.querySelector('.crumbs')?.textContent).toBe('Moritz Klein: DIY VCO Series · part 6');
+    expect(host.querySelectorAll('.lab-nav a').map((a) => a.attributes.href)).toEqual(['#/lab/sawtooth-to-square', '#/more/klein-vco']);
+    expect([source.textContent, source.attributes.href]).toEqual(['Moritz’s playlist ↗', 'https://www.youtube.com/playlist?list=PLHeL0JWdJLvTuGCyC3qvx0RM39YvopVQN']);
     // Ben's other videos, then other channels': every group with a card per video, the group's sidebar link lit
     loc.hash = '#/more/clock';
     app.render();

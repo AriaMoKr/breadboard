@@ -145,8 +145,9 @@ and Moritz Klein's synth, from his
   the 2518 line register, the 2513, the 74165 that shifts the dots out and the 7401 that makes the
   video, with a stand-in for the memory board that you type into, and the TV draws the text.
 * **Moritz Klein's labs** (`#/lab/using-a-breadboard`, `#/lab/oscillator-core`,
-  `#/lab/exponential-converter`, `#/lab/vco-tuning`, `#/lab/sawtooth-to-square`): his
-  synthesizer videos, from his "For Beginners" playlist on.
+  `#/lab/exponential-converter`, `#/lab/vco-tuning`, `#/lab/sawtooth-to-square`,
+  `#/lab/sawtooth-to-triangle`): his synthesizer videos, from his "For Beginners" playlist on,
+  then his "DIY VCO Series" playlist.
   The first lab is his complete beginner's guide to using a breadboard: four circuits on one
   board, a TL074 on two 9 V batteries, with his parts and values. They are an LED, a crude op-amp
   inverter (its − input on the + rail, the − rail or left floating), an oscillator that flashes
@@ -168,12 +169,19 @@ and Moritz Klein's synth, from his
   thermistors in the mixer, which keep a warmer room's notes together, and a fine-tune knob
   through 1M; then a pulse from the sawtooth. A spare op amp amplifies it, a pot setting its gain,
   and a 1N4148 with a pull-down feeds it to a spare 40106 inverter, the pot setting the pulse's
-  width on a scope. Both waves are then brought to 10 V peak to peak for their jacks. The analog
-  parts are small per-lab models with his values (`src/labs/synth/_analog.ts`).
+  width on a scope. Both waves are then brought to 10 V peak to peak for their jacks. The sixth is
+  his quick tip from the DIY VCO series, a sawtooth-to-triangle converter: an inverting buffer
+  turns the sawtooth upside down, and two 1N4148s splice the upper halves of it and its copy into
+  a triangle. Its two 10k must be a matched pair (a close-up shows the step at the peak when
+  they aren't), the input is AC coupled through a buffer, and the output needs 20k to −12 V
+  before its own AC coupling gives anything. A sequencer plays the finished triangle beside a
+  chart of its harmonics. The analog parts are small per-lab models with his values
+  (`src/labs/synth/_analog.ts`).
 * **More videos** (`#/more`): Ben's videos outside the playlist that go with it. These are his first
   build running programs and his introduction to transistors and logic gates (both from 2015 and
   linked from eater.net/8bit), plus his digital clock series (2026, eater.net/clock). Then other
-  channels' videos that teach circuits on a breadboard: Moritz Klein's "For Beginners" playlist.
+  channels' videos that teach circuits on a breadboard: Moritz Klein's "For Beginners" playlist
+  and his "DIY VCO Series".
 
 ## Running
 

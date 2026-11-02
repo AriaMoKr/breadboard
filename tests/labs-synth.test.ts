@@ -2,14 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { ANALOG_CHIPS, CHIPS, CHIP_IDS, chipDef } from '../src/breadboard/catalog';
 import { validateLayout } from '../src/breadboard/layout';
 import {
-  BC548C, CLAMP_IN, Coupling, FloatingInput, PHONES, R_FOLLOW, R_OUT, Relaxation, SAW_AMP, SQUARE_DIV, SchmittCore, SinkCore, TUNING, V12, VDIODE, VD_PULL, VN, VP, VSAT, VSAT12, amplify,
-  baseVoltage, collectorCurrent, comparator, converter, coreTimes, coreWave, coupled, coupledSaw, divide, follower, gainOf, ledCurrent, mixer, noteHz, noteOf, offsetFor, par,
-  pickupTau, pnpSaturationCurrent, potForPulse, pulse, pulseWidth, relaxationPeriod, sampleCore, saturationCurrent, sawOut, sawTop, sawWave, schmittOut, shaperIn, sinkTimes, squareOut,
-  thermalVoltage,
-  thermistor, thresholds, tune, wiper,
+  BC548C, CLAMP_IN, Coupling, D1N4148, FloatingInput, PHONES, R_FOLLOW, R_OUT, Relaxation, SAW_AMP, SCOPE_IN, SQUARE_DIV, SchmittCore, SinkCore, TRI, TRI_BASIC, TRI_BUILT, TRI_SAW, TUNING,
+  V12, VDIODE, VD_PULL, VN, VP, VSAT, VSAT12, amplify, baseVoltage, collectorCurrent, comparator, converter, coreTimes, coreWave, coupled, coupledRamp, coupledSaw, diodePoint, divide,
+  follower, gainOf, ledCurrent, mixer, noteHz, noteOf, offsetFor, par, pickupTau, pnpSaturationCurrent, potForPulse, pulse, pulseWidth, rampTop, relaxationPeriod, sampleCore,
+  saturationCurrent, sawOut, sawToTriangle, sawTop, sawWave, schmittOut, shaperIn, sinkTimes, squareOut, thermalVoltage, thermistor, thresholds, tune, wiper,
 } from '../src/labs/synth/_analog';
 import { guideLayout, guideNets, type Setup } from '../src/labs/synth/_board';
-import { periodicWave } from '../src/labs/synth/_sound';
+import { harmonics, periodicWave } from '../src/labs/synth/_sound';
 
 /** Rising edges of `Relaxation`'s output over `secs`, stepped `dt` at a time, after the first one. */
 function periods(rf: number, c: number, dt: number, secs: number): number[] {
@@ -717,5 +716,163 @@ describe('synth: DIY VCO part 4’s thermistors, fine tuning and pulse', () => {
     expect(Math.max(...saw)).toBeLessThan(5);
     expect(Math.min(...saw)).toBeLessThan(-4.6);
     expect(Math.min(...saw)).toBeGreaterThan(-4.9);
+  });
+});
+
+describe('synth: the sawtooth-to-triangle converter', () => {
+  const nvt = D1N4148.n * thermalVoltage(25);
+  /** Each harmonic in dB under the first. */
+  const levels = (wave: readonly number[], n = 9) => {
+    const h = harmonics(wave, n);
+    return h.map((x) => 20 * Math.log10(x / h[0]));
+  };
+  const range = (r: ReturnType<typeof sawToTriangle>) => [Math.max(...r.out), Math.min(...r.out)];
+
+  it('rampTop and coupledRamp are part 4’s sawtooth with any jump', () => {
+    const { vp, vn } = thresholds(V12);
+    expect(rampTop(1 / 130, 0.1, vp - vn)).toBe(sawTop(1 / 130, 0.1));
+    expect(coupledRamp(64, 1 / 130, 0.1, vp - vn)).toEqual(coupledSaw(64, 1 / 130, 0.1));
+    // settled: the ramp after the 1 µF averages 0 V, and its bottom is the jump below its top
+    const r = coupledRamp(4096, 1 / 200, 0.2, 10);
+    expect(r.reduce((a, b) => a + b, 0) / r.length).toBeCloseTo(10 / 2 / 4096, 6);
+    expect(rampTop(1 / 200, 0.2, 10)).toBeCloseTo(5.0208, 4);
+  });
+
+  it('a 1N4148 by the Shockley law: about 0.58 V at a milliamp, 0.48 V at a tenth of one', () => {
+    expect(nvt * Math.log(1e-3 / D1N4148.is)).toBeCloseTo(0.58, 2);
+    expect(nvt * Math.log(1e-4 / D1N4148.is)).toBeCloseTo(0.48, 2);
+  });
+
+  it('the diodes’ point: the higher output less a drop that grows with the current, both sharing it where they meet', () => {
+    const scope = [{ g: 1 / SCOPE_IN, v: 0 }];
+    // 5 V into the scope's 1M: a few microamps, a third of a volt
+    const x = diodePoint(5, -5, scope);
+    expect(5 - x).toBeCloseTo(0.34, 2);
+    expect(D1N4148.is * Math.expm1((5 - x) / nvt) + D1N4148.is * Math.expm1((-5 - x) / nvt)).toBeCloseTo(x / SCOPE_IN, 12);
+    // either way round, and with 20k to −12 V a little over half a milliamp: about 0.57 V
+    expect(diodePoint(-5, 5, scope)).toBeCloseTo(x, 12);
+    const pulled = diodePoint(5, -5, [{ g: 1 / TRI.pull, v: -V12 }]);
+    expect(5 - pulled).toBeGreaterThan(0.56);
+    expect(5 - pulled).toBeLessThan(0.6);
+    // where they meet at 0 V both conduct, each about half: n V_T ln 2 higher than one alone would be
+    const one = diodePoint(0, null, [{ g: 1 / TRI.pull, v: -V12 }]), both = diodePoint(0, 0, [{ g: 1 / TRI.pull, v: -V12 }]);
+    expect(both - one).toBeCloseTo(nvt * Math.LN2, 3);
+    // no diodes: the loads alone; a load above the diodes: the point above them, the diodes off
+    expect(diodePoint(null, null, [{ g: 1e-3, v: 2 }, { g: 1e-3, v: 4 }])).toBeCloseTo(3, 12);
+    expect(diodePoint(1, 0, [{ g: 1e-3, v: 6 }])).toBeGreaterThan(5.99);
+  });
+
+  it('the basic converter: a triangle from about 4.66 V to 0 V halfway, nearly odd harmonics only', () => {
+    const r = sawToTriangle(TRI_BASIC);
+    expect(r.ends.after).toBeCloseTo(4.661, 3);
+    expect(r.ends.before).toBeCloseTo(r.ends.after, 12);
+    expect(r.cross).toBe(0.5);
+    // its two halves mirror each other about the valley
+    for (const k of [1, 50, 128, 200, 255]) expect(r.node[256 + k]).toBeCloseTo(r.node[256 - k], 9);
+    expect(Math.min(...r.node)).toBeGreaterThan(-0.01);
+    expect(Math.min(...r.node)).toBeLessThan(0.01);
+    const db = levels(r.out);
+    expect(db[2]).toBeCloseTo(-19.5, 0);
+    expect(db[4]).toBeCloseTo(-29, 0);
+    // the scope's 1M lets the drop shrink near 0 V, which rounds the valleys a little: even harmonics, but low
+    expect(db[1]).toBeLessThan(-35);
+  });
+
+  it('each diode alone lets its own upper half through, and the scope holds the point near 0 V the rest of the time', () => {
+    const one = sawToTriangle({ ...TRI_BASIC, d2: false }), two = sawToTriangle({ ...TRI_BASIC, d1: false });
+    expect(one.node[0]).toBeCloseTo(4.661, 3);
+    expect(Math.max(...one.node.slice(300))).toBeLessThan(0.05);
+    expect(two.node[511]).toBeCloseTo(4.661, 1);
+    expect(Math.max(...two.node.slice(0, 200))).toBeLessThan(0.05);
+    expect(sawToTriangle({ ...TRI_BASIC, d1: false, d2: false }).node.every((v) => v === 0)).toBe(true);
+  });
+
+  it('a mismatched pair: the inverter’s gain is their ratio, and the step at the peak about 4.7 V times the mismatch', () => {
+    const big = sawToTriangle({ ...TRI_BASIC, rIn: 9.9e3, rFb: 10.1e3 }), small = sawToTriangle({ ...TRI_BASIC, rIn: 10.1e3, rFb: 9.9e3 });
+    expect(big.gain).toBeCloseTo(10.1 / 9.9, 12);
+    expect(big.b[100]).toBeCloseTo(-big.gain * big.a[100], 12);
+    // the inverted half taller: down at the jump; shorter: up
+    expect(big.ends.after - big.ends.before).toBeCloseTo(-0.1, 2);
+    expect(small.ends.after - small.ends.before).toBeCloseTo(0.098, 2);
+    // a matched pair, whatever their value, none
+    const matched = sawToTriangle({ ...TRI_BASIC, rIn: 10.07e3, rFb: 10.07e3 });
+    expect(matched.ends.after - matched.ends.before).toBeCloseTo(0, 12);
+  });
+
+  it('an offset: the crossing off the middle and a step of about twice it; the input’s 1 µF and buffer take it out', () => {
+    const up = sawToTriangle({ ...TRI_BASIC, offset: 1 });
+    expect(up.cross).toBeCloseTo(0.6, 12);
+    expect(up.ends.after - up.ends.before).toBeCloseTo(1.98, 2);
+    // a sawtooth all above 0 V: no crossing, and the inverted copy never gets through
+    const above = sawToTriangle({ ...TRI_BASIC, offset: 5 });
+    expect(above.cross).toBeNull();
+    expect(above.ends.before).toBeCloseTo(0, 2);
+    const coupledIn = sawToTriangle({ ...TRI_BASIC, offset: 1, inCap: true }), centred = sawToTriangle({ ...TRI_BASIC, inCap: true });
+    expect(coupledIn.a).toEqual(centred.a);
+    expect(coupledIn.cross).toBeCloseTo(0.499, 3);
+  });
+
+  it('the input’s 1 µF bends the ramp: a step at the peak of its own, more at lower notes, that a mismatch adds to or takes from', () => {
+    const at = (hz: number, pair = {}) => {
+      const r = sawToTriangle({ ...TRI_BUILT, ...pair }, hz);
+      return r.ends.after - r.ends.before;
+    };
+    const bend = (hz: number) => 2 * rampTop(1 / hz, TRI.c * TRI.rc, 2 * TRI_SAW.amp) - 2 * TRI_SAW.amp;
+    expect(bend(200)).toBeCloseTo(0.042, 3);
+    expect(at(200)).toBeCloseTo(bend(200), 2);
+    expect(at(noteHz('C3'))).toBeCloseTo(0.064, 2);
+    expect(at(noteHz('C2'))).toBeCloseTo(0.127, 2);
+    expect(at(noteHz('C2'))).toBeGreaterThan(at(noteHz('C3')));
+    // the feedback 10k 2% smaller: the mismatch's step and the bend's together; bigger, the one less the other
+    expect(at(200, { rIn: 10.1e3, rFb: 9.9e3 })).toBeCloseTo(0.14, 2);
+    expect(at(200, { rIn: 9.9e3, rFb: 10.1e3 })).toBeCloseTo(-0.059, 2);
+  });
+
+  it('the output: with no 20k next to nothing, to ground flat valleys, to −12 V the whole triangle at about ±2.5 V', () => {
+    const none = sawToTriangle({ ...TRI_BUILT, pull: 'none' });
+    // the 1 µF charged to about the peak, less the diodes' drop: blips at the peaks only
+    expect(none.vc).toBeGreaterThan(4.6);
+    expect(Math.max(...none.out)).toBeLessThan(0.1);
+    expect(Math.min(...none.out)).toBeGreaterThan(-0.01);
+    const ground = sawToTriangle({ ...TRI_BUILT, pull: 'ground' });
+    const off = ground.node.filter((v, k) => Math.max(ground.a[k], ground.b[k]) - v < 0.25).length / ground.node.length;
+    expect(off).toBeGreaterThan(0.08);
+    expect(off).toBeLessThan(0.13);
+    expect(Math.min(...ground.node)).toBeCloseTo(0.19, 2);
+    // while the diodes are off the point sits on the divider of the 20k and the 200k: a tenth of what the 1 µF holds, and a little more
+    expect(Math.min(...ground.node)).toBeCloseTo((ground.vc * TRI.pull) / (TRI.pull + TRI.rc), 2);
+    const [gHi, gLo] = range(ground);
+    expect(gHi - gLo).toBeLessThan(4.4);
+    const built = sawToTriangle(TRI_BUILT), [hi, lo] = range(built);
+    expect(Math.min(...built.node)).toBeCloseTo(-0.52, 2);
+    expect(hi).toBeCloseTo(2.5, 1);
+    expect(lo).toBeCloseTo(-2.46, 1);
+    // no current through the 1 µF on average
+    expect(built.out.reduce((a, b) => a + b, 0) / built.out.length).toBeCloseTo(0, 5);
+    // flat valleys bring in even harmonics; the whole triangle has next to none
+    expect(levels(ground.out)[1]).toBeGreaterThan(-30);
+    expect(levels(built.out)[1]).toBeLessThan(-45);
+  });
+
+  it('harmonics: the finished converter’s odd ones fall as 1/n², the sawtooth’s all as 1/n; 2% apart lifts the second', () => {
+    const tri = levels(sawToTriangle(TRI_BUILT).out), saw = levels(Array.from({ length: 512 }, (_, k) => 5 - (10 * k) / 512));
+    for (const n of [3, 5, 7, 9]) expect(tri[n - 1]).toBeCloseTo(-40 * Math.log10(n), 0);
+    for (const n of [2, 3, 4, 5]) expect(saw[n - 1]).toBeCloseTo(-20 * Math.log10(n), 1);
+    // the lab's 2% apart, the feedback 10k smaller, at 200 Hz and at each of the sequence's notes
+    const apart = levels(sawToTriangle({ ...TRI_BUILT, rIn: 10.1e3, rFb: 9.9e3 }).out);
+    expect(apart[1]).toBeGreaterThan(tri[1] + 6);
+    expect(apart[1]).toBeGreaterThan(-40);
+    for (const n of ['C3', 'E3', 'G3', 'C4', 'E4', 'G4', 'C5']) {
+      const matched = levels(sawToTriangle(TRI_BUILT, noteHz(n)).out, 2), off = levels(sawToTriangle({ ...TRI_BUILT, rIn: 10.1e3, rFb: 9.9e3 }, noteHz(n)).out, 2);
+      expect(off[1], n).toBeGreaterThan(matched[1] + 5);
+    }
+  });
+
+  it('the op amps clip about 1.5 V short of the rails', () => {
+    // twice the gain on a sawtooth from 0 to 10 V: it would reach −20 V
+    const r = sawToTriangle({ ...TRI_BASIC, offset: 5, rFb: 2 * TRI.r });
+    expect(VSAT12).toBeCloseTo(10.5, 12);
+    expect(Math.min(...r.b)).toBe(-VSAT12);
+    expect(r.b[400]).toBeCloseTo(-2 * r.a[400], 12);
   });
 });

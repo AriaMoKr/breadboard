@@ -2,7 +2,7 @@ import { buildLabel } from '../build-info';
 import type { Lab } from '../labs/types';
 import { Machine } from '../sim/machine';
 import { h } from '../ui/dom';
-import { CHAPTERS, LAB_IDS, MORE_GROUPS, OTHER_GROUPS, PLAYLIST_URL, PROJECTS, VIDEOS, VIDEO_BY_INDEX, embedUrl, groupLabs, groupTitle, moreVideosForLab, projectForLab, shortTitle, videoUrl, videosForLab, watchUrl, type Chapter, type MoreGroup, type Project, type ProjectPart, type Source } from './chapters';
+import { CHAPTERS, LAB_IDS, MORE_GROUPS, OTHER_GROUPS, PLAYLIST_URL, PROJECTS, VIDEOS, VIDEO_BY_INDEX, embedUrl, groupLabs, groupTitle, moreVideosForLab, projectForLab, seriesLabs, shortTitle, videoNumber, videoUrl, videosForLab, watchUrl, type Chapter, type MoreGroup, type Project, type ProjectPart, type Source } from './chapters';
 import { mountComputerWorkbench } from './computer-page';
 import { hasLab, loadLab, loadedLab } from './lab-loader';
 
@@ -106,7 +106,7 @@ export class App {
       ),
     );
     // a group's videos that have labs, numbered if it is a series in parts
-    const labVideos = (g: MoreGroup) => g.videos.filter((v) => v.lab).map((v) => h('li', null, h('a', { href: labHref(v.lab!), dataset: { lab: v.lab! } }, h('span', { class: 'nav-num' }, g.numbered ? String(g.videos.indexOf(v) + 1) : '·'), h('span', { class: 'nav-title' }, shortTitle(v.title)), h('span', { class: 'nav-dur' }, v.duration))));
+    const labVideos = (g: MoreGroup) => g.videos.filter((v) => v.lab).map((v) => h('li', null, h('a', { href: labHref(v.lab!), dataset: { lab: v.lab! } }, h('span', { class: 'nav-num' }, g.numbered ? String(videoNumber(g, g.videos.indexOf(v))) : '·'), h('span', { class: 'nav-title' }, shortTitle(v.title)), h('span', { class: 'nav-dur' }, v.duration))));
     const moreLink = (g: MoreGroup, title: string) => h('li', null, h('a', { href: `#/more/${g.id}`, dataset: { route: 'more', group: g.id } }, h('span', { class: 'nav-num' }, '▸'), h('span', { class: 'nav-title' }, title), h('span', { class: 'nav-dur' }, String(g.videos.length))));
     return h(
       'nav',
@@ -205,6 +205,7 @@ export class App {
     document.title = SITE;
     const tvt = PROJECTS.find((p) => p.id === 'tvt')!;
     const synth = OTHER_GROUPS.find((g) => g.id === 'klein-beginners')!;
+    const synthGroups = OTHER_GROUPS.filter((g) => g.by === synth.by);
     // a stage's lab, numbered as in the sidebar; Ben's by his chapters and their videos
     const stage = (href: string, num: string, title: string) => h('li', null, h('a', { href }, h('span', { class: 'nav-num' }, num), ' ', h('span', null, title)));
     const videos = (ch: Chapter) => {
@@ -239,8 +240,8 @@ export class App {
       build(
         'yellow',
         'Moritz Klein’s synth',
-        [h('p', { class: 'lede' }, 'Analog synthesizer circuits on a breadboard, explained from scratch. His “For Beginners” videos start with a guide to the breadboard itself, then build a voltage-controlled oscillator part by part: a sawtooth core, an exponential converter for 1 V per octave, keeping it in tune, and shaping the sawtooth into a square. The labs show each stage on a scope and play it.')],
-        synth.videos.filter((v) => v.lab).map((v) => stage(labHref(v.lab!), String(synth.videos.indexOf(v) + 1), shortTitle(v.title))),
+        [h('p', { class: 'lede' }, 'Analog synthesizer circuits on a breadboard, explained from scratch. His “For Beginners” videos start with a guide to the breadboard itself, then build a voltage-controlled oscillator part by part: a sawtooth core, an exponential converter for 1 V per octave, keeping it in tune, and shaping the sawtooth into a square. A quick tip from his DIY VCO series turns the sawtooth into a triangle. The labs show each stage on a scope and play it.')],
+        synthGroups.flatMap((g) => g.videos.filter((v) => v.lab).map((v) => stage(labHref(v.lab!), String(videoNumber(g, g.videos.indexOf(v))), shortTitle(v.title)))),
         start(labHref(groupLabs(synth)[0]), 'Start with the breadboard guide'),
         h('a', { class: 'btn btn-ghost', href: `#/more/${synth.id}` }, 'All his videos'),
         away(synth.source),
@@ -278,7 +279,7 @@ export class App {
         { class: 'more-group', id: `more-${g.id}` },
         h('h2', null, groupTitle(g)),
         h('p', { class: 'lede' }, g.text, ' ', h('span', { class: 'dim' }, `${g.by ?? 'Ben'} lists them on `, h('a', { href: g.source.href, target: '_blank', rel: 'noopener' }, `${g.source.label} ↗`), '.')),
-        h('div', { class: 'video-list' }, g.videos.map((v, i) => this.videoCard({ ...v, num: g.numbered ? String(i + 1) : undefined, url: watchUrl(v.youtubeId), lab: v.lab }, false))),
+        h('div', { class: 'video-list' }, g.videos.map((v, i) => this.videoCard({ ...v, num: g.numbered ? String(videoNumber(g, i)) : undefined, url: watchUrl(v.youtubeId), lab: v.lab }, false))),
       );
     this.main.append(head, ...MORE_GROUPS.map(section), ...OTHER_GROUPS.map(section));
     if (group) this.main.querySelector(`#more-${group}`)?.scrollIntoView?.();
@@ -312,9 +313,9 @@ export class App {
   }
 
   private async renderLab(id: string, videoIndex: number | undefined, token: number) {
-    // prev/next within the playlist, the group of videos the lab belongs to, or its project
+    // prev/next within the playlist, the series the lab belongs to (another creator's groups one after the other), or its project
     const group = moreVideosForLab(id)[0]?.group, project = projectForLab(id)?.project;
-    const order = project ? project.parts.map((p) => p.lab) : LAB_IDS.includes(id) || !group ? LAB_IDS : groupLabs(group);
+    const order = project ? project.parts.map((p) => p.lab) : LAB_IDS.includes(id) || !group ? LAB_IDS : seriesLabs(group);
     const idx = order.indexOf(id);
     const prev = idx > 0 ? order[idx - 1] : null;
     const next = idx >= 0 && idx < order.length - 1 ? order[idx + 1] : null;

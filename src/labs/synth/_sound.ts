@@ -22,6 +22,12 @@ export function periodicWave(samples: readonly number[], n: number): { real: Flo
   return { real, imag };
 }
 
+/** How strong each of the first `n` harmonics of a wave is, from one period of `samples`: the amplitude of terms 1 to `n` of its Fourier series. */
+export function harmonics(samples: readonly number[], n: number): number[] {
+  const { real, imag } = periodicWave(samples, n);
+  return Array.from({ length: n }, (_, k) => Math.hypot(real[k + 1], imag[k + 1]));
+}
+
 /**
  * The synth labs' "Listen" toggles: a circuit's tone through WebAudio, quietly. Browsers only play
  * sound after a click or a key, so it starts from the toggle; where there is no AudioContext (the

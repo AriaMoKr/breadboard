@@ -9,7 +9,8 @@ breadboard guide, then DIY VCO parts 1-4), and what the simulator needs for them
 a group on the site (`OTHER_GROUPS` in `src/app/chapters.ts`), and its labs are in
 `src/labs/synth/`: the breadboard guide's (`using-a-breadboard`), then VCO part 1's
 (`oscillator-core`), part 2's (`exponential-converter`), part 3's (`vco-tuning`) and part 4's
-(`sawtooth-to-square`).
+(`sawtooth-to-square`). His "DIY VCO Series" playlist, which goes on from part 4, is a second
+group, with a lab for its sawtooth-to-triangle quick tip (`sawtooth-to-triangle`).
 
 Labels: [V] his own words in the video, from YouTube's auto-generated transcript, read in the
 browser (summarised here, not quoted). [D] from the video's description: his bill of materials,
@@ -384,8 +385,9 @@ panel works in the in-app browser.
   for, and the 40106's inputs are rated from −0.5 V to its supply plus 0.5 V (SCHS097F).
 - [I] In the model, at C3, the square out at 50% is about ±5.2 V, and the saw out about +4.9 and
   −4.8 V.
-- [D] "How to build a DIY 3X VCO module from scratch" (OCAb2UoSPs0, 16:17, 2020-09-28) ends the
-  series: three VCOs on stripboard, behind a panel.
+- [D] "How to build a DIY 3X VCO module from scratch" (OCAb2UoSPs0, 16:17, 2020-09-28) comes
+  next: three VCOs on stripboard, behind a panel. It opens his "DIY VCO Series" playlist's videos
+  after part 4 (below).
 - [Lab] The lab (`sawtooth-to-square`) has six steps:
   - the thermistors, with the room's temperature, fingers on both transistors, and a sequencer
     playing a major arpeggio beside part 3's circuit tuned the same;
@@ -404,14 +406,116 @@ panel works in the in-app browser.
   reach (the video doesn't say where they sit); the finger's 32 °C and 6 s, as in parts 2 and 3;
   the sequence, the lab's own; and the core's jump, instant.
 
+## DIY VCO Series (playlist PLHeL0JWdJLvTuGCyC3qvx0RM39YvopVQN)
+
+| # | Video | id | Length | Date |
+|---|---|---|---|---|
+| 1-4 | DIY VCO Parts 1-4, as in For Beginners (above) | | | |
+| 5 | How to build a DIY 3X VCO module from scratch | OCAb2UoSPs0 | 16:17 | 2020-09-28 |
+| 6 | DIY SYNTH Quick Tip: Sawtooth-to-Triangle Converter | 4r3TTaUKNe0 | 15:41 | 2021-01-18 |
+| 7 | Adding voltage controlled PWM to my VCO | FUz3gFAh9pY | 17:25 | 2021-04-18 |
+| 8 | Introducing the mki x es.edu DIY VCO kit | 8JuYLLpZzBs | 7:23 | 2022-01-09 |
+
+The site's group for it lists 5 to 8, numbered as in the playlist (`first` in `chapters.ts`),
+since parts 1-4 are For Beginners' already. The kit video's length is from its watch page (443
+s); the playlist shows 7:24.
+
+### DIY SYNTH Quick Tip: Sawtooth-to-Triangle Converter
+
+- [D] Parts: a TL074, two 1 µF foil or ceramic capacitors, two 200k, a 20k, two 10k ("matched!")
+  and two 1N4148.
+- [D] Chapters: intro, inverting buffers (1:26), spliced triangles (5:00), resistor values and
+  imperfections (8:10), AC coupling input and output (10:27), sound demo and outro (14:02).
+- [D] The first of a new series of shorter, less basic videos on smaller or auxiliary circuit
+  ideas: a converter to use with his SHAPES VCO, for example, for another output wave. For
+  refreshers it links VCO part 1, its AC coupling (at 20:48), and VCF part 2's op amps (at 2:28).
+- [D] A correction: he cut corners explaining the output's AC coupling. The 20k goes to −12 V
+  rather than ground also because of the diodes' drop: they conduct only with about 0.6 V across
+  them, so with the point after them at 0 V at its lowest they cut off before the triangle reaches
+  its valleys, and flatten them. With −12 V the point can go a fair bit below 0 V, and all of the
+  triangle gets through.
+- [S] His simulation is the same circuit with a ±5 V, 200 Hz sawtooth from a generator, but 100k
+  after the input's 1 µF instead of 200k, and 10k to −12 V instead of 20k; the output's 1 µF and
+  200k as built. Its op amps clip at ±15 V.
+- [V] The captions are YouTube's auto-generated ones taken for Dutch, so the English comes out
+  garbled; these notes piece them together with the description and what's on screen.
+- [V] He suggests watching the VCO series first for the basics. The aim: a triangle as perfectly
+  symmetrical as it can be.
+- [V] The inverting buffer: part 1's buffer has the signal on its + input. Turned round, the +
+  input goes to ground and the signal comes through 10k to the − input, with another 10k from the
+  output back to it. The action is at the − input, which the op amp holds where its + input is: 5
+  V in pushes current in through the first 10k, and the output has to take it away through the
+  second, at −5 V if the two are identical. Within the supply's range, of course.
+- [V] Splicing: the sawtooth and its inverted copy share their start and end points and cross
+  precisely at 0 V halfway, so there are at least three ways to splice a triangle out of them. He
+  takes the upper halves, with a 1N4148 from each op amp's output to one point: diodes conduct
+  one way only, so whichever output is higher gets through.
+- [V] On the scope the halves come up at slightly different angles, with a step at the peak: the
+  devil is in the details. The two 10k have to be the same, and his bag of them (SEGOR) says 1%:
+  two picked at random can be 2% apart. For most circuits that's negligible; here a matched pair
+  is crucial. Mismatched, the inverted copy comes out bigger or smaller than the sawtooth, which
+  adds overtones, never great in his opinion. He tests a bunch with a multimeter and keeps two
+  that seem a good fit; a trimmer would let it be set exactly.
+- [V] AC coupling: the converter needs the sawtooth centred on 0 V, since an offset moves the
+  inverted copy the other way. So the input is AC coupled, as his modules' inputs and outputs
+  usually are, with 1 µF and 200k. But the converter draws a fair amount of current, which would
+  mess with the high-pass, so another of the TL074's op amps buffers it.
+- [V] The triangle sits above 0 V, so the output wants AC coupling too, but the usual 1 µF and 200k
+  give nothing: a high-pass needs its capacitor to charge and discharge, and the diodes let
+  current flow one way only, so it fills up and stays there. A resistor from the point to the
+  negative rail lets it discharge: 20k to −12 V. Why not to ground, he answers loosely (the
+  correction above).
+- [V] The sound demo plays the triangle from a sequence of notes, with the scope following it.
+- [I] The model (`sawToTriangle` in `src/labs/synth/_analog.ts`) works out one settled period of
+  every node, the point between the diodes by Newton's method:
+  - the 1N4148 by the Shockley law, with the common SPICE model's I_S (2.52 nA) and n (1.752):
+    0.58 V at a milliamp, 0.48 V at a tenth of one;
+  - into the scope's 1M alone, the triangle peaks at 4.66 V (a drop of 0.34 V at about 5 µA), with
+    its valleys at 0 V halfway; the drop shrinking near 0 V brings in even harmonics at about −36
+    dB;
+  - a mismatch gives the inverter a gain of their ratio and a step at the peak of about 4.7 V times
+    the mismatch, 0.1 V for 2%;
+  - an offset moves the crossing to (amplitude + offset) ÷ (2 × amplitude) of the period, 60% for 1
+    V, and leaves a step of about twice the offset;
+  - the input's 1 µF and 200k (0.2 s) bend the ramp, its top a little higher than its bottom is
+    low: a step of its own at the peak of about the jump × T ÷ 6τ, 0.042 V at 200 Hz, 0.064 V at
+    C3, 0.127 V at C2. A mismatch with the feedback 10k the smaller adds to it, the other way
+    round takes from it. Without the buffer the inverter's 10k, its − input at 0 V, would sit
+    across the 200k: 9.5 ms instead of 200 ms;
+  - with nothing from the point, the output's 1 µF charges to about 4.72 V, and what comes out
+    is blips of 0.07 V at the peaks;
+  - 20k to ground: the diodes are off about 9% of each period, the valleys flat at 0.19 V (the
+    20k and 200k dividing what the 1 µF holds, 2.07 V), the output +2.43 to −1.89 V, its second
+    harmonic at −27 dB;
+  - 20k to −12 V: the point from −0.52 to +4.45 V, the output +2.51 to −2.46 V, its odd harmonics
+    at 1/n² (−19, −28, −34 and −38 dB for the 3rd to the 9th) and its second at −46 dB at 200 Hz
+    from the input's bend (−38 dB with the pair 2% apart).
+- [Lab] The lab (`sawtooth-to-triangle`) has six steps:
+  - inverting buffers: part 1's buffer or the inverting one, with the sawtooth or a steady
+    voltage;
+  - spliced triangles: the converter, each diode in or out;
+  - a matched pair: the two 10k on sliders within 1%, two at random or a matched pair, and a
+    close-up of the peak;
+  - AC coupling the input: an offset, and the 1 µF, 200k and buffer;
+  - AC coupling the output: nothing, 20k to ground or 20k to −12 V from the point;
+  - the sound: the finished converter with a sequencer playing part 4's arpeggio, the triangle
+    or the sawtooth to listen to, the pair matched or 2% apart, and a chart of the harmonics.
+
+  Its estimates, said on the page: the 1N4148's model; the scope's 1M as the point's only load
+  in the second step to the fourth; the TL074 on ±12 V, clipping 1.5 V short of the rails; which
+  op amps buffer and invert (his breadboard is filmed upside down); the sawtooth, his
+  simulation's ±5 V at 200 Hz, instant at its jump; the output's 1 µF holding its charge over a
+  period; and the sequence, the lab's own.
+- [Lab] The site's group lists all four videos after part 4. The tip has its lab, the PWM video
+  is to get one next, and the module video and the kit's introduction stay listed without.
+
 ## The other series
 
 Main parts from his bills of materials [D]. The kit videos ("Introducing the mki x es.edu DIY …
-kit", 3-8 minutes each) are left out.
+kit", 3-8 minutes each) are left out, and so is the rest of the DIY VCO series, above.
 
 | Series | Videos (id, length, date) | Parts |
 |---|---|---|
-| DIY VCO, after parts 1-4 | 3X VCO module (above); sawtooth-to-triangle quick tip 4r3TTaUKNe0, 15:41, 2021-01-18; voltage-controlled PWM FUz3gFAh9pY, 17:25, 2021-04-18 | TL074 |
 | Power | dual supply pQKN30Mzi2g, 26:04, 2020-11-15: he says it's not for beginners, who should use 9 V batteries | 7812, 7912, 1N4007, 4700 µF, a 12 V AC wall wart |
 | DIY VCF | Part 1, analog filtering basics 3tMGNI--ofU, 21:46, 2020-12-15; Part 2, active filters and resonance YNoj9Rrw_VM, 27:30, 2021-01-03; Part 3, resonant high-pass and vactrol control ITJX9jP-zm4, 29:21, 2021-02-14; diode ladder filter jvNNgUl3al0, 36:04, 2021-03-08; as a Eurorack module tWKLFcc_BJM, 34:47, 2021-05-12 | TL074s, diodes, vactrols |
 | VCA | transistor VCA yMrCCx6uqcE, 48:41, 2021-08-09 | 2 matched BC548, TL072 |
@@ -524,13 +628,16 @@ kit", 3-8 minutes each) are left out.
 - [Lab] It's a creator's video series, like Ben's "More videos" groups (`MORE_GROUPS` in
   `src/app/chapters.ts`), but by someone else. It went in the first of two ways: `MoreGroup` has
   a `by`, and `OTHER_GROUPS` holds his "For Beginners" playlist, numbered: the guide, then VCO
-  parts 1-4. (The other way was a list beside `PROJECTS`.)
+  parts 1-4. (The other way was a list beside `PROJECTS`.) His "DIY VCO Series" playlist follows
+  it, numbered on from 5 as in the playlist. The labs' previous and next links run through both
+  groups, and the home page's card lists the labs of both.
 - [Lab] Labs, in order:
   - "Using a breadboard": the guide's four circuits;
   - "The oscillator core" (VCO part 1);
   - "The exponential converter" (part 2);
   - "Tuning the VCO" (part 3);
-  - "Sawtooth to square" (part 4).
+  - "Sawtooth to square" (part 4);
+  - "Sawtooth to triangle" (the quick tip).
 
   The embeds and links work as Ben's do (youtube-nocookie), with the playlist or his channel as
   the source.
@@ -544,7 +651,7 @@ kit", 3-8 minutes each) are left out.
 | TL072, TL074 op amps | nearly every video, the breadboard guide | the TL074 in `ANALOG_CHIPS`: drawn and wired, not simulated |
 | CD40106 hex Schmitt inverter | VCO core and part 4, arpeggiator 2, hi-hat | 74LS04 (no hysteresis) |
 | BC548, BC558, 2N3904 transistors | VCO 2-3, VCA, sequencer, wavefolder, drums | — |
-| 1N4148 diodes | VCO core, envelope, sequencer, mixer | — |
+| 1N4148 diodes | VCO core and part 4, the triangle tip, envelope, sequencer, mixer | — |
 | NTC thermistors | VCO 4 | — |
 | CD4017 decade counter | 5-step sequencer | 74LS90 (counts in BCD, not one of ten) |
 | CD4040 12-bit counter | arpeggiator 1 | 74LS161 (4 bits) |
@@ -558,7 +665,8 @@ kit", 3-8 minutes each) are left out.
 | Capacitors as timing parts | everything | — (the sandbox's capacitors only make edge pulses) |
 
 _Sources: his channel and its playlists on YouTube (the watch pages' details and descriptions; the
-transcripts of the guide and VCO parts 1-4); his CircuitJS links (tinyurl.com, decoded); Erica
+transcripts of the guide, VCO parts 1-4 and the triangle tip); his CircuitJS links (tinyurl.com,
+decoded); the 1N4148's common SPICE model (D1N4148); Erica
 Synths' kit pages; CDM, 3 January 2022; the Mixer kit's manual as rendered on manualsdir.com;
 onsemi's BC556B/BC557/BC558B datasheet (Rev. 3, 2007) and Fairchild's BC556-BC560 (Rev. 1.7,
 2016); TI's CD40106B (SCHS097F) and TL07xx (SLOS080W) datasheets; the parts in
