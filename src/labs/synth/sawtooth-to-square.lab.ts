@@ -1,5 +1,5 @@
 import { Circuit } from '../../logic/circuit';
-import { Button, Scope, Slider, Toggle, note, panel, readouts, row, select, type ScopeChannel } from '../../ui/components';
+import { Button, Scope, Slider, Toggle, note, panel, readouts, row, scrollBox, select, type ScopeChannel } from '../../ui/components';
 import { Disposer, animate, growOnly, h, s, setClass, setText } from '../../ui/dom';
 import { Schematic } from '../../ui/schematic';
 import { Kit, kitCss } from '../clock/_draw';
@@ -491,9 +491,8 @@ export default defineLab({
       return { tr: h('tr', null, h('td', null, String(k + 1)), h('td', null, fmtCv(cvOf(meant))), h('td', null, meant), off, was), off, was };
     });
     const seqHead = h('h3', { class: 'sub-head' }, 'The sequence');
-    const seqTable = h(
-      'div',
-      { class: 'table-scroll' },
+    const seqTable = scrollBox(
+      'The sequence',
       h('table', { class: 'truth-table seq-table' }, h('thead', null, h('tr', null, ['step', 'CV', 'meant', 'off', 'part 3’s'].map((x) => h('th', null, x)))), h('tbody', null, seqRows.map((r) => r.tr))),
     );
     const seqNote = note('“off”: how far each note is from the one meant, with the thermistors. “part 3’s”: the same note on part 3’s circuit, without them, tuned at the same time (“tuned at”), in this room now. Both with the transistors as warm as they are.');
@@ -516,16 +515,12 @@ export default defineLab({
     };
     lanes[5] = lanes[4];
     const scopes = {} as Record<ShapeStep, Scope>;
-    for (const k of [3, 4, 5, 6] as const) {
-      scopes[k] = new Scope(lanes[k], { width: 640, laneHeight: 70 });
-      scopes[k].canvas.setAttribute('role', 'img');
-    }
+    for (const k of [3, 4, 5, 6] as const) scopes[k] = new Scope(lanes[k], { width: 640, laneHeight: 70 });
     const scopeHost = h('div');
     const scopeNote = h('p', { class: 'note' });
     const chartOf = (rf: number) => Array.from({ length: CHART_N }, (_, k) => 100 * pulse(NOTE, rf, (k / (CHART_N - 1)) * POT, TAU_DIV, PERIOD_N).width);
     const chart100 = chartOf(100e3), chart200 = chartOf(200e3);
     const chart = new Scope([{ label: 'pulse width, 45 to 100%', kind: 'analog', min: 45, max: 102, guides: [50, 100], color: '#f59e0b', overlayColor: '#60a5fa' }], { width: 640, laneHeight: 80 });
-    chart.canvas.setAttribute('role', 'img');
     chart.canvas.setAttribute(
       'aria-label',
       `Chart: the pulse width over the pot’s turn at C3. With the 200k it rises from about ${Math.round(chart200[0])}% at 0 Ω to about ${Math.round(100 * pulse(NOTE, 200e3, R200 - 100, TAU_DIV).width)}% at ${kOhm(R200)}, then the output stays high; with the 100k, the same by ${kOhm(R100)}.`,

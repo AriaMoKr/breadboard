@@ -52,7 +52,7 @@ body.
 | Need | Use |
 | --- | --- |
 | DOM | `h(tag, props, ...children)`, `s(svgTag, attrs)`, `setText`, `setClass`, `animate(cb)`, `Disposer` — `src/ui/dom.ts` |
-| Widgets | `Led`, `LedBar` (`setLevels(levels, readout?)` for floating/contended lines), `Toggle`, `Button` (`onPress`/`onRelease` for momentary), `DipSwitch`, `Slider` (supports `log`; `positions` for a fine one: an arrow key's step is the range over it), `select` (returns the `<label>` with `selectEl`, `getValue()`, `setValue(v)`), `SevenSegment` (`set(byte, brightness?)`, brightness 0..1 for all or per segment a..g,dp), `Scope` (digital + analog lanes; `draw(samples, { window, cursor, markers })`), `panel`, `row`, `note`, `readouts` — `src/ui/components.ts` |
+| Widgets | `Led`, `LedBar` (`setLevels(levels, readout?)` for floating/contended lines), `Toggle`, `Button` (`onPress`/`onRelease` for momentary), `DipSwitch`, `Slider` (supports `log`; `positions` for a fine one: an arrow key's step is the range over it), `select` (returns the `<label>` with `selectEl`, `getValue()`, `setValue(v)`), `SevenSegment` (`set(byte, brightness?)`, brightness 0..1 for all or per segment a..g,dp), `Scope` (digital + analog lanes; `draw(samples, { window, cursor, markers })`; a picture named by its lanes, or set its `canvas`'s `aria-label` for a better name), `panel`, `row`, `note`, `readouts`, `scrollBox(name, table)` (a table that can be wider than a phone, in a box that takes focus and is a region with a name, none alike on a page; `scrollable(el, name)` for a `<pre>` or other box that scrolls) — `src/ui/components.ts` |
 | Gate-level logic | `Circuit` (event-driven, unit gate delays, 0/1/Z/X, tri-state, `edgeDetector`, custom components with state via `add({evaluate})`), `Trace` — `src/logic/circuit.ts` |
 | Live gate drawings | `Schematic` (gates, chips with pins, wires coloured by net level, clickable switches, LED probes) — `src/ui/schematic.ts`. See "Schematic extras" below. |
 | Whole computer | `Machine` (`src/sim/machine.ts`) wraps `Computer` (`src/sim/computer.ts`); `ComputerView` (`src/ui/computer-view.ts`, options: `modules` (subset of modules for earlier chapters), `manualControl` (16 control switches instead of the control logic, shown in the 'control' slot), `manualSignals` (only these switches; works without 'control' in `modules`), `busInput` (8 switches that drive the bus like Ben's test jumpers), `highlight`; methods `setHighlight(modules)`, `moduleEl(m)`); `mountComputerWorkbench(root, opts)` (`src/app/computer-page.ts`) adds toolbar + program/microcode/output tabs and returns `{ machine, dispose, view, programPanel, microcodePanel, showTab }` |
@@ -123,8 +123,9 @@ it in cleanup.
   inverted 74LS189 outputs.
 * Interactive first: switches, buttons and sliders that the learner drives, with live
   LEDs/wires/scope, plus a short `callout` that explains what is happening now.
-* Everything must work at 375 px width (no horizontal page scroll; the
-  schematic SVGs scale down) and in light and dark colour schemes (use CSS
+* Everything must work at 320 px width (no horizontal page scroll; the
+  schematic SVGs scale down, on a touch screen to 3/4 of their size, then their box scrolls; a
+  table that doesn't fit goes in a `scrollBox`) and in light and dark colour schemes (use CSS
   variables like `var(--fg)`, `var(--panel)`, never hard-coded white or black text).
 * Keep each lab self-contained in its own file(s) under its group directory.
   Shared helpers for one group go in `src/labs/<group>/_shared.ts` (no

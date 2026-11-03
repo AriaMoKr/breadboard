@@ -3,7 +3,7 @@ import { disassemble } from '../../sim/assembler';
 import { Machine } from '../../sim/machine';
 import { buildMicrocodeVersion, INSTRUCTION_BY_OPCODE, microcodeEepromImage, MICROCODE_VERSIONS, type Microcode } from '../../sim/microcode';
 import { CE, SIGNALS, formatControlWord } from '../../sim/signals';
-import { Button, Toggle, note, panel, row } from '../../ui/components';
+import { Button, Toggle, note, panel, row, scrollBox } from '../../ui/components';
 import { Disposer, h, setClass, setText } from '../../ui/dom';
 import { MicrocodePanel } from '../../ui/microcode-panel';
 import { scopedStyle } from '../control/_shared';
@@ -206,13 +206,13 @@ export default defineLab({
           addrBits,
           addrGroups,
           addrText,
-          h('div', { class: 'table-scroll' }, dump),
+          scrollBox('EEPROM image', dump),
           byteInfo,
           fullT.el,
           note('Blue: the two bytes the EEPROMs are outputting right now. Outlined: bytes that differ from Ben’s image. Bytes flash when an edit changes them. Before the flags register, A8–A10 are tied to GND, so only these 256 bytes are ever read.'),
         ),
       ),
-      panel('The Arduino sketch', { accent: 'gray', subtitle: 'microcode-eeprom-programmer.ino (excerpt), regenerated from the table' }, h('div', { class: 'table-scroll' }, sketch), note('Highlighted lines differ from Ben’s version. writeEEPROM(address, data) stores the 8 low bits of data, so “data[address] >> 8” is the high byte.')),
+      panel('The Arduino sketch', { accent: 'gray', subtitle: 'microcode-eeprom-programmer.ino (excerpt), regenerated from the table' }, scrollBox('The Arduino sketch', sketch), note('Highlighted lines differ from Ben’s version. writeEEPROM(address, data) stores the 8 low bits of data, so “data[address] >> 8” is the high byte.')),
       wbHost,
     );
     root.appendChild(wrap);

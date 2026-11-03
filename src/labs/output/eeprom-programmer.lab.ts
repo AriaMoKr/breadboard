@@ -1,6 +1,6 @@
 import type { Level } from '../../logic/circuit';
 import { hex } from '../../sim/assembler';
-import { Button, DipSwitch, Led, LedBar, Scope, Toggle, note, panel, row, select } from '../../ui/components';
+import { Button, DipSwitch, Led, LedBar, Scope, Toggle, note, panel, row, scrollable, select } from '../../ui/components';
 import { Disposer, animate, h, setClass, setText } from '../../ui/dom';
 import { badge, ledCell, ledRow, makeHexDump, scopedStyle } from '../ram/_ui';
 import { defineLab } from '../types';
@@ -68,7 +68,7 @@ export default defineLab({
     'Setting DIP switches for 2048 bytes is no fun, so Ben builds a programmer around an Arduino Nano. The Nano doesn’t have enough pins for 11 address lines, so two chained 74HC595 shift registers take the address one bit at a time on SHIFT_DATA/SHIFT_CLK and update all their outputs together on SHIFT_LATCH. The last bit drives the EEPROM’s O̅E̅. Eight Arduino pins connect straight to the data lines and one drives W̅E̅. Step through the sketch and watch every bit move.',
   mount(root) {
     const d = new Disposer();
-    const dump = makeHexDump();
+    const dump = makeHexDump('EEPROM contents');
     d.add(scopedStyle(root, CSS + dump.css));
     root.classList.add('eprog');
 
@@ -83,13 +83,13 @@ export default defineLab({
 
     // ---- code view ----
     const lineEls = CODE_LINES.map((l) => h('div', { class: l.id ? 'hl' : '' }, l.text || ' '));
-    const code = h('div', { class: 'code', role: 'region', 'aria-label': 'Arduino sketch', tabindex: 0 }, lineEls);
+    const code = scrollable(h('div', { class: 'code' }, lineEls), 'Arduino sketch');
     let curLineIdx = -1;
     const evNote = h('div', { class: 'mono small' });
     const explain = h('div', { class: 'callout' });
 
     // ---- serial ----
-    const serial = h('pre', { class: 'serial', 'aria-live': 'polite' });
+    const serial = scrollable(h('pre', { class: 'serial', 'aria-live': 'polite' }), 'Serial monitor');
     let serialLen = -1;
 
     // ---- controls ----

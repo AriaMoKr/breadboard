@@ -1,4 +1,5 @@
 import type { Circuit, Level, Net } from '../../logic/circuit';
+import { scrollBox } from '../../ui/components';
 import { animate, h, headCell, setClass } from '../../ui/dom';
 import type { Schematic } from '../../ui/schematic';
 
@@ -30,12 +31,13 @@ export interface TruthTable {
   set(i: number): void;
 }
 
-export function truthTable(head: string[], rows: string[][]): TruthTable {
+/** A truth table in a `scrollBox`, named `name`: another on the same page needs another name. */
+export function truthTable(head: string[], rows: string[][], name = 'Truth table'): TruthTable {
   const trs = rows.map((r) => h('tr', null, r.map((x) => h('td', null, x))));
   const table = h('table', { class: 'truth-table' }, h('thead', null, h('tr', null, head.map((x) => headCell(x)))), h('tbody', null, trs));
   let cur = -2;
   return {
-    el: h('div', { style: 'overflow-x:auto;max-width:100%' }, table),
+    el: scrollBox(name, table),
     rows: trs,
     set(i) {
       if (i === cur) return;

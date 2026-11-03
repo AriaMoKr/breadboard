@@ -140,7 +140,7 @@ export default defineLab({
       ['0', '0', 'write D1-D4 into the addressed word', 'high-Z (floating)'],
       ['0', '1', 'read the addressed word', 'complement of stored data'],
       ['1', 'X', 'not selected', 'high-Z (floating)'],
-    ]);
+    ], { name: 'What the chip is doing' });
     const status = h('div', { class: 'callout' });
 
     // ---- the 16 x 4 cell grid with decoder word lines ----
@@ -148,7 +148,7 @@ export default defineLab({
     const grid = makeTable(
       ['word line', 'addr', 'D4', 'D3', 'D2', 'D1', 'hex'],
       Array.from({ length: 16 }, (_, a) => [wordLeds[a].el, bin(a, 4), '', '', '', '', '']),
-      { class: 'compact cellgrid' },
+      { name: 'The cells', class: 'compact cellgrid' },
     );
     grid.cells.forEach((r) => { r[0].classList.add('wl'); for (let k = 2; k <= 5; k++) r[k].classList.add('bit'); });
 
@@ -156,7 +156,7 @@ export default defineLab({
     const bytes = makeTable(
       ['addr', 'U24 (bits 7-4)', 'U25 (bits 3-0)', 'byte'],
       Array.from({ length: 16 }, (_, a) => [String(a), '', '', '']),
-      { class: 'compact' },
+      { name: 'The 16 bytes', class: 'compact' },
     );
     const hiRaw = ledRow(['O̅8', 'O̅7', 'O̅6', 'O̅5'], 'red');
     const byteLeds = ledRow(['7', '6', '5', '4', '3', '2', '1', '0'], 'red');

@@ -2,7 +2,7 @@ import { mountComputerWorkbench } from '../../app/computer-page';
 import { Machine } from '../../sim/machine';
 import { INSTRUCTION_BY_MNEMONIC, microIndex } from '../../sim/microcode';
 import { formatControlWord } from '../../sim/signals';
-import { DipSwitch, LedBar, note, panel, row, select } from '../../ui/components';
+import { DipSwitch, LedBar, note, panel, row, scrollBox, select } from '../../ui/components';
 import { Disposer, h, setClass, setText } from '../../ui/dom';
 import { MicrocodePanel } from '../../ui/microcode-panel';
 import { describeTransfer } from '../control/_models';
@@ -189,7 +189,7 @@ export default defineLab({
           { accent: 'blue', subtitle: 'microcode only, no new hardware' },
           seg,
           summary,
-          h('div', { class: 'table-scroll' }, h('table', { class: 'truth-table steps' }, h('thead', null, h('tr', null, ['step', 'control word', 'what happens'].map((x) => h('th', null, x)))), stepsBody)),
+          scrollBox('Its micro-steps', h('table', { class: 'truth-table steps' }, h('thead', null, h('tr', null, ['step', 'control word', 'what happens'].map((x) => h('th', null, x)))), stepsBody)),
           extra,
         ),
         panel('Microcode', { accent: 'blue', subtitle: 'new rows in orange' }, mp.el, note('The current micro-step is blue while the program runs. STA, LDI and JMP each take 5 clocks like every other instruction, even though LDI and JMP only need T2.')),

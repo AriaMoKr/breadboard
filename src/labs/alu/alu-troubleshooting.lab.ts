@@ -1,7 +1,7 @@
-import { Button, Toggle, note, panel, row, select } from '../../ui/components';
+import { Button, Toggle, note, panel, row, scrollBox, select } from '../../ui/components';
 import { Disposer, h, setClass, setText } from '../../ui/dom';
 import { defineLab } from '../types';
-import { BitRow, labFrame } from '../registers/_shared';
+import { BitRow, labFrame, logBox } from '../registers/_shared';
 import { BEN_FAULTS, LS283_PINS, applyFaults, bitOf, describeSource, evalWiring, fixWire, isCorrect, nextHint, randomFaults, toBinSpaced, wireId, wrongWires, type AluTest, type AluWiring, type Fault, type Side } from './_model';
 
 /**
@@ -270,7 +270,7 @@ export default defineLab({
           h('div', { class: 'tr-result' }, h('div', { class: 'lbl' }, 'should be: ', expText), expRow.el, h('div', { class: 'lbl' }, 'Σ LEDs on the board: ', gotText), gotRow.el),
           verdict,
         ),
-        panel('Isolate the fault', { accent: 'yellow' }, hint, row(zeroAdd.el, zeroSub.el, symptom.el), h('div', { class: 'dp-scroll' }, matrix), note('Each square sets up one single-bit test (B = 0 and one A bit, or A = 0 and one B bit). ✓ = right answer, ✗ = wrong. Hover a square to see what came out.')),
+        panel('Isolate the fault', { accent: 'yellow' }, hint, row(zeroAdd.el, zeroSub.el, symptom.el), scrollBox('Single-bit tests', matrix), note('Each square sets up one single-bit test (B = 0 and one A bit, or A = 0 and one B bit). ✓ = right answer, ✗ = wrong. Hover a square to see what came out.')),
       ),
       h(
         'div',
@@ -299,7 +299,7 @@ export default defineLab({
         'div',
         { class: 'lab-grid two' },
         panel('Ben’s final checks', { accent: 'green' }, row(run1.el, run2.el), check1, check2, victory, note('Run both after fixing the wiring. 6 − 2 = 0000 0110 + 1111 1101 + 1 = 1 0000 0100: 4 with the carry out set (no borrow).')),
-        panel('Test log', { accent: 'gray' }, logEl, note('A fault can hide behind a lucky test: with A = 0 a wrong A jumper is invisible, and a swap only shows when the two swapped bits differ. That’s why testing one bit at a time works so well.')),
+        panel('Test log', { accent: 'gray' }, logBox(logEl, 'Test log'), note('A fault can hide behind a lucky test: with A = 0 a wrong A jumper is invisible, and a swap only shows when the two swapped bits differ. That’s why testing one bit at a time works so well.')),
       ),
     );
     newBoard();

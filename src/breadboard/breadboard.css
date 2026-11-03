@@ -99,7 +99,7 @@
 .sb-lifted { opacity: 0.3; } /* in hand: the ghost shows where it would go */
 .sb-status { font-size: 0.8rem; color: var(--fg-dim); min-height: 1.3em; }
 .sb-side { margin-top: 10px; }
-.sb-problems { margin: 4px 0; padding-left: 18px; font-size: 0.85rem; color: var(--wire-x); }
+.sb-problems { margin: 4px 0; padding-left: 18px; font-size: 0.85rem; color: var(--wire-x-text); }
 .sb-problems li.ok { color: var(--ok); list-style: none; margin-left: -18px; }
 .sb-mark { fill: none; stroke-width: 0.12; pointer-events: none; }
 .sb-mark.ok { stroke: #16a34a; fill: rgba(22, 163, 74, 0.25); }

@@ -7,7 +7,7 @@ import type { Circuit, Level } from '../../logic/circuit';
 import type { Transfer } from '../../sim/computer';
 import type { Machine } from '../../sim/machine';
 import { SIGNAL_BITS, SIGNAL_INFO, type Signal } from '../../sim/signals';
-import { Toggle } from '../../ui/components';
+import { Toggle, scrollable } from '../../ui/components';
 import { Disposer, animate, h, headCell, setClass, setText } from '../../ui/dom';
 import type { GateHandle, P } from '../../ui/schematic';
 
@@ -19,7 +19,6 @@ const DP_CSS = `
 .dp-lab .callout.good { border-left-color: var(--ok); background: color-mix(in srgb, var(--ok) 10%, var(--panel)); }
 .dp-lab .dp-warn { color: var(--danger); font-weight: 600; }
 .dp-lab .dp-good { color: var(--ok); font-weight: 600; }
-.dp-lab .dp-scroll { overflow-x: auto; max-width: 100%; }
 .dp-lab svg.schematic { touch-action: manipulation; }
 .dp-lab .legend .lz { background: repeating-linear-gradient(90deg, var(--wire-z) 0 4px, transparent 4px 7px); }
 /* bit rows */
@@ -54,7 +53,7 @@ const DP_CSS = `
 .dp-jumpers { display: flex; flex-wrap: wrap; gap: 8px 14px; }
 .dp-jumper { display: inline-flex; flex-direction: column; gap: 2px; }
 .dp-jumper .dp-line { font: 0.68rem var(--mono); color: var(--fg-faint); padding-left: 41px; }
-.dp-jumper .dp-line.low { color: var(--led-blue); }
+.dp-jumper .dp-line.low { color: var(--wire-0-text); }
 /* equations and tables */
 .dp-eq { font-family: var(--mono); font-size: 0.95rem; line-height: 1.6; overflow-wrap: anywhere; }
 .dp-eq b { color: var(--fg); }
@@ -66,13 +65,14 @@ const DP_CSS = `
 .dp-sum .strike { text-decoration: line-through; color: var(--fg-faint); }
 .dp-lab table.truth-table { max-width: 100%; }
 .dp-lab .truth-table td.z { color: var(--fg-faint); }
-.dp-lab .truth-table td.x { color: var(--wire-x); font-weight: 700; }
+.dp-lab .truth-table td.x { color: var(--wire-x-text); font-weight: 700; }
 .dp-lab .truth-table.compact th, .dp-lab .truth-table.compact td { padding: 2px 7px; }
 .dp-pill { display: inline-block; font: 600 0.7rem var(--mono); padding: 1px 7px; border-radius: 999px; border: 1px solid var(--border); color: var(--fg-dim); }
 .dp-pill.on { background: var(--led-blue); border-color: var(--led-blue); color: #fff; }
 .dp-pill.bad { background: var(--danger); border-color: var(--danger); color: #fff; }
 .dp-pill.good { background: var(--ok); border-color: var(--ok); color: #04210f; }
-.dp-log { margin: 0; padding-left: 20px; font: 0.8rem var(--mono); color: var(--fg-dim); max-height: 9.5em; overflow-y: auto; }
+.dp-log-box { max-height: 7.6rem; overflow-y: auto; }
+.dp-log { margin: 0; padding-left: 20px; font: 0.8rem var(--mono); color: var(--fg-dim); }
 .dp-log li.bad { color: var(--danger); }
 .dp-log li.good { color: var(--ok); }
 @media (max-width: 860px) {
@@ -98,6 +98,11 @@ export function labFrame(root: HTMLElement, d: Disposer, extraCss = ''): HTMLDiv
 }
 
 export const levelText = (l: Level) => String(l);
+
+/** A log (`ol.dp-log`) in a box that scrolls once it is longer than a few lines: it takes focus and has a name, as a `scrollBox`. */
+export function logBox(log: HTMLOListElement, name: string): HTMLDivElement {
+  return scrollable(h('div', { class: 'dp-log-box' }, log), name);
+}
 
 /** Legend for wire colours: 1 / 0 / Z (floating) / X (contention). */
 export function levelLegend(): HTMLElement {

@@ -3,7 +3,7 @@ import { Machine } from '../../sim/machine';
 import { INSTRUCTION_BY_OPCODE, microcodeEepromImage, microIndex, type Microcode } from '../../sim/microcode';
 import { PROGRAM_BY_ID } from '../../sim/programs';
 import { SIGNALS, formatControlWord } from '../../sim/signals';
-import { Button, Slider, note, panel } from '../../ui/components';
+import { Button, Slider, note, panel, scrollBox, scrollable } from '../../ui/components';
 import { Disposer, h, s, setClass, setText } from '../../ui/dom';
 import { onRisingEdge, scopedStyle } from '../control/_shared';
 import { defineLab } from '../types';
@@ -111,7 +111,7 @@ export default defineLab({
 
     // ---- carry semantics of x − 1 ----
     const xSlider = new Slider({ label: 'x', min: 0, max: 255, step: 1, value: 3, format: (v) => String(v), onInput: () => renderSub() });
-    const sumPre = h('pre', { class: 'sum' });
+    const sumPre = scrollable(h('pre', { class: 'sum' }), 'x − 1 in binary');
     const subNote = h('div', { class: 'small' });
     const loopTable = h(
       'table',
@@ -202,7 +202,7 @@ export default defineLab({
         panel(
           'The only difference: T2 of JC and JZ',
           { accent: 'blue' },
-          h('div', { class: 'table-scroll' }, jTable),
+          scrollBox('T2 of JC and JZ', jTable),
           note('Ben’s initUCode() copies UCODE_TEMPLATE four times, then patches ucode[FLAGS_Z0C1][JC][2] = IO|J, ucode[FLAGS_Z1C0][JZ][2] = IO|J and both in FLAGS_Z1C1. A jump that is not taken is just a 5-cycle NOP. The highlighted column is the current flags.'),
         ),
       ),

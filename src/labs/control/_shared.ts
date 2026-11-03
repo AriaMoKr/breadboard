@@ -7,7 +7,7 @@ import type { Computer, Transfer } from '../../sim/computer';
 import type { Machine } from '../../sim/machine';
 import { microIndex } from '../../sim/microcode';
 import { HLT, SIGNAL_BITS, SIGNAL_INFO, SIGNALS, formatControlWord, type ModuleId, type Signal } from '../../sim/signals';
-import { Button, Toggle, select } from '../../ui/components';
+import { Button, Toggle, scrollBox, select } from '../../ui/components';
 import { Disposer, growOnly, h, setClass, setText } from '../../ui/dom';
 import { describeTransfer, explainMicrostepMistake, microstepGoal } from './_models';
 
@@ -285,7 +285,7 @@ export class MicrostepTrace {
       'div',
       { class: 'ustep-trace' },
       h('div', { class: 'row' }, h('h3', { class: 'sub-head' }, opts.title ?? 'Micro-step trace'), this.info),
-      h('div', { class: 'table-scroll' }, h('table', { class: 'microcode ustep-table' }, h('thead', null, h('tr', null, head.map((x) => h('th', null, x)))), this.body)),
+      scrollBox(opts.title ?? 'Micro-step trace', h('table', { class: 'microcode ustep-table' }, h('thead', null, h('tr', null, head.map((x) => h('th', null, x)))), this.body)),
     );
     this.d.add(
       onRisingEdge(c, (e) => {

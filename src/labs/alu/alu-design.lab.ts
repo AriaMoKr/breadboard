@@ -1,5 +1,5 @@
 import type { Net } from '../../logic/circuit';
-import { LedBar, Toggle, note, panel, row } from '../../ui/components';
+import { LedBar, Toggle, note, panel, row, scrollBox } from '../../ui/components';
 import { Disposer, h, s, setClass, setText } from '../../ui/dom';
 import { Schematic, switchPitch } from '../../ui/schematic';
 import { defineLab } from '../types';
@@ -155,7 +155,7 @@ export default defineLab({
           'div',
           { class: 'lab-stack' },
           panel('Inputs', { accent: 'red', subtitle: 'from the A and B registers' }, aRow.el, bRow.el, suT.el),
-          panel('Result', { accent: 'red' }, row(sumBar.el, carryLed.el), h('div', { class: 'dp-scroll' }, eq), readout, status),
+          panel('Result', { accent: 'red' }, row(sumBar.el, carryLed.el), scrollBox('The sum', eq), readout, status),
           panel('XOR as a controllable inverter', { accent: 'gray', chips: '74LS86: 4 XOR gates per chip, 8 in total' }, xorTT.el),
           panel(
             'Why A + NOT B + 1?',

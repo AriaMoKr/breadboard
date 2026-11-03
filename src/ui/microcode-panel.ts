@@ -1,6 +1,7 @@
 import type { Machine } from '../sim/machine';
 import { INSTRUCTION_BY_OPCODE, MICROCODE_VERSIONS, microIndex } from '../sim/microcode';
 import { formatControlWord, parseControlWord } from '../sim/signals';
+import { scrollBox } from './components';
 import { Disposer, h, setClass, setText } from './dom';
 
 export interface MicrocodePanelOptions {
@@ -72,7 +73,7 @@ export class MicrocodePanel {
       'div',
       { class: 'microcode-panel' },
       h('div', { class: 'row' }, h('h3', { class: 'sub-head' }, 'Microcode'), version),
-      h('div', { class: 'table-scroll' }, h('table', { class: 'microcode' }, h('thead', null, head), h('tbody', null, body))),
+      scrollBox('Microcode', h('table', { class: 'microcode' }, h('thead', null, head), h('tbody', null, body))),
       addrText,
     );
     if (opts.highlightOpcodes) this.setHighlight(opts.highlightOpcodes);

@@ -329,14 +329,10 @@ export default defineLab({
     };
     lanes[3] = lanes[2];
     const scopes = {} as Record<Step, Scope>;
-    for (const k of [1, 2, 3, 4, 5, 6] as const) {
-      scopes[k] = new Scope(lanes[k], { width: 640, laneHeight: 70 });
-      scopes[k].canvas.setAttribute('role', 'img');
-    }
+    for (const k of [1, 2, 3, 4, 5, 6] as const) scopes[k] = new Scope(lanes[k], { width: 640, laneHeight: 70 });
     // wide enough for any pair the sliders give: the ends at about 4.46 V or more, the peak at most about 4.76 V
     const CLOSE_LO = 4.4, CLOSE_HI = 4.8;
     const close = new Scope([{ label: `around the peak, 0.1 ms across: ${CLOSE_LO} to ${CLOSE_HI} V`, kind: 'analog', min: CLOSE_LO, max: CLOSE_HI, color: '#f59e0b' }], { width: 640, laneHeight: 80 });
-    close.canvas.setAttribute('role', 'img');
     const scopeHost = h('div');
     const scopeNote = h('p', { class: 'note' });
     const closeBox = h('div', null, h('h3', { class: 'sub-head' }, 'Close-up of the peak'), close.el);

@@ -3,7 +3,7 @@ import { Disposer, animate, h, media, s, setClass, setText } from '../../ui/dom'
 import { levelClass } from '../../ui/schematic';
 import { defineLab } from '../types';
 import { BUS_MODULES, busControlWord, busModuleOutput, clockBus, resolveBus, type BusModuleId, type BusRegId, type BusTransfer, type BusValues } from './_model';
-import { Checklist, bin8, labFrame, levelLegend } from './_shared';
+import { Checklist, bin8, labFrame, levelLegend, logBox } from './_shared';
 
 /**
  * Video 9 — "Bus architecture and how register transfers work".
@@ -71,7 +71,7 @@ const CSS = `
 .bt-svg .bt-packet rect { fill: var(--accent-2); stroke: rgba(0,0,0,.35); }
 .bt-svg .bt-packet.bad rect { fill: var(--wire-x); }
 .bt-svg .bt-packet text { fill: #1a1300; font: 700 11px var(--mono); }
-.bt-svg .bt-warn { fill: var(--wire-x); font: 700 12px var(--sans); }
+.bt-svg .bt-warn { fill: var(--wire-x-text); font: 700 12px var(--sans); }
 .bt-ctl { font-family: var(--mono); font-size: 1.15rem; font-weight: 700; }
 `;
 
@@ -413,7 +413,7 @@ export default defineLab({
           { class: 'lab-stack' },
           panel('What happens now', { accent: 'gray' }, h('div', null, h('span', { class: 'dim small' }, 'Control word: '), ctlWord), status),
           panel('Try it', { accent: 'yellow' }, checklist.el),
-          panel('Transfers', { accent: 'gray' }, logEl),
+          panel('Transfers', { accent: 'gray' }, logBox(logEl, 'Transfers')),
           panel(
             'Signal names used later',
             { accent: 'blue' },

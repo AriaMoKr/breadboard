@@ -71,7 +71,7 @@ export default defineLab({
     let tapLeds: { led: Led; freq: number; on: number; n: number }[] = [];
     const u1Bar = new LedBar({ bits: 4, color: 'yellow', label: 'first chip Q3-Q0', formats: ['dec'] });
     const u2Bar = new LedBar({ bits: 4, color: 'yellow', label: 'second chip Q3-Q0', formats: ['dec'] });
-    const seq = truthTable(['count', 'Q3', 'Q2', 'Q1', 'Q0'], LS92_SEQUENCE.map((v, i) => [String(i), ...[3, 2, 1, 0].map((b) => String((v >> b) & 1))]));
+    const seq = truthTable(['count', 'Q3', 'Q2', 'Q1', 'Q0'], LS92_SEQUENCE.map((v, i) => [String(i), ...[3, 2, 1, 0].map((b) => String((v >> b) & 1))]), '74LS92 count sequence');
     const seqPanelBody = h('div');
     const tbKv = readouts(['chain', 'second', 'pulses in']);
     const tbText = callout();

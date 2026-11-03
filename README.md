@@ -214,8 +214,12 @@ with a gamepad (a stand-in for `navigator.getGamepads`) and on a TV (`?tv=emulat
 presses as the remote sends them, and through a door of the Hallway), and leads back to the
 Hallway when a door of it led there. It also runs Deque's
 [axe-core](https://github.com/dequelabs/axe-core) on every page and the VR view, in the dark and
-the light theme, with the rules of WCAG 2.2 AA and its best practices, and fails on anything it
-finds: text contrast, target sizes, names and roles, headings, landmarks. Under emulated high
+the light theme, on a desktop and at 320 px wide, with the rules of WCAG 2.2 AA and its best
+practices, and fails on anything it finds: text contrast, target sizes, names and roles,
+headings, landmarks, boxes that scroll but can't be reached by keys. In Chrome's accessibility
+tree it checks that a slider is named by its label and gives its value once, as it moves, and at
+320 px that Tab reaches a table's box that scrolls, with its focus ring, and the arrow keys
+scroll it. Under emulated high
 contrast (forced colours, as Windows' contrast themes) it checks that the LEDs, switches, toggles
 and lit signals still show their states and the open tab and current page are marked, and at
 320 px wide that no page scrolls sideways.

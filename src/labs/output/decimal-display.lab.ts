@@ -147,7 +147,10 @@ export default defineLab({
     const addrText = h('span', { class: 'mono small' });
     const dataLeds = ledRow(['dp', 'a', 'b', 'c', 'd', 'e', 'f', 'g'], 'red');
     const dataText = h('span', { class: 'mono small' });
-    const table = makeTable(['digit', 'Y̅ low', 'A10 A9 A8', 'address', 'data', 'shows'], [3, 2, 1, 0].map((k) => [DIGIT_NAMES[k], `Y̅${k}`, '', '', '', '']), { class: 'compact' });
+    const addrRow = row(h('span', { class: 'mo-label' }, 'address'), aHi.el, aSel.el, aVal.el, addrText);
+    const dataRow = row(h('span', { class: 'mo-label' }, 'data'), dataLeds.el, dataText);
+    for (const r of [addrRow, dataRow]) growOnly(r); // they follow the 555, above the table (which takes focus) on phones
+    const table = makeTable(['digit', 'Y̅ low', 'A10 A9 A8', 'address', 'data', 'shows'], [3, 2, 1, 0].map((k) => [DIGIT_NAMES[k], `Y̅${k}`, '', '', '', '']), { name: 'The four digits’ addresses', class: 'compact' });
 
     const update = () => {
       const timing = astable555(DISPLAY_555.r1, DISPLAY_555.r2, capForFreq(st.hz));
@@ -262,8 +265,8 @@ export default defineLab({
           panel(
             'EEPROM address and data right now',
             { accent: 'blue' },
-            row(h('span', { class: 'mo-label' }, 'address'), aHi.el, aSel.el, aVal.el, addrText),
-            row(h('span', { class: 'mo-label' }, 'data'), dataLeds.el, dataText),
+            addrRow,
+            dataRow,
             table.el,
             note('Address = A10 (signed) · A9 A8 (digit) · A7-A0 (value). Ben’s Arduino sketch fills all 2048 bytes: ones digits from 0, tens from 256, hundreds from 512, sign from 768, then the same again for two’s complement starting at 1024.'),
           ),

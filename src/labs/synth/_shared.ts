@@ -81,7 +81,7 @@ export function tunerRow(label: string) {
   // the bar's ends are 50 cents either way
   const bar = s(
     'svg',
-    { viewBox: '0 0 200 24', class: 't-bar', role: 'img', 'aria-label': '' },
+    { viewBox: '0 0 200 24', class: 't-bar', role: 'img', 'aria-label': 'Tuner: no note yet' },
     s('rect', { x: 5, y: 8, width: 190, height: 8, rx: 4, class: 'bar' }),
     ...[-25, 0, 25].map((c) => s('line', { x1: 100 + c * 1.9, y1: c ? 6 : 2, x2: 100 + c * 1.9, y2: c ? 18 : 22, class: c ? 'tick' : 'tick zero' })),
     mark,

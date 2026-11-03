@@ -162,7 +162,7 @@ export default defineLab({
     sch76.text('GND', [334, chip76.right[3].y], { anchor: 'start', size: 10, class: 'gate-label' });
     sch76.text('flip-flop 2 (pins 6-12) unused here', [230, 230 + grow76], { size: 10, class: 'gate-label' });
     d.add(sch76.autoUpdate());
-    const tt76 = truthTable(['PRE̅', 'CLR̅', 'CLK', 'J', 'K', 'Q', ''], LS76_ROWS);
+    const tt76 = truthTable(['PRE̅', 'CLR̅', 'CLK', 'J', 'K', 'Q', ''], LS76_ROWS, '74LS76 function table');
     const status76 = callout();
     const update76 = () => {
       tt76.set(ls76Row(PRE1.value, CLR1.value, J1.value, K1.value));

@@ -1,5 +1,5 @@
 import type { Level } from '../../logic/circuit';
-import { Led, type LedColor } from '../../ui/components';
+import { Led, scrollBox, type LedColor } from '../../ui/components';
 import { h, headCell, s, setClass, setText } from '../../ui/dom';
 import type { Schematic } from '../../ui/schematic';
 
@@ -22,7 +22,6 @@ const MO_CSS = `
 .mo-lab .mo-bus.active { stroke: var(--accent-2); opacity: 0.95; }
 .mo-lab .mo-bus.off { stroke-dasharray: 7 6; opacity: 0.3; }
 .mo-lab .mo-bus.bad { stroke: var(--wire-x); opacity: 0.95; }
-.mo-lab .table-scroll { overflow-x: auto; max-width: 100%; }
 .mo-lab .select { max-width: 100%; min-width: 0; flex-wrap: wrap; }
 .mo-lab .select select { max-width: 100%; min-width: 0; }
 .mo-lab .panel-body > * { min-width: 0; max-width: 100%; }
@@ -94,8 +93,8 @@ export interface Table {
   highlight(i: number): void;
 }
 
-/** A `.truth-table` (wrapped in a horizontal scroller) whose rows can be highlighted. */
-export function makeTable(headers: (string | Node)[], rows: (string | number | Node)[][], opts: { class?: string; caption?: string } = {}): Table {
+/** A `.truth-table` (in a `scrollBox` with the name given) whose rows can be highlighted. */
+export function makeTable(headers: (string | Node)[], rows: (string | number | Node)[][], opts: { name: string; class?: string; caption?: string }): Table {
   const head = headers.map((x) => headCell(x));
   const cells: HTMLTableCellElement[][] = [];
   const trs = rows.map((r) => {
@@ -106,7 +105,7 @@ export function makeTable(headers: (string | Node)[], rows: (string | number | N
   const table = h('table', { class: `truth-table ${opts.class ?? ''}` }, opts.caption ? h('caption', { class: 'dim small' }, opts.caption) : null, h('thead', null, h('tr', null, head)), h('tbody', null, trs));
   let cur = -1;
   return {
-    el: h('div', { class: 'table-scroll' }, table),
+    el: scrollBox(opts.name, table),
     table,
     rows: trs,
     cells,
@@ -172,8 +171,8 @@ const HEXDUMP_CSS = `
 .mo-lab .hexdump td.flash { background: color-mix(in srgb, var(--led-red) 40%, transparent); }
 `;
 
-/** A 16 × 16 hex dump of one 256-byte page. `set` marks bytes that differ from `blank`. */
-export function makeHexDump(blank = 0xff): { el: HTMLElement; css: string; update(mem: ArrayLike<number>, base: number, cur?: number, flash?: number): void } {
+/** A 16 × 16 hex dump of one 256-byte page, in a `scrollBox` named `name`. `set` marks bytes that differ from `blank`. */
+export function makeHexDump(name: string, blank = 0xff): { el: HTMLElement; css: string; update(mem: ArrayLike<number>, base: number, cur?: number, flash?: number): void } {
   const body = h('tbody');
   const cells: HTMLTableCellElement[] = [];
   const heads: HTMLTableCellElement[] = [];
@@ -186,7 +185,7 @@ export function makeHexDump(blank = 0xff): { el: HTMLElement; css: string; updat
   }
   const table = h('table', { class: 'hexdump' }, h('thead', null, h('tr', null, h('th', null, h('span', { class: 'sr-only' }, 'address')), Array.from({ length: 16 }, (_, i) => h('th', null, i.toString(16))))), body);
   return {
-    el: h('div', { class: 'table-scroll' }, table),
+    el: scrollBox(name, table),
     css: HEXDUMP_CSS,
     update(mem, base, cur = -1, flash = -1) {
       heads.forEach((th, r) => setText(th, (base + r * 16).toString(16).padStart(3, '0')));

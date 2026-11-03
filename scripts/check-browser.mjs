@@ -4,7 +4,8 @@
 // one machine, sandbox links round-trip, the breadboard view keeps its frame rate, and the VR
 // view builds the computer, runs it and answers the mouse on its boards' switches and buttons,
 // answers a gamepad and a TV's remote (?tv=emulate), and axe-core finds no accessibility problem
-// (WCAG 2.2 AA and its best practices) on any page.
+// (WCAG 2.2 AA and its best practices) on any page, on a desktop and at 320 px, where the keys
+// reach and scroll a table's box; a slider says its value once.
 // With --dist it checks the built site instead (run `npm run build` first), plus the download
 // link, install support and offline use; with --url <address> it checks a deployed copy the same
 // way, such as https://example.com/breadboard/. --only <text> runs just the checks whose names
@@ -1033,10 +1034,11 @@ try {
     return 'the 2D page still but its LEDs, the VR view at the table at once with its veil held, the choice on its panel and in its settings';
   });
 
-  await check('accessibility: axe-core finds nothing on any page, in either theme, nor in the VR view', async () => {
-    // Deque's axe-core (a devDependency, put into each page), with the rules of WCAG 2.2 AA and
-    // its best practices: contrast, target sizes, names, roles, headings, landmarks. Each page is
-    // checked dark and light (prefers-color-scheme, switched without a reload).
+  // Deque's axe-core (a devDependency, put into each page), with the rules of WCAG 2.2 AA and its
+  // best practices: contrast, target sizes, names, roles, headings, landmarks, boxes that scroll.
+  // Every page and the VR view (its menus, and on a TV) at the screen's size as set, each dark and
+  // light (prefers-color-scheme, switched without a reload): what it finds, with where.
+  const axeSweep = async () => {
     const axe = readFileSync(new URL('../node_modules/axe-core/axe.min.js', import.meta.url), 'utf8');
     const tags = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice'];
     const run = `axe.run(document, { runOnly: { type: 'tag', values: ${JSON.stringify(tags)} }, resultTypes: ['violations'] }).then((r) => r.violations.flatMap((v) => v.nodes.map((n) => v.id + ' ' + n.target.join(' '))))`;
@@ -1074,9 +1076,46 @@ try {
     await page.evaluate(`hallwayTV.menu(), document.querySelector('.vr-controls').open = true`);
     await both('vr.html?tv=emulate, in the card');
     await page.send('Emulation.setEmulatedMedia', { features: [] });
+    return problems;
+  };
+  const noAxeProblems = (problems) => {
     const shown = problems.slice(0, 25);
     assert(!problems.length, shown.join('\n') + (problems.length > shown.length ? `\n… and ${problems.length - shown.length} more` : ''));
+  };
+
+  await check('accessibility: axe-core finds nothing on any page, in either theme, nor in the VR view', async () => {
+    noAxeProblems(await axeSweep());
     return `${routes.length} pages and the VR view (its menus, and on a TV), each dark and light`;
+  });
+
+  await check('accessibility: a slider is named by its label and says its value once, as it moves', async () => {
+    // The timing lab's vertical hold. Its name from Chrome's own accessibility tree: the label's
+    // words, without the value shown beside it (aria-hidden). Its value as words, aria-valuetext,
+    // which DevTools' tree leaves out (its valuetext is the track's position): the attribute. Then
+    // a real Page Up.
+    await page.goto(`${base}#/lab/tvt-timing`, 1500);
+    const find = `[...document.querySelectorAll('label.slider')].find((l) => l.textContent.startsWith('Vertical hold'))`;
+    await page.send('Accessibility.enable');
+    const heard = async () => {
+      const { result } = await page.send('Runtime.evaluate', { expression: `${find}.querySelector('input')` });
+      const [n] = (await page.send('Accessibility.getPartialAXTree', { objectId: result.objectId, fetchRelatives: false })).nodes;
+      const [value, shown] = await page.evaluate(`[${find}.querySelector('input').getAttribute('aria-valuetext'), ${find}.querySelector('.slider-value').textContent]`);
+      return { role: n.role?.value, name: n.name?.value, value, shown };
+    };
+    try {
+      const before = await heard();
+      assert(before.role === 'slider' && before.name === 'Vertical hold' && before.value === before.shown && before.shown === '57.0 Hz', `heard ${JSON.stringify(before)}`);
+      await page.evaluate(`${find}.querySelector('input').focus()`);
+      const k = { key: 'PageUp', code: 'PageUp', windowsVirtualKeyCode: 33, nativeVirtualKeyCode: 33 };
+      await page.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', ...k });
+      await page.send('Input.dispatchKeyEvent', { type: 'keyUp', ...k });
+      await sleep(200);
+      const after = await heard();
+      assert(after.name === 'Vertical hold' && after.value === after.shown && after.shown !== before.shown, `after Page Up, heard ${JSON.stringify(after)}`);
+      return `${before.role} “${before.name}”: ${before.value}, then ${after.value}`;
+    } finally {
+      await page.send('Accessibility.disable');
+    }
   });
 
   // ---- phone --------------------------------------------------------------------------
@@ -1266,6 +1305,65 @@ try {
     await page.goto(base, 1500);
     assert(!problems.length, problems.join('\n'));
     return `${routes.length} pages; ${menus.join(', ')}`;
+  });
+
+  await check('narrow phones: axe-core finds nothing at 320 px either, on any page, in either theme, nor in the VR view', async () => {
+    // As on the desktop, here with touch: a box narrower than its table (or, on a touch screen,
+    // than its schematic) scrolls sideways, and has to take focus, or hold what does, for the keys.
+    await page.send('Emulation.setDeviceMetricsOverride', { width: 320, height: 568, deviceScaleFactor: 2, mobile: true });
+    try {
+      noAxeProblems(await axeSweep());
+    } finally {
+      await page.send('Emulation.setDeviceMetricsOverride', { width: 375, height: 812, deviceScaleFactor: 2, mobile: true });
+      await page.goto(base, 1500);
+    }
+    return `${routes.length} pages and the VR view (its menus, and on a TV), each dark and light`;
+  });
+
+  await check('narrow phones: Tab reaches a table’s box, which shows the focus ring, and the arrow keys scroll it', async () => {
+    // Real keys, as a keyboard sends them: Tab from what comes before the box, then the arrows.
+    // The TV Typewriter's test points and sawtooth-to-square's sequence (its first step), whichever
+    // of them this browser's fonts make wider than the phone.
+    const press = async (key, code) => {
+      const k = { key, code: key, windowsVirtualKeyCode: code, nativeVirtualKeyCode: code };
+      await page.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', ...k });
+      await page.send('Input.dispatchKeyEvent', { type: 'keyUp', ...k });
+      await sleep(400); // a smooth scroll's time
+    };
+    await page.send('Emulation.setDeviceMetricsOverride', { width: 320, height: 568, deviceScaleFactor: 2, mobile: true });
+    const seen = [];
+    let scrolled = 0;
+    try {
+      for (const [route, name] of [['#/lab/tvt-timing', 'Test points'], ['#/lab/sawtooth-to-square', 'The sequence']]) {
+        await page.evaluate(`location.hash = ${JSON.stringify(route)}`);
+        await sleep(1200);
+        await page.evaluate(`(() => {
+          const box = document.querySelector('[role=region][aria-label="${name}"]');
+          const stops = [...document.querySelectorAll('#content :is(a[href], button, input, select, textarea, summary, [tabindex]:not([tabindex="-1"]))')].filter((e) => !e.disabled && e.checkVisibility());
+          stops[stops.indexOf(box) - 1].focus();
+          box.scrollIntoView({ block: 'center' });
+        })()`);
+        await press('Tab', 9);
+        const at = await page.evaluate(`(() => { const a = document.activeElement, s = getComputedStyle(a); return { name: a.getAttribute('aria-label'), ring: a.matches(':focus-visible') && s.outlineStyle === 'solid' && parseFloat(s.outlineWidth) >= 2 }; })()`);
+        assert(at.name === name, `${route}: Tab went to ${at.name}, not the box “${name}”`);
+        assert(at.ring, `${route}: “${name}” shows no focus ring`);
+        const scroll = `(() => { const a = document.activeElement; return { left: a.scrollLeft, over: a.scrollWidth - a.clientWidth }; })()`;
+        await press('ArrowRight', 39);
+        const right = await page.evaluate(scroll);
+        await press('ArrowLeft', 37);
+        const back = await page.evaluate(scroll);
+        if (right.over > 0) {
+          assert(right.left > 0 && back.left < right.left, `${route}: the arrow keys left “${name}” at ${right.left} then ${back.left} px of ${right.over}`);
+          scrolled++;
+        }
+        seen.push(`“${name}” ${right.over > 0 ? `scrolled to ${Math.round(right.left)} of ${right.over} px and back` : 'fits'}`);
+      }
+    } finally {
+      await page.send('Emulation.setDeviceMetricsOverride', { width: 375, height: 812, deviceScaleFactor: 2, mobile: true });
+      await page.goto(base, 1500);
+    }
+    assert(scrolled, `neither box is wider than the phone here, so nothing scrolled: ${seen.join(', ')}`);
+    return `focused by Tab with its ring: ${seen.join('; ')}`;
   });
 
   // ---- built site: install and offline ---------------------------------------------------

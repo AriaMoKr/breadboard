@@ -13,7 +13,8 @@ import {
 } from '../src/sim/microcode';
 import { PROGRAM_BY_ID, PROGRAMS } from '../src/sim/programs';
 import { AI, AO, BI, CE, CO, EO, FI, HLT, II, IO, J, MI, OI, RI, RO, SIGNAL_BITS, SIGNAL_INFO, SIGNALS, SU, formatControlWord, parseControlWord } from '../src/sim/signals';
-import { select, SevenSegment } from '../src/ui/components';
+import { Scope, scrollable, scrollBox, select, SevenSegment, Slider } from '../src/ui/components';
+import { h } from '../src/ui/dom';
 import { ComputerView } from '../src/ui/computer-view';
 import { Circuit } from '../src/logic/circuit';
 import { Schematic } from '../src/ui/schematic';
@@ -883,6 +884,30 @@ function fire(el: FElement, type: string, key?: string) {
 }
 const windowListenerCount = () => Object.values(windowListeners).reduce((n, l) => n + l.length, 0);
 const asEl = (x: unknown) => x as unknown as FElement;
+const allIn = (e: FElement): FElement[] => [e, ...e.children.flatMap(allIn)];
+/** The words a screen reader takes from inside an element, leaving out what is aria-hidden. */
+const spokenText = (e: FElement): string => (e.getAttribute('aria-hidden') === 'true' ? '' : e.childNodes.map((n) => (n instanceof FElement ? spokenText(n) : n.textContent)).join(''));
+
+/**
+ * CLAUDE.md's rules for what a lab draws, where the fake DOM can see them: a box that scrolls
+ * (`scrollBox`, `scrollable`) takes focus and is a region with a name of its own on the page, a
+ * scope is a named picture and a slider says its value once.
+ */
+function a11yProblems(root: FElement): string[] {
+  const out: string[] = [];
+  const names = new Set<string>();
+  for (const e of root.querySelectorAll('.table-scroll, [role=region]')) {
+    const name = e.getAttribute('aria-label') ?? '';
+    if (e.getAttribute('tabindex') !== '0' || e.getAttribute('role') !== 'region' || !name) out.push(`a box that scrolls, ${e.tagName}.${e.className}: tabindex ${e.getAttribute('tabindex')}, role ${e.getAttribute('role')}, name "${name}"`);
+    else if (names.has(name)) out.push(`two boxes named "${name}"`);
+    names.add(name);
+  }
+  const scrolls = (e: FElement) => /overflow[-\w]*:\s*(auto|scroll)/.test(e.attributes.style ?? '') || ['overflow', 'overflowX', 'overflowY'].some((k) => /auto|scroll/.test(String(e.style[k] ?? '')));
+  for (const e of allIn(root)) if (scrolls(e) && e.getAttribute('role') !== 'region') out.push(`a box that scrolls, made by hand: ${e.tagName}.${e.className}`);
+  for (const c of root.querySelectorAll('canvas.scope-canvas')) if (c.getAttribute('role') !== 'img' || !c.getAttribute('aria-label')) out.push(`a scope: role ${c.getAttribute('role')}, name "${c.getAttribute('aria-label')}"`);
+  for (const v of root.querySelectorAll('.slider-value')) if (v.getAttribute('aria-hidden') !== 'true') out.push(`a slider says its value twice: ${v.textContent}`);
+  return out;
+}
 
 /** Click every button and switch, flip every checkbox, try every select option, move every slider. */
 function pokeEverything(root: FElement) {
@@ -938,9 +963,11 @@ describe('integration: every lab mounts, runs and cleans up (fake DOM)', () => {
       const cleanup = lab!.mount(asEl(root) as unknown as HTMLElement);
       frames(30);
       expect(root.textContent.length, 'renders something').toBeGreaterThan(50);
+      expect(a11yProblems(root), 'boxes, scopes and sliders as mounted').toEqual([]);
       pokeEverything(root);
       frames(30);
       expect(root.textContent, 'no NaN / undefined in the text').not.toMatch(/\bNaN\b|\bundefined\b/);
+      expect(a11yProblems(root), 'boxes, scopes and sliders after every control').toEqual([]);
       if (typeof cleanup === 'function') cleanup();
       root.remove();
       frames(2); // anything still scheduling frames after cleanup is a leak
@@ -1014,6 +1041,37 @@ describe('shared UI pieces (fake DOM)', () => {
     expect(segs[0].style.opacity).toBe('');
     seg.set(0x7e, [1, 0, 1, 1, 1, 1, 1, 1]);
     expect(segs[1].classList.contains('on')).toBe(false); // brightness 0 = off
+  });
+
+  it('Slider says its value once: the track gives it, the value shown beside it is hidden from screen readers', () => {
+    const hold = new Slider({ label: 'Vertical hold', min: 50, max: 70, value: 57, step: 0.5, format: (v) => `${v.toFixed(1)} Hz` });
+    const el = asEl(hold.el);
+    const [input, shown] = [el.querySelector('input')!, el.querySelector('.slider-value')!];
+    expect([shown.textContent, shown.getAttribute('aria-hidden'), input.getAttribute('aria-valuetext')]).toEqual(['57.0 Hz', 'true', '57.0 Hz']);
+    expect(spokenText(el)).toBe('Vertical hold'); // the label's words, the track's name
+    input.value = '650'; // of 1000 positions
+    fire(input, 'input');
+    expect([hold.value, shown.textContent, input.getAttribute('aria-valuetext'), spokenText(el)]).toEqual([63, '63.0 Hz', '63.0 Hz', 'Vertical hold']);
+  });
+
+  it('Scope: a picture named by its lanes, as they change, unless the lab names it', () => {
+    const scope = new Scope([{ label: 'C' }, { label: 'D' }, { label: '' }, { label: 'QH: the dots' }]);
+    const canvas = asEl(scope.canvas);
+    expect([canvas.getAttribute('role'), canvas.getAttribute('aria-label')]).toEqual(['img', 'A scope: C, D, QH: the dots']);
+    scope.channels[2].label = 'LINE CLOCK';
+    scope.draw([[0, 1], [1, 0], [0, 0], [1, 1]]);
+    expect(canvas.getAttribute('aria-label')).toBe('A scope: C, D, LINE CLOCK, QH: the dots');
+    scope.canvas.setAttribute('aria-label', 'Scope: the dots of one line');
+    scope.channels[2].label = 'S';
+    scope.draw([[0, 1], [1, 0], [0, 0], [1, 1]]);
+    expect(canvas.getAttribute('aria-label')).toBe('Scope: the dots of one line');
+  });
+
+  it('scrollBox and scrollable: a box that scrolls takes focus, and is a region with a name', () => {
+    const box = asEl(scrollBox('Test points', h('table')));
+    expect([box.tagName, box.className, box.getAttribute('tabindex'), box.getAttribute('role'), box.getAttribute('aria-label'), box.children[0]?.tagName]).toEqual(['div', 'table-scroll', '0', 'region', 'Test points', 'table']);
+    const pre = asEl(scrollable(h('pre', { class: 'sum' }), 'x − 1 in binary'));
+    expect([pre.tagName, pre.className, pre.getAttribute('tabindex'), pre.getAttribute('role'), pre.getAttribute('aria-label')]).toEqual(['pre', 'sum', '0', 'region', 'x − 1 in binary']);
   });
 
   it('ComputerView: manualSignals shows only those switches, without the control module', () => {

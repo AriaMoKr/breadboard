@@ -4,7 +4,7 @@ import { Button, LedBar, Toggle, note, panel, row } from '../../ui/components';
 import { ComputerView } from '../../ui/computer-view';
 import { Disposer, h, setClass, setText } from '../../ui/dom';
 import { defineLab } from '../types';
-import { Checklist, bin8, controlJumpers, labFrame, onRisingEdge } from './_shared';
+import { Checklist, bin8, controlJumpers, labFrame, logBox, onRisingEdge } from './_shared';
 
 /**
  * Video 13 — "Testing our computer's registers".
@@ -114,7 +114,7 @@ export default defineLab({
           note('An instruction byte is opcode (high 4 bits) + operand (low 4 bits). The opcode goes straight to the control logic, never to the bus. The operand is a RAM address or a small number, and with only 16 bytes of RAM 4 bits are all it needs. So Ben wires just the low nibble to the IR’s 74LS245 and grounds its other 4 inputs: IO drives the operand onto bus bits 0-3 and 0000 onto bits 4-7.'),
           note('The IR is also built mirror-image on the breadboard to make the wiring fit; logically bit 0 is still bit 0.'),
         ),
-        panel('Clock edges', { accent: 'gray' }, logEl, note('Registers only change on the rising edge, and only if their load line (AI, BI, II) is on. Enabling an output (AO, IO) changes the bus immediately, without a clock.')),
+        panel('Clock edges', { accent: 'gray' }, logBox(logEl, 'Clock edges'), note('Registers only change on the rising edge, and only if their load line (AI, BI, II) is on. Enabling an output (AO, IO) changes the bus immediately, without a clock.')),
       ),
     );
     update();

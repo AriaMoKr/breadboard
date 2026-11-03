@@ -1,7 +1,7 @@
 import { mountComputerWorkbench } from '../../app/computer-page';
 import { Machine } from '../../sim/machine';
 import type { MicrocodeVersionId } from '../../sim/microcode';
-import { Button, note, panel, row, select } from '../../ui/components';
+import { Button, note, panel, row, scrollBox, select } from '../../ui/components';
 import { Disposer, animate, growOnly, h, s, setClass, setText } from '../../ui/dom';
 import { onRisingEdge, scopedStyle } from '../control/_shared';
 import { defineLab } from '../types';
@@ -197,7 +197,7 @@ export default defineLab({
         'div',
         { class: 'lab-grid two' },
         panel('What is missing?', { accent: 'gray', subtitle: 'compute x × y' }, pseudo, note('Our instructions can load, add, subtract, store, output and jump. But JMP always jumps, so a program either never loops or loops forever. To run a loop that ends we need an instruction whose effect depends on the data: “jump if…”. That is a conditional branch.')),
-        panel('A Turing machine', { accent: 'blue', subtitle: 'binary +1' }, tapeEl, row(inputSel, stepB.el, runB.el, resetB.el), h('div', { class: 'table-scroll' }, ruleTable), tmState),
+        panel('A Turing machine', { accent: 'blue', subtitle: 'binary +1' }, tapeEl, row(inputSel, stepB.el, runB.el, resetB.el), scrollBox('The Turing machine’s rules', ruleTable), tmState),
       ),
       panel(
         'Multiply on the breadboard computer',

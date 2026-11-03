@@ -1,5 +1,5 @@
 import { Circuit } from '../../logic/circuit';
-import { Button, Scope, Slider, Toggle, note, panel, readouts, row, select, type ScopeChannel } from '../../ui/components';
+import { Button, Scope, Slider, Toggle, note, panel, readouts, row, scrollBox, select, type ScopeChannel } from '../../ui/components';
 import { Disposer, animate, growOnly, h, s, setClass, setText } from '../../ui/dom';
 import { Schematic } from '../../ui/schematic';
 import { Kit, kitCss } from '../clock/_draw';
@@ -305,9 +305,8 @@ export default defineLab({
       return { tr: h('tr', null, h('td', null, String(k + 1)), h('td', null, fmtCv(SEQ[k])), h('td', null, meant), plays), plays };
     });
     const seqHead = h('h3', { class: 'sub-head' }, 'The sequence');
-    const seqTable = h(
-      'div',
-      { class: 'table-scroll' },
+    const seqTable = scrollBox(
+      'The sequence',
       h('table', { class: 'truth-table seq-table' }, h('thead', null, h('tr', null, ['note', 'CV', 'meant', 'plays'].map((x) => h('th', null, x)))), h('tbody', null, seqRows.map((r) => r.tr))),
     );
 

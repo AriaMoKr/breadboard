@@ -272,7 +272,8 @@ export class Slider {
     this.value = opts.value;
     this.positions = opts.positions ?? 1000;
     this.input = h('input', { type: 'range', min: 0, max: this.positions, step: 1 });
-    this.out = h('span', { class: 'slider-value' });
+    // the track says its value itself (aria-valuetext), so the label's name is just its words
+    this.out = h('span', { class: 'slider-value', 'aria-hidden': 'true' });
     this.input.addEventListener('input', () => {
       this.value = this.fromPos(Number(this.input.value));
       this.show();
@@ -438,6 +439,23 @@ export function note(...children: (Node | string)[]): HTMLParagraphElement {
   return h('p', { class: 'note' }, children);
 }
 
+/**
+ * A box that scrolls sideways where what it holds is wider than the page, as a table is on a
+ * phone. It takes focus, so Tab reaches it and the arrow keys scroll it, and it is a region with
+ * a name, for a screen reader to say what it holds: a landmark's name, so no two on a page alike.
+ */
+export function scrollBox(name: string, ...children: (Node | null | undefined | false)[]): HTMLDivElement {
+  return scrollable(h('div', { class: 'table-scroll' }, children.filter(Boolean) as Node[]), name);
+}
+
+/** The same for a box made otherwise, a `<pre>` or a log that scrolls: focus, the region and its name. */
+export function scrollable<T extends HTMLElement>(el: T, name: string): T {
+  el.setAttribute('tabindex', '0');
+  el.setAttribute('role', 'region');
+  el.setAttribute('aria-label', name);
+  return el;
+}
+
 /** Key/value readout list. Returns the element and a setter per key. */
 export function readouts(keys: string[]): { el: HTMLDListElement; set: (key: string, value: string) => void } {
   const vals = new Map<string, HTMLElement>();
@@ -481,18 +499,26 @@ export class Scope {
   readonly el: HTMLDivElement;
   readonly canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D | null;
+  /** The name it gave itself from its lanes, kept up with them unless the lab names it otherwise. */
+  private lanesName: string;
   constructor(
     readonly channels: ScopeChannel[],
     opts: { width?: number; laneHeight?: number } = {},
   ) {
     const w = opts.width ?? 640;
     const lh = opts.laneHeight ?? 44;
-    this.canvas = h('canvas', { width: w * 2, height: channels.length * lh * 2, class: 'scope-canvas' });
+    // a picture, named by its lanes until the lab names it better (setAttribute after this)
+    this.lanesName = this.byLanes();
+    this.canvas = h('canvas', { width: w * 2, height: channels.length * lh * 2, class: 'scope-canvas', role: 'img', 'aria-label': this.lanesName });
     this.canvas.style.width = '100%';
     this.canvas.style.maxWidth = `${w}px`;
     this.canvas.style.aspectRatio = `${w} / ${channels.length * lh}`;
     this.ctx = this.canvas.getContext?.('2d') ?? null;
     this.el = h('div', { class: 'scope' }, this.canvas);
+  }
+
+  private byLanes() {
+    return `A scope: ${this.channels.map((c) => c.label).filter(Boolean).join(', ')}`;
   }
 
   /**
@@ -502,6 +528,10 @@ export class Scope {
    * second trace to analog channel c, in its `overlayColor`.
    */
   draw(samples: (Level | number)[][], opts: { window?: number; cursor?: number | null; markers?: ScopeMarker[]; overlays?: (number[] | undefined)[] } = {}) {
+    if (this.canvas.getAttribute('aria-label') === this.lanesName) {
+      const name = this.byLanes(); // a lane's label can change (exponential-converter's)
+      if (name !== this.lanesName) this.canvas.setAttribute('aria-label', (this.lanesName = name));
+    }
     const ctx = this.ctx;
     if (!ctx) return;
     const W = this.canvas.width;

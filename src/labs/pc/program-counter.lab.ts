@@ -140,7 +140,7 @@ export default defineLab({
       ['1', '1', '1', '1', '↑', 'count up'],
       ['1', '1', '0', 'X', 'X', 'hold'],
       ['1', '1', 'X', '0', 'X', 'hold'],
-    ]);
+    ], { name: '74LS161 function table' });
     const status = h('div', { class: 'callout' });
 
     // ---- timing diagram ----

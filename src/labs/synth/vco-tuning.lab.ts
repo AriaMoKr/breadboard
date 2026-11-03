@@ -1,5 +1,5 @@
 import { Circuit } from '../../logic/circuit';
-import { Button, Scope, Slider, Toggle, note, panel, readouts, row, select, type ScopeChannel } from '../../ui/components';
+import { Button, Scope, Slider, Toggle, note, panel, readouts, row, scrollBox, select, type ScopeChannel } from '../../ui/components';
 import { Disposer, animate, growOnly, h, setClass, setText } from '../../ui/dom';
 import { Schematic } from '../../ui/schematic';
 import { Kit, kitCss } from '../clock/_draw';
@@ -284,7 +284,7 @@ export default defineLab({
     const sequencePanel = panel(
       'The sequence',
       { accent: 'blue' },
-      h('div', { class: 'table-scroll' }, h('table', { class: 'truth-table seq-table' }, h('thead', null, h('tr', null, ['step', 'CV', 'meant', 'plays'].map((x) => h('th', null, x)))), h('tbody', null, seqRows.map((r) => r.tr)))),
+      scrollBox('The sequence', h('table', { class: 'truth-table seq-table' }, h('thead', null, h('tr', null, ['step', 'CV', 'meant', 'plays'].map((x) => h('th', null, x)))), h('tbody', null, seqRows.map((r) => r.tr)))),
       note('Part 2’s eight notes for 0 to 4 V, meant at 1 V per octave from C2. The pot sets where they start; the 4k, how far apart they land.'),
     );
 
@@ -295,9 +295,8 @@ export default defineLab({
       return { tr: h('tr', null, h('td', null, String(k + 1)), h('td', null, fmtCv(cvOf(meant))), h('td', null, meant), off, part2), off, part2 };
     });
     const majorHead = h('h3', { class: 'sub-head' }, 'The sequence');
-    const majorTable = h(
-      'div',
-      { class: 'table-scroll' },
+    const majorTable = scrollBox(
+      'The sequence on the tuner',
       h('table', { class: 'truth-table seq-table' }, h('thead', null, h('tr', null, ['step', 'CV', 'meant', 'off', 'part 2’s'].map((x) => h('th', null, x)))), h('tbody', null, majorRows.map((r) => r.tr))),
     );
     const majorNote = note('“off”: how far each note is from the one meant, with the follower. “part 2’s”: the same note on part 2’s converter, had it been tuned the same at the same time (“tuned at”), in this room now.');
@@ -310,7 +309,6 @@ export default defineLab({
       { label: 'the pitch: semitones from 25 °C, −12 to +12', kind: 'analog', min: -12, max: 12, guides: [0], color: '#a78bfa' },
     ];
     const recorder = new Scope(recLanes, { width: 640, laneHeight: 60 });
-    recorder.canvas.setAttribute('role', 'img');
     recorder.canvas.setAttribute('aria-label', 'Chart recorder: the last thirty seconds of both transistors’ temperatures, and the pitch’s drift from where it was at 25 °C.');
     const rec: number[][] = [[], [], []];
     const record = () => {

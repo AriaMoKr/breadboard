@@ -177,7 +177,7 @@ export default defineLab({
     const busText = h('span', { class: 'mono dim small' });
     const marText = h('span', { class: 'mono dim small' });
 
-    const memTable = makeTable(['addr', 'binary', 'hex', 'as code'], Array.from({ length: 16 }, (_, a) => [String(a), '', '', '']), { class: 'compact' });
+    const memTable = makeTable(['addr', 'binary', 'hex', 'as code'], Array.from({ length: 16 }, (_, a) => [String(a), '', '', '']), { name: 'Memory contents', class: 'compact' });
 
     const progSteps = stepList([
       'Flip the switch to PROGRAM: the red LED lights and the 157s select the DIP switches and the WRITE button.',

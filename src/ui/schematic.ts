@@ -96,6 +96,8 @@ export class Schematic {
   private layerTop: SVGGElement;
   /** Hit areas of the switches placed so far, so neighbouring ones don't overlap (see `switch`). */
   private switchHits: { x: number; y: number; rect: SVGRectElement; half: number }[] = [];
+  /** It takes focus itself (a picture on a touch screen, see the constructor). */
+  private tabStop: boolean;
 
   constructor(
     readonly circuit: Circuit,
@@ -116,6 +118,11 @@ export class Schematic {
       this.layerTop,
     );
     this.el.style.maxWidth = `${opts.width}px`;
+    // On a touch screen it stops shrinking at 3/4 of its size and its box scrolls sideways
+    // (styles.css): a picture with nothing to focus in it takes focus itself there, so Tab reaches
+    // it and the arrow keys scroll its box. A switch gives it controls of its own (`switch`).
+    this.tabStop = !!media('(pointer: coarse)')?.matches;
+    if (this.tabStop) this.el.setAttribute('tabindex', '0');
   }
 
   /** The SVG group of a layer, for drawing custom shapes. */
@@ -394,8 +401,10 @@ export class Schematic {
     const p = P(at);
     const g = s('g', { class: `sch-switch ${opts.momentary ? 'momentary' : ''}`, transform: `translate(${p.x},${p.y})`, tabindex: 0, role: 'button', 'aria-label': opts.label ?? net.name });
     // With a switch in it the schematic is no longer only a picture (whose insides a screen reader
-    // skips): a named group, so the switches can be found and used.
+    // skips): a named group, so the switches can be found and used, and take focus instead of it.
     this.el.setAttribute('role', 'group');
+    if (this.tabStop) this.el.removeAttribute('tabindex');
+    this.tabStop = false;
     const box = s('rect', { x: -22, y: -10, width: 22, height: 20, rx: 4, class: 'switch-body' });
     const knob = s('circle', { cx: -11, cy: 0, r: 5, class: 'switch-knob' });
     // Invisible hit area, bigger than the switch so a fingertip finds it: wide (over the label)

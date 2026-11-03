@@ -59,7 +59,7 @@ export default defineLab({
     const tt = makeTable(
       [...VARS, 'hex', ...SEGS],
       Array.from({ length: 16 }, (_, v) => [...bin(v, 4).split(''), hex(v, 1), ...SEGS.map(() => '')]),
-      { class: 'compact' },
+      { name: 'Truth table', class: 'compact' },
     );
     SEGS.forEach((s, i) => {
       const th = tt.head[5 + i];
@@ -89,7 +89,7 @@ export default defineLab({
     d.add(() => logic?.dispose());
 
     // ---- gate count panel ----
-    const costTable = makeTable(['design', '2-in AND', '2-in OR', 'NOT', 'chips (08 + 32 + 04)'], Array.from({ length: 6 }, () => ['', '', '', '', '']), { class: 'compact' });
+    const costTable = makeTable(['design', '2-in AND', '2-in OR', 'NOT', 'chips (08 + 32 + 04)'], Array.from({ length: 6 }, () => ['', '', '', '', '']), { name: 'Gates for one digit', class: 'compact' });
     const fillCost = () => {
       const row = (name: string, c: ReturnType<typeof decoderCost>) => [name, String(c.and2), String(c.or2), String(c.not), `${c.chips.ls08} + ${c.chips.ls32} + ${c.chips.ls04} = ${c.chips.total}`];
       const rows = [

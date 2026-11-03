@@ -31,9 +31,10 @@
   --wire-0: #3a6ea5;
   --wire-z: #707888;
   --wire-x: #ffb020;
-  /* the levels' colours for text (a pin's level in a table): readable on the panels */
+  /* the levels' colours for text (a pin's level in a table, a warning of X): readable on the panels and the page */
   --wire-0-text: #81a2c5;
   --wire-1-text: #ff6b6b;
+  --wire-x-text: #ffb020;
 
   --radius: 10px;
   --topbar-h: 44px; /* sticky bars sit right under the top bar */
@@ -59,6 +60,7 @@
     --ok: #217a3c;
     --wire-0-text: #48638a;
     --wire-1-text: #c43b3b;
+    --wire-x-text: #8a4f00; /* --wire-x is 1.6:1 on the light page */
     --grid: #dde2ea;
     --led-off: #d5d9e1;
     --wire-0: #6b8fc4;
@@ -315,7 +317,7 @@ pre.error { color: var(--danger); white-space: pre-wrap; }
 .module-slot.empty { border: 1px dashed var(--grid); border-radius: var(--radius); min-height: 60px; }
 .panel.bus .panel-body { align-items: center; }
 .bus-drivers { font-family: var(--mono); font-size: 0.72rem; color: var(--fg-dim); text-align: center; }
-.bus-warn { display: none; color: var(--wire-x); font-size: 0.72rem; text-align: center; }
+.bus-warn { display: none; color: var(--wire-x-text); font-size: 0.72rem; text-align: center; }
 .bus-warn.show { display: block; }
 .alu-eq { font-size: 0.8rem; }
 .tleds { display: inline-flex; gap: 6px; }
@@ -364,7 +366,7 @@ table.memory tr.mar td.mem-marker { color: var(--led-yellow); }
 
 /* microcode panel */
 .microcode-panel { display: flex; flex-direction: column; gap: 8px; }
-.table-scroll { overflow-x: auto; }
+.table-scroll { overflow-x: auto; max-width: 100%; }
 table.microcode { border-collapse: collapse; font-size: 0.74rem; }
 table.microcode th, table.microcode td { border: 1px solid var(--border); padding: 3px 6px; white-space: nowrap; text-align: left; }
 table.microcode thead th { color: var(--fg-dim); background: var(--panel-2); }

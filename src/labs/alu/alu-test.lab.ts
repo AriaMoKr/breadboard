@@ -1,10 +1,10 @@
 import { Machine } from '../../sim/machine';
 import { AI, EO, SU, formatControlWord } from '../../sim/signals';
-import { Button, LedBar, note, panel, row } from '../../ui/components';
+import { Button, LedBar, note, panel, row, scrollBox } from '../../ui/components';
 import { ComputerView } from '../../ui/computer-view';
 import { Disposer, animate, h, setClass, setText } from '../../ui/dom';
 import { defineLab } from '../types';
-import { Checklist, controlJumpers, labFrame, onRisingEdge } from '../registers/_shared';
+import { Checklist, controlJumpers, labFrame, logBox, onRisingEdge } from '../registers/_shared';
 import { aluDetail, latchRace, toBinSpaced, toSigned } from './_model';
 
 /**
@@ -146,8 +146,8 @@ export default defineLab({
       h(
         'div',
         { class: 'lab-grid two' },
-        panel('The ALU right now', { accent: 'red', chips: 'Σ = A + (B XOR SU) + SU' }, h('div', { class: 'dp-scroll' }, eq), next),
-        panel('Clock edges', { accent: 'gray' }, logEl, note('On the rising edge A latches the bus value it saw just before the edge. The ALU is combinational: its output changes a few nanoseconds later, but by then the edge is over.')),
+        panel('The ALU right now', { accent: 'red', chips: 'Σ = A + (B XOR SU) + SU' }, scrollBox('The sum', eq), next),
+        panel('Clock edges', { accent: 'gray' }, logBox(logEl, 'Clock edges'), note('On the rising edge A latches the bus value it saw just before the edge. The ALU is combinational: its output changes a few nanoseconds later, but by then the edge is over.')),
       ),
       h(
         'div',

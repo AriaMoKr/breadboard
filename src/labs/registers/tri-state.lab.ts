@@ -194,7 +194,7 @@ export default defineLab({
     function renderBus() {
       const w = W.value;
       setText(busLevel, String(w));
-      busLevel.style.color = w === 1 ? 'var(--wire-1)' : w === 0 ? 'var(--wire-0)' : w === 'X' ? 'var(--wire-x)' : 'var(--fg-dim)';
+      busLevel.style.color = w === 1 ? 'var(--wire-1)' : w === 0 ? 'var(--wire-0)' : w === 'X' ? 'var(--wire-x-text)' : 'var(--fg-dim)';
       const rowsNow: number[] = [];
       const members: string[][] = [[], [], [], []];
       A.forEach((a, i) => {

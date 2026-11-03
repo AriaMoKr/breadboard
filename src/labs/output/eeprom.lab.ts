@@ -28,7 +28,7 @@ export default defineLab({
     'An EEPROM is a memory you can write electrically and that keeps its data without power. The 28C16 stores 2048 bytes: 11 address lines in, 8 data lines out. Ben wires A0-A3 to a DIP switch and the data lines to LEDs, then writes bytes by hand: set the address and data switches, take O̅E̅ high and pulse W̅E̅ low for under a microsecond. Once the hex-digit patterns are stored, the 4 address switches drive a 7-segment display through the chip. Any truth table can be stored this way and read back as a lookup.',
   mount(root) {
     const d = new Disposer();
-    const dump = makeHexDump();
+    const dump = makeHexDump('Memory contents');
     d.add(scopedStyle(root, CSS + dump.css));
     root.classList.add('eeprom-lab');
 

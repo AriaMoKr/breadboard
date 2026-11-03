@@ -1,7 +1,7 @@
 import type { Level } from '../../logic/circuit';
 import { Machine } from '../../sim/machine';
 import { PROGRAM_BY_ID } from '../../sim/programs';
-import { Button, Scope, Slider, Toggle, note, panel, row } from '../../ui/components';
+import { Button, Scope, Slider, Toggle, note, panel, row, scrollBox } from '../../ui/components';
 import { ComputerView } from '../../ui/computer-view';
 import { Disposer, animate, h, s, setText } from '../../ui/dom';
 import { ProgramPanel } from '../../ui/program-panel';
@@ -272,7 +272,7 @@ export default defineLab({
         panel(
           'What reset clears',
           { accent: 'red', subtitle: 'highlighted rows changed' },
-          h('div', { class: 'table-scroll' }, h('table', { class: 'truth-table' }, h('thead', null, h('tr', null, ['module', 'line', 'before', 'after'].map((x) => h('th', null, x)))), rows)),
+          scrollBox('What reset clears', h('table', { class: 'truth-table' }, h('thead', null, h('tr', null, ['module', 'line', 'before', 'after'].map((x) => h('th', null, x)))), rows)),
           effect,
           note('Ben lists PC, A, B, OUT, IR, MAR and the micro-step counter here; the flags register (video 43) joins the CLR line later.'),
         ),

@@ -1,4 +1,4 @@
-import { Button, note, panel, row, select } from '../../ui/components';
+import { Button, note, panel, row, scrollBox, select } from '../../ui/components';
 import { Disposer, animate, h, headCell, s, setClass, setText } from '../../ui/dom';
 import { defineLab } from '../types';
 import { BitRow, labFrame } from '../registers/_shared';
@@ -336,12 +336,12 @@ export default defineLab({
           presetRow,
           note('The only difference from ordinary binary: the top bit’s place value is negative.'),
         ),
-        panel('The same bits, four ways', { accent: 'gray' }, h('div', { class: 'dp-scroll' }, interp), zeroNote, ben),
+        panel('The same bits, four ways', { accent: 'gray' }, scrollBox('The same bits, four ways', interp), zeroNote, ben),
       ),
       h(
         'div',
         { class: 'lab-grid two' },
-        panel('Negating: invert, then add 1', { accent: 'yellow' }, row(negBtn.el), h('div', { class: 'dp-scroll' }, stepTable), negNote),
+        panel('Negating: invert, then add 1', { accent: 'yellow' }, row(negBtn.el), scrollBox('Invert, then add 1', stepTable), negNote),
         panel(
           'The number wheel',
           { accent: 'blue' },
@@ -359,7 +359,7 @@ export default defineLab({
           row(encSel),
           row(h('label', { class: 'select' }, h('span', { class: 'slider-label' }, 'x'), xIn), h('span', null, '+'), h('label', { class: 'select' }, h('span', { class: 'slider-label' }, 'y'), yIn)),
           addPresetRow,
-          h('div', { class: 'dp-scroll' }, sumTable),
+          scrollBox('The sum', sumTable),
           verdict,
         ),
         panel(

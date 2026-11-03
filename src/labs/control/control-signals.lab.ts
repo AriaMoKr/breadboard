@@ -2,7 +2,7 @@ import { Machine } from '../../sim/machine';
 import { INSTRUCTION_BY_OPCODE, microIndex, UCODE_TEMPLATE_FLAGS } from '../../sim/microcode';
 import { PROGRAM_BY_ID } from '../../sim/programs';
 import { SIGNAL_BITS, SIGNAL_INFO, SIGNALS, formatControlWord, type ModuleId, type Signal } from '../../sim/signals';
-import { Led, note, panel } from '../../ui/components';
+import { Led, note, panel, scrollBox } from '../../ui/components';
 import { ComputerView } from '../../ui/computer-view';
 import { Disposer, growOnly, h, headCell, setClass, setText } from '../../ui/dom';
 import { defineLab } from '../types';
@@ -157,9 +157,8 @@ export default defineLab({
       const tr = h('tr', null, h('td', { class: 'mono' }, w.label), h('td', { class: 'mono' }, `T${w.step}`), h('td', { class: 'mono' }, formatControlWord(word)), h('td', null, describeTransfer(word)));
       return { ...w, tr };
     });
-    const wtable = h(
-      'div',
-      { class: 'table-scroll' },
+    const wtable = scrollBox(
+      'Micro-steps of LDA, ADD, OUT',
       h('table', { class: 'truth-table', style: 'text-align:left' }, h('thead', null, h('tr', null, ['', 'step', 'control word', 'what moves'].map((x) => headCell(x)))), h('tbody', null, wrows.map((r) => r.tr))),
     );
     const now = h('div', { class: 'callout' });
@@ -192,7 +191,7 @@ export default defineLab({
       h(
         'div',
         { class: 'lab-grid two' },
-        panel('Control signals', { accent: 'blue', subtitle: 'click a row', chips: '2 × 74LS04 (U49, U53) invert the active-low lines' }, h('div', { class: 'table-scroll' }, table), info),
+        panel('Control signals', { accent: 'blue', subtitle: 'click a row', chips: '2 × 74LS04 (U49, U53) invert the active-low lines' }, scrollBox('Control signals', table), info),
         panel(
           'Micro-steps of LDA, ADD, OUT',
           { accent: 'gray', subtitle: 'from the fetch/execute walkthrough' },

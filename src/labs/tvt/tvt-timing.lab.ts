@@ -1,5 +1,5 @@
 import type { Level } from '../../logic/circuit';
-import { Button, Led, LedBar, Scope, Slider, note, panel, readouts, row, select } from '../../ui/components';
+import { Button, Led, LedBar, Scope, Slider, note, panel, readouts, row, scrollBox, select } from '../../ui/components';
 import { Disposer, animate, h, setText } from '../../ui/dom';
 import { callout, injectStyle, truthTable } from '../latches/_shared';
 import { defineLab } from '../types';
@@ -198,7 +198,7 @@ export default defineLab({
     const tSel = select<TGate>([{ value: 'R', label: 'R, as drawn' }, { value: 'Q', label: 'Q' }], board.jumpers.t, (v) => board.setJumper('t', v), 'IC10 pin 11 to');
     const ic6Bar = new LedBar({ bits: 4, color: 'yellow', label: 'IC6: S R Q P', formats: ['dec'] });
     const tLed = new Led('red', 'T, IC6’s reset, low');
-    const ic6Table = truthTable(['count', 'S', 'R', 'Q', 'P', 'lines'], IC6_ROWS.map((what, n) => [String(n), ...[3, 2, 1, 0].map((b) => String((n >> b) & 1)), what]));
+    const ic6Table = truthTable(['count', 'S', 'R', 'Q', 'P', 'lines'], IC6_ROWS.map((what, n) => [String(n), ...[3, 2, 1, 0].map((b) => String((n >> b) & 1)), what]), 'IC6’s count');
     const ic6Kv = readouts(['IC6 counts', 'T has fired']);
     const ic6Text = callout();
 
@@ -219,7 +219,7 @@ export default defineLab({
       measured.set(p, m);
       return h('tr', null, h('td', null, led.el, ' ', h('b', null, p)), h('td', null, info.from, info.what ? h('span', { class: 'dim' }, ` · ${info.what}`) : null), h('td', { class: 'num' }, info.dots ? hz(DOT_HZ / info.dots) : p === 'S' ? '60 Hz' : '—'), m);
     });
-    const pointsTable = h('div', { style: 'overflow-x:auto;max-width:100%' }, h('table', { class: 'tvt-points' }, h('thead', null, h('tr', null, h('th', null, 'point'), h('th', null, 'from'), h('th', null, 'Lancaster'), h('th', null, 'here'))), h('tbody', null, pointRows)));
+    const pointsTable = scrollBox('Test points', h('table', { class: 'tvt-points' }, h('thead', null, h('tr', null, h('th', null, 'point'), h('th', null, 'from'), h('th', null, 'Lancaster'), h('th', null, 'here'))), h('tbody', null, pointRows)));
     const lineScope = new Scope(lineLanes.map(([label]) => ({ label, color: label === 'HS' ? '#fbbf24' : '#4ade80' })), { width: 640, laneHeight: 26 });
     const frameScope = new Scope(frameLanes.map(([label]) => ({ label, color: label === 'VS' ? '#fbbf24' : label === 'S' ? '#f87171' : '#4ade80' })), { width: 640, laneHeight: 26 });
 

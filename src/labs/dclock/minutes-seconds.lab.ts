@@ -119,7 +119,7 @@ export default defineLab({
     dc.c.settle(1000);
     const one = new SevenSegment({ height: 96 });
     const segBar = new LedBar({ bits: 7, color: 'red', label: 'a b c d e f g' });
-    const table = truthTable(['D C B A', 'a b c d e f g', 'shows'], CD4511_TABLE.map((s, v) => [v.toString(2).padStart(4, '0'), s.split('').join(' '), v < 10 ? String(v) : 'blank']));
+    const table = truthTable(['D C B A', 'a b c d e f g', 'shows'], CD4511_TABLE.map((s, v) => [v.toString(2).padStart(4, '0'), s.split('').join(' '), v < 10 ? String(v) : 'blank']), 'The CD4511’s truth table');
     const decText = callout();
     const setIn = (v: number, l: Level = lt.value, b: Level = bi.value, e: Level = le.value) => {
       bcd.forEach((n, k) => dc.c.set(n, ((v >> k) & 1) as Level));
