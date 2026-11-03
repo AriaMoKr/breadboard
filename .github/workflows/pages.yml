@@ -22,7 +22,7 @@ concurrency:
 
 jobs:
   pages:
-    uses: AriaMoKr/common/.github/workflows/pages.yml@v0.5.0
+    uses: AriaMoKr/common/.github/workflows/pages.yml@v0.8.3
     with:
       build: npm run build
       path: dist
