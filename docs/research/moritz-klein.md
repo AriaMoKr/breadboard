@@ -10,7 +10,8 @@ a group on the site (`OTHER_GROUPS` in `src/app/chapters.ts`), and its labs are 
 `src/labs/synth/`: the breadboard guide's (`using-a-breadboard`), then VCO part 1's
 (`oscillator-core`), part 2's (`exponential-converter`), part 3's (`vco-tuning`) and part 4's
 (`sawtooth-to-square`). His "DIY VCO Series" playlist, which goes on from part 4, is a second
-group, with a lab for its sawtooth-to-triangle quick tip (`sawtooth-to-triangle`).
+group, with labs for its sawtooth-to-triangle quick tip (`sawtooth-to-triangle`) and for adding
+voltage-controlled PWM (`voltage-controlled-pwm`).
 
 Labels: [V] his own words in the video, from YouTube's auto-generated transcript, read in the
 browser (summarised here, not quoted). [D] from the video's description: his bill of materials,
@@ -506,8 +507,115 @@ s); the playlist shows 7:24.
   op amps buffer and invert (his breadboard is filmed upside down); the sawtooth, his
   simulation's ±5 V at 200 Hz, instant at its jump; the output's 1 µF holding its charge over a
   period; and the sequence, the lab's own.
-- [Lab] The site's group lists all four videos after part 4. The tip has its lab, the PWM video
-  is to get one next, and the module video and the kit's introduction stay listed without.
+
+### Adding voltage controlled PWM to my VCO
+
+- [D] Parts: two 100k, two 68k, a 14k, a 1k, a 250k linear mono pot and a TL074. The offset pot
+  isn't listed: [I] part 4's 100k pulse-width pot, set up again as a divider.
+- [D] Chapters: intro and sound demo, the trouble with pulse waves and AC coupling (1:02),
+  comparators as saw-to-square converters (7:30), controlling the pulse width with external CV
+  (11:10), output impedances (13:00), another sound demo and outro (14:33). Links: his Patreon,
+  the Erica kit, and his simulation.
+- [S] His simulation is the finished circuit, on a 5 µs step:
+  - a sawtooth of ±1.5 V at 300 Hz from a generator (CircuitJS's, rising), on the comparator's +
+    input, the op amp clipping at ±12 V;
+  - on its − input: a 100k pot ("OFFSET", at 53%) across ±12 V, its wiper through 100k, with 14k
+    to ground;
+  - a CV slider from −7 to +7 V (at 0.42 V) through a 250k pot as a variable resistor ("CV INT",
+    at 0.5%: 1.25k) and 68k to the same − input;
+  - the output through 100k, with 68k to ground, into a follower (its − input on its output), then
+    1k to the output. At the moment it was saved the follower stood at −4.857 V, −12 V divided.
+- [V] The intro: most of his VCO works, but he missed voltage control of the pulse's width, which
+  only a knob set. After a demo of the result, the video adds it, fixing a bug on the way.
+- [V] The bug: built as in part 4, the square out on a scope is centred on 0 V at 50%, but as the
+  width grows the whole wave slides down, its centre reaching about −4.5 V at the widest: an
+  offset too big to live with, audible as distortion. The AC coupling (1 µF, then 100k to ground)
+  is there; it just doesn't suit every wave.
+- [V] His water analogy, with three examples: the capacitor a stretchy membrane that can move a lot
+  of water, the large resistor a thin pipe to ground that lets little through.
+  - A 50% square with no offset, rising to 5 V: the step pushes through the membrane, and during
+    the high phase a little leaks away through the pipe, so the voltage sags; swinging low it lands
+    a little below −5 V and recovers slightly; it stays centred on 0 V, almost unchanged.
+  - The same square raised, both phases positive: the voltage sags during both, so its centre
+    sinks period after period; once its low phase is below 0 V the sinking slows, and it settles
+    when the centre is at 0 V, where what the high phase loses the low phase gains back, the two
+    being equally long.
+  - A 5% pulse raised: it sinks too, but once its low phase is a little below 0 V the long low
+    phase gains back what the short high phase loses, and it stays far off centre, as on his
+    scope. AC coupling only centres a symmetrical wave, which is why it works for sawtooth, sine
+    and triangle waves.
+- [V] The comparator: part 4's way was roundabout, an op amp to amplify the sawtooth and then a
+  Schmitt trigger inverter, whose pulse sat 6 V up. A comparator needs one op amp and no feedback,
+  the signal on its + input and a threshold on its − input: it amplifies the difference so much
+  that its output is nearly always at ±12 V here, high while the sawtooth is above the threshold
+  and low while below. So the threshold also sets the width; his graphs show a sawtooth against
+  several thresholds.
+- [V] On the breadboard: the sawtooth core, a 100k pot as a divider for the threshold. Centred it
+  gives nearly 50%, but most of its turn does nothing: the sawtooth swings only about ±1.5 V, and
+  past that the output stays high or low and the oscillation stops. The threshold has to stay
+  inside that swing: a 100k in place of the jumper and 14k to ground scale ±12 V to about ±1.5 V,
+  and most of the turn then works.
+- [V] External CV: mixed in through another resistor, whose value sets how much of the mix is its
+  own. Two questions decide it: the range coming in, and whether the PWM should go through zero
+  (the CV able to stop the pulse). His LFOs give +7 to −7 V and he wants it through zero; trial and
+  error, rather than a calculation, gave 68k, with a 250k pot in series to set how strongly the CV
+  acts, through a jack socket. With the intensity up, it goes through zero on his scope.
+- [V] Output impedance: the comparator swings around 24 V peak to peak where 10 is wanted. Part 4's
+  plain divider works, but left the output 20k behind the jack, easily dragged down by a load;
+  professional modules have about 1k. A divider of smaller resistors would waste current to
+  ground, almost 10 mA by his count. So a large divider buffered by an op amp, with 1k between it
+  and the jack; the saw out's 20k on the schematic becomes 1k too. Built: the comparator's output
+  through 100k with 68k to ground into another buffer, 1k to a new jack.
+- [V] The demo: a slow LFO sounds like several detuned oscillators, through zero it becomes a
+  rhythm, and an audio-rate oscillator on the CV gives harsh, strange tones. The comparator frees a
+  Schmitt trigger inverter, so one 40106 could in theory run six VCOs, more than anyone needs.
+- [I] The model (`src/labs/synth/_analog.ts`):
+  - part 4's square out, its pulse 0 or 12 V: the 1 µF keeps its average at 0 V, so its middle is
+    (6 − 12d) V, five sixths of it after the 20k and 100k: 0 V at 50%, −4.5 V at 95%. Part 4's model
+    pulse stops at about 84% (a middle of −3.4 V), so the lab's first step sets the width directly;
+  - AC coupling from rest (`coupledFromRest`), at 40 Hz through 1 µF and 100k (0.1 s): ±5 V settles
+    at ±5.31 V (its first period's middle −0.29 V); the square from +2 to +12 V starts with a middle
+    of about 6.3 V and comes down to 0 V; the 5% pulse settles at +9.56 and −0.56 V, its middle +4.5
+    V;
+  - the comparator's width (`comparatorWidth`): the sawtooth after part 1's 1 µF (0.1 s) falls from
+    its top as −Sτ + (top + Sτ)e^(−t/τ), S the jump over the period, and the width is the time it
+    takes to reach the threshold. At C3 it swings +1.22 to −1.18 V with TI's typical thresholds,
+    where his scope shows about ±1.5 V;
+  - the threshold (`thresholdOf`) by Millman's theorem from its feeds: the wiper behind the halves
+    of its pot and the 100k, the 14k to 0 V, and the CV through 68k and the intensity pot. The bare
+    pot gives a pulse over 10% of its turn, the jump over 24 V; 100k and 14k take ±12 V to ±1.474 V,
+    a pulse over 86% of it (from 7% to 93%), and with the 68k beside the 14k the ends are ±1.248 V;
+  - the CV's share: 0.156 with the intensity up (±1.09 V of the LFO's ±7 V), 0.038 at 250k (±0.27
+    V). Centred and turned up, a ±7 V triangle takes the width from 4.9% to 96.1%, just short of
+    zero; about a twentieth of the offset pot's turn either way and it goes through;
+  - the output stage (`outStage`), from the TL074's ±10.5 V: 4.25 V open. 100k and 68k alone are
+    40.5k behind and lose 29% into a module's 100k; 1k and 680 Ω are 405 Ω behind but take 6.25 mA;
+    the buffer and 1k lose 1%, the divider taking 63 µA. From ±12 V his divider gives ±4.86 V.
+- [I] The sound (`PwmTone` in `src/labs/synth/_sound.ts`): the browser's sawtooth less a copy of it
+  delayed by the width, which is a pulse as free of aliasing as the sawtooth. The threshold, a
+  steady voltage and a triangle LFO, goes through a curve of the model's width, so the delay
+  follows it sample by sample; a gate shuts the pulse off where the output is stuck, since a
+  delay of a whole period leaves the sawtooth's jump behind, smeared by the delay's interpolation.
+  Rendered offline, its widths match the model's.
+- [Lab] The lab (`voltage-controlled-pwm`) has seven steps:
+  - the trouble with pulse waves: part 4's square out, the 40106's width on a slider;
+  - AC coupling, cycle by cycle: his three examples from the moment each is connected;
+  - a comparator: the offset pot through a jumper, with a chart of the width over its turn;
+  - 100k and 14k: the same chart, with the jumper's dashed;
+  - external CV: an LFO or a steady voltage through the intensity pot and 68k, with charts of the
+    width over the LFO's cycle or the CV, and whether it goes through zero;
+  - output impedances: the divider alone, a low-value one, or his buffer and 1k, into a scope, a
+    module's input, three inputs or 10k;
+  - the sound: the finished circuit with a sequencer playing part 4's arpeggio and an LFO on the
+    CV, with his three sounds as presets.
+
+  Its estimates, said on the page: the sawtooth, the core's with TI's typical thresholds; the
+  TL074's swing for both op amps; the first step's width set directly; the three examples at 40
+  Hz, ±5 V and 7 V up; the LFO, a triangle with no resistance of its own; the low-value divider
+  and the loads; the note, C3, until the last step; the sequence; and the audio-rate oscillator, a
+  triangle at 110 Hz.
+- [Lab] The site's group lists all four videos after part 4. The tip and the PWM video have their
+  labs, and the module video and the kit's introduction stay listed without.
 
 ## The other series
 
@@ -637,7 +745,8 @@ kit", 3-8 minutes each) are left out, and so is the rest of the DIY VCO series, 
   - "The exponential converter" (part 2);
   - "Tuning the VCO" (part 3);
   - "Sawtooth to square" (part 4);
-  - "Sawtooth to triangle" (the quick tip).
+  - "Sawtooth to triangle" (the quick tip);
+  - "Voltage-controlled PWM" (adding it to his VCO).
 
   The embeds and links work as Ben's do (youtube-nocookie), with the playlist or his channel as
   the source.

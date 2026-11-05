@@ -256,7 +256,7 @@ export const OTHER_GROUPS: MoreGroup[] = [
     videos: [
       m('OCAb2UoSPs0', 'How to build a DIY 3X VCO module from scratch', '16:17', '2020-09-28'),
       m('4r3TTaUKNe0', 'DIY SYNTH Quick Tip: Sawtooth-to-Triangle Converter', '15:41', '2021-01-18', 'sawtooth-to-triangle'),
-      m('FUz3gFAh9pY', 'Adding voltage controlled PWM to my VCO', '17:25', '2021-04-18'),
+      m('FUz3gFAh9pY', 'Adding voltage controlled PWM to my VCO', '17:25', '2021-04-18', 'voltage-controlled-pwm'),
       m('8JuYLLpZzBs', 'Introducing the mki x es.edu DIY VCO kit', '7:23', '2022-01-09'),
     ],
   },

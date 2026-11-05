@@ -2,13 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { ANALOG_CHIPS, CHIPS, CHIP_IDS, chipDef } from '../src/breadboard/catalog';
 import { validateLayout } from '../src/breadboard/layout';
 import {
-  BC548C, CLAMP_IN, Coupling, D1N4148, FloatingInput, PHONES, R_FOLLOW, R_OUT, Relaxation, SAW_AMP, SCOPE_IN, SQUARE_DIV, SchmittCore, SinkCore, TRI, TRI_BASIC, TRI_BUILT, TRI_SAW, TUNING,
-  V12, VDIODE, VD_PULL, VN, VP, VSAT, VSAT12, amplify, baseVoltage, collectorCurrent, comparator, converter, coreTimes, coreWave, coupled, coupledRamp, coupledSaw, diodePoint, divide,
-  follower, gainOf, ledCurrent, mixer, noteHz, noteOf, offsetFor, par, pickupTau, pnpSaturationCurrent, potForPulse, pulse, pulseWidth, rampTop, relaxationPeriod, sampleCore,
-  saturationCurrent, sawOut, sawToTriangle, sawTop, sawWave, schmittOut, shaperIn, sinkTimes, squareOut, thermalVoltage, thermistor, thresholds, tune, wiper,
+  BC548C, CLAMP_IN, Coupling, D1N4148, FloatingInput, OUT_STAGES, PHONES, PWM, PWM_TAU, R_FOLLOW, R_OUT, Relaxation, SAW_AMP, SCOPE_IN, SQUARE_DIV, SQUARE_Z, SchmittCore, SinkCore, TRI,
+  TRI_BASIC, TRI_BUILT, TRI_SAW, TUNING, V12, VDIODE, VD_PULL, VN, VP, VSAT, VSAT12, amplify, baseVoltage, collectorCurrent, comparator, comparatorWidth, converter, coreTimes, coreWave,
+  coupled, coupledFromRest, coupledRamp, coupledSaw, cvShare, diodePoint, divide, follower, gainOf, ledCurrent, meet, mixer, noteHz, noteOf, offsetFeed, offsetFor, outStage, par,
+  pickupTau, pnpSaturationCurrent, potForPulse, pulse, pulseWidth, pwmBuilt, rampTop, relaxationPeriod, sampleCore, saturationCurrent, sawOut, sawToTriangle, sawTop, sawWave,
+  schmittOut, shaperIn, sinkTimes, squareOut, thermalVoltage, thermistor, thresholdOf, thresholds, tune, wiper, type Threshold,
 } from '../src/labs/synth/_analog';
 import { guideLayout, guideNets, type Setup } from '../src/labs/synth/_board';
-import { harmonics, periodicWave } from '../src/labs/synth/_sound';
+import { PWM_SPAN, PwmTone, harmonics, periodicWave, pwmCurve, pwmGate, triangle } from '../src/labs/synth/_sound';
 
 /** Rising edges of `Relaxation`'s output over `secs`, stepped `dt` at a time, after the first one. */
 function periods(rf: number, c: number, dt: number, secs: number): number[] {
@@ -874,5 +875,171 @@ describe('synth: the sawtooth-to-triangle converter', () => {
     expect(VSAT12).toBeCloseTo(10.5, 12);
     expect(Math.min(...r.b)).toBe(-VSAT12);
     expect(r.b[400]).toBeCloseTo(-2 * r.a[400], 12);
+  });
+});
+
+describe('synth: voltage-controlled PWM', () => {
+  const C3 = noteHz('C3');
+  const JUMPER: Threshold = { turn: 0.5, rOffset: 0, rGround: Infinity, rCv: null };
+  const DIVIDED: Threshold = { turn: 0.5, rOffset: PWM.offset, rGround: PWM.ground, rCv: null };
+  /** How much of the offset pot's turn gives a pulse at C3, from `n` + 1 settings. */
+  const usable = (t: Threshold, n = 4000) => {
+    let k = 0;
+    for (let i = 0; i <= n; i++) {
+      const w = comparatorWidth(thresholdOf({ ...t, turn: i / n }), C3);
+      if (w > 0 && w < 1) k++;
+    }
+    return k / (n + 1);
+  };
+  /** A wave high `d` of each period of `per` readings, from `lo` to `hi`, for `periods` periods. */
+  const train = (lo: number, hi: number, d: number, per: number, periods: number) => Array.from({ length: per * periods }, (_, k) => (k % per < d * per ? hi : lo));
+  const mid = (v: readonly number[]) => (Math.max(...v) + Math.min(...v)) / 2;
+
+  it('the AC coupling keeps a wave’s average at 0 V, not its middle: part 4’s square out at 95% is about 4.5 V down', () => {
+    // 0 or 12 V from the 40106, high d of the time: 12 (1 − d) and −12 d after the 1 µF, five sixths of it after the 20k and 100k
+    for (const d of [0.5, 0.7, 0.95]) {
+      const out = squareOut(Array.from({ length: 1000 }, (_, k) => k < d * 1000), C3);
+      expect(out.reduce((a, b) => a + b, 0) / out.length, String(d)).toBeCloseTo(0, 6);
+      expect(mid(out), String(d)).toBeCloseTo(((6 - 12 * d) * 5) / 6, 1);
+    }
+    expect(mid(squareOut(Array.from({ length: 1000 }, (_, k) => k < 950), C3))).toBeCloseTo(-4.5, 1);
+    // part 4's own pulse stops at about 84%, its middle about −3.4 V
+    const p = pulse(C3, 200e3, 38e3, PWM_TAU);
+    expect(p.width).toBeGreaterThan(0.83);
+    expect(p.width).toBeLessThan(0.86);
+    expect(mid(squareOut(p.out, C3))).toBeCloseTo(-3.4, 1);
+  });
+
+  it('his three examples: a square centres itself on 0 V from any offset, a 5% pulse stops with its low phase just below 0 V', () => {
+    const per = 100, T = 1 / 40, tau = 1e-6 * 100e3, dt = T / per;
+    const run = (lo: number, hi: number, d: number, periods: number) => coupledFromRest(train(lo, hi, d, per, periods), dt, tau);
+    // from the moment it is connected the capacitor is empty: the wave comes straight through
+    expect(run(2, 12, 0.5, 1).slice(0, 1)[0]).toBe(12);
+    // a ±5 V square droops a little in each phase and stays centred
+    const square = run(-5, 5, 0.5, 200).slice(-per);
+    expect(mid(square)).toBeCloseTo(0, 6);
+    expect(Math.max(...square)).toBeCloseTo((10 * -Math.expm1(-T / 2 / tau)) / -Math.expm1(-T / tau), 6);
+    // 7 V up, it drifts down period by period, until its middle is at 0 V
+    const offset = run(2, 12, 0.5, 200);
+    const mids = Array.from({ length: 200 }, (_, p) => mid(offset.slice(p * per, (p + 1) * per)));
+    expect(mids[0]).toBeGreaterThan(6);
+    for (let p = 1; p < 40; p++) expect(mids[p]).toBeLessThan(mids[p - 1]);
+    expect(mids[199]).toBeCloseTo(0, 6);
+    // a 5% pulse settles with its low phase just below 0 V, its middle about 4.5 V up
+    const narrow = run(2, 12, 0.05, 200).slice(-per);
+    expect(Math.min(...narrow)).toBeLessThan(0);
+    expect(Math.min(...narrow)).toBeGreaterThan(-1);
+    expect(mid(narrow)).toBeCloseTo(4.5, 1);
+    // settled, it is `coupled`'s wave (which spreads each jump over a reading)
+    const settled = coupled(train(2, 12, 0.05, per, 1), T, tau);
+    expect(Math.min(...narrow)).toBeCloseTo(Math.min(...settled), 2);
+    expect(Math.abs(Math.max(...narrow) - Math.max(...settled))).toBeLessThan(0.02);
+  });
+
+  it('feeds meet where their currents balance (Millman), a stiff one setting it outright', () => {
+    expect(meet([{ v: 1, r: 1e3 }, { v: 0, r: 1e3 }])).toBeCloseTo(0.5, 12);
+    expect(meet([{ v: 12, r: 100e3 }, { v: 0, r: 14e3 }])).toBeCloseTo((12 * 14) / 114, 12);
+    expect(meet([{ v: 3, r: 0 }, { v: 0, r: 1e3 }])).toBe(3);
+    expect(meet([{ v: 5, r: Infinity }, { v: 2, r: 1e3 }])).toBe(2);
+    expect(meet([])).toBe(0);
+  });
+
+  it('the comparator’s width: the time the sawtooth spends above the threshold', () => {
+    const saw = coupledSaw(4096, 1 / C3, PWM_TAU), top = saw[0], { vp, vn } = thresholds(V12);
+    expect(comparatorWidth(top, C3)).toBe(0);
+    expect(comparatorWidth(top + 0.1, C3)).toBe(0);
+    expect(comparatorWidth(top - (vp - vn), C3)).toBe(1);
+    for (const vth of [-1, -0.5, 0, 0.3, 1]) {
+      const above = saw.filter((v) => comparator(v, vth, VSAT12) > 0).length / saw.length;
+      expect(comparatorWidth(vth, C3), String(vth)).toBeCloseTo(above, 3);
+    }
+    // centred, it is close to a square; it widens as the threshold falls
+    expect(comparatorWidth(0, C3)).toBeCloseTo(0.5, 1);
+    expect(comparatorWidth(-0.5, C3)).toBeGreaterThan(comparatorWidth(0.5, C3));
+  });
+
+  it('the bare pot gives a pulse over a tenth of its turn; 100k and 14k scale ±12 V to ±1.47 V, most of it', () => {
+    // with the jumper the threshold is the wiper itself
+    for (const turn of [0, 0.25, 0.5, 1]) expect(thresholdOf({ ...JUMPER, turn })).toBeCloseTo(24 * turn - 12, 12);
+    const { vp, vn } = thresholds(V12);
+    expect(usable(JUMPER)).toBeCloseTo((vp - vn) / 24, 2);
+    expect(usable(JUMPER)).toBeCloseTo(0.1, 2);
+    expect(thresholdOf({ ...DIVIDED, turn: 0 })).toBeCloseTo((-12 * 14) / 114, 12);
+    expect(thresholdOf({ ...DIVIDED, turn: 1 })).toBeCloseTo((12 * 14) / 114, 12);
+    expect(usable(DIVIDED)).toBeCloseTo(0.86, 2);
+    // the 68k in the mix (the CV at 0 V) leaves the pot ±1.25 V
+    expect(thresholdOf(pwmBuilt(1))).toBeCloseTo(12 / (1 + 100 / 14 + 100 / 68), 12);
+    expect(usable(pwmBuilt(0.5))).toBeGreaterThan(0.95);
+    // the offset feed: the wiper behind its pot's two halves and the 100k
+    expect(offsetFeed(pwmBuilt(0.5))).toEqual({ v: 0, r: 125e3 });
+  });
+
+  it('the CV’s share: ±7 V moves the threshold about ±1.09 V with the intensity up, ±0.27 V with it down', () => {
+    const up = pwmBuilt(0.5, 0), down = pwmBuilt(0.5, PWM.intensity);
+    expect(cvShare(up)).toBeCloseTo(1 / 68e3 / (1 / 125e3 + 1 / 14e3 + 1 / 68e3), 12);
+    expect(PWM.lfo * cvShare(up)).toBeCloseTo(1.0936, 3);
+    expect(PWM.lfo * cvShare(down)).toBeCloseTo(0.2666, 3);
+    expect(cvShare(DIVIDED)).toBe(0);
+    // it moves the threshold in proportion
+    expect(thresholdOf(up, 7) - thresholdOf(up, 0)).toBeCloseTo(7 * cvShare(up), 12);
+    // centred and turned up, the LFO takes the width from about 5% to 96%: just short of zero
+    expect(comparatorWidth(thresholdOf(up, 7), C3)).toBeCloseTo(0.049, 2);
+    expect(comparatorWidth(thresholdOf(up, -7), C3)).toBeCloseTo(0.961, 2);
+    // a twentieth of a turn down, the LFO's −7 V takes the threshold below the sawtooth: no pulse
+    expect(comparatorWidth(thresholdOf(pwmBuilt(0.45, 0), -7), C3)).toBe(1);
+    expect(comparatorWidth(thresholdOf(pwmBuilt(0.46, 0), -7), C3)).toBeLessThan(1);
+  });
+
+  it('the output: 100k and 68k alone are 40k behind, buffered 1k; a low-value divider takes milliamps', () => {
+    const open = (VSAT12 * 68) / 168;
+    // all three take it down alike, the low-value divider's halves a hundredth of the others'
+    for (const stage of ['divider', 'low', 'buffered'] as const) expect(outStage(VSAT12, stage).open, stage).toBeCloseTo(open, 9);
+    expect(OUT_STAGES.low.top * 100).toBe(OUT_STAGES.divider.top);
+    expect(outStage(VSAT12, 'divider').z).toBeCloseTo(par(100e3, 68e3), 6);
+    expect(outStage(VSAT12, 'buffered').z).toBe(1e3);
+    // into a module's 100k: 29% lost behind the divider alone, 1% behind the buffer's 1k
+    expect(1 - outStage(VSAT12, 'divider', 100e3).out / open).toBeCloseTo(0.288, 3);
+    expect(1 - outStage(VSAT12, 'buffered', 100e3).out / open).toBeCloseTo(0.0099, 4);
+    expect(1 - outStage(VSAT12, 'low', 100e3).out / open).toBeCloseTo(0.004, 3);
+    // the current: tens of microamps through the high values, 6.25 mA through 1k and 680 Ω
+    expect(outStage(VSAT12, 'buffered').current).toBeCloseTo(VSAT12 / 168e3, 9);
+    expect(outStage(VSAT12, 'low').current).toBeCloseTo(6.25e-3, 6);
+    expect(outStage(VSAT12, 'low').toGround).toBeCloseTo(6.25e-3, 6);
+    // from a full ±12 V his divider gives ±4.86 V, about 10 V peak to peak; part 4's square out was 16.7k behind
+    expect(outStage(V12, 'buffered').open).toBeCloseTo(4.857, 3);
+    expect(SQUARE_Z).toBeCloseTo(par(20e3, 100e3), 6);
+  });
+
+  it('the voice: its curve gives the width less a half, and its LFO is a sine-phase triangle', () => {
+    const curve = pwmCurve((v) => comparatorWidth(v, C3), 2049);
+    expect(curve.length).toBe(2049);
+    expect(curve[0]).toBe(0.5);
+    expect(curve[2048]).toBe(-0.5);
+    expect(curve[1024]).toBeCloseTo(comparatorWidth(0, C3) - 0.5, 6);
+    // a quarter of the way along is −PWM_SPAN / 2
+    expect(curve[512]).toBeCloseTo(comparatorWidth(-PWM_SPAN / 2, C3) - 0.5, 6);
+    // a width past 0 or 1 is held there
+    expect(Array.from(pwmCurve(() => 1.5, 5))).toEqual([0.5, 0.5, 0.5, 0.5, 0.5]);
+    expect(Array.from(pwmCurve(() => -1, 3))).toEqual([-0.5, -0.5, -0.5]);
+    // the gate is shut where the output is stuck: past the sawtooth's bottom (high) and its top (low)
+    const gate = pwmGate((v) => comparatorWidth(v, C3), 2049), top = coupledSaw(1, 1 / C3, PWM_TAU)[0], { vp, vn } = thresholds(V12);
+    expect(gate[0]).toBe(0);
+    expect(gate[1024]).toBe(1);
+    expect(gate[2048]).toBe(0);
+    const at = (v: number) => Math.round(((v / PWM_SPAN + 1) / 2) * 2048);
+    expect(gate[at(top) - 2]).toBe(1);
+    expect(gate[at(top) + 2]).toBe(0);
+    expect(gate[at(top - (vp - vn)) + 2]).toBe(1);
+    expect(gate[at(top - (vp - vn)) - 2]).toBe(0);
+    for (const [ph, v] of [[0, 0], [0.125, 0.5], [0.25, 1], [0.5, 0], [0.75, -1], [1, 0], [-0.25, -1], [2.25, 1]]) expect(triangle(ph), String(ph)).toBeCloseTo(v, 12);
+  });
+
+  it('the voice does nothing where there is no AudioContext', () => {
+    const v = new PwmTone();
+    v.set(C3, (x) => comparatorWidth(x, C3), 'c', 0, 1, 0.5);
+    expect(v.playing).toBe(false);
+    expect(v.lfoPhase()).toBe(null);
+    v.stop();
+    v.dispose();
   });
 });

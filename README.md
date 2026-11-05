@@ -146,8 +146,8 @@ and Moritz Klein's synth, from his
   video, with a stand-in for the memory board that you type into, and the TV draws the text.
 * **Moritz Klein's labs** (`#/lab/using-a-breadboard`, `#/lab/oscillator-core`,
   `#/lab/exponential-converter`, `#/lab/vco-tuning`, `#/lab/sawtooth-to-square`,
-  `#/lab/sawtooth-to-triangle`): his synthesizer videos, from his "For Beginners" playlist on,
-  then his "DIY VCO Series" playlist.
+  `#/lab/sawtooth-to-triangle`, `#/lab/voltage-controlled-pwm`): his synthesizer videos, from his
+  "For Beginners" playlist on, then his "DIY VCO Series" playlist.
   The first lab is his complete beginner's guide to using a breadboard: four circuits on one
   board, a TL074 on two 9 V batteries, with his parts and values. They are an LED, a crude op-amp
   inverter (its − input on the + rail, the − rail or left floating), an oscillator that flashes
@@ -175,8 +175,15 @@ and Moritz Klein's synth, from his
   a triangle. Its two 10k must be a matched pair (a close-up shows the step at the peak when
   they aren't), the input is AC coupled through a buffer, and the output needs 20k to −12 V
   before its own AC coupling gives anything. A sequencer plays the finished triangle beside a
-  chart of its harmonics. The analog parts are small per-lab models with his values
-  (`src/labs/synth/_analog.ts`).
+  chart of its harmonics. The seventh adds voltage control to the pulse's width, and fixes part
+  4's square out, which drifts off centre as its pulse widens: his three examples show, cycle by
+  cycle, why AC coupling centres only a symmetrical wave. A comparator, one op amp with the
+  sawtooth on one input and a threshold on the other, makes the pulse with no offset to remove.
+  100k and 14k keep its threshold within the sawtooth's swing (charts show the pot's turn without
+  and with them), a CV comes in through 68k and a 250k intensity pot, and a buffered divider with
+  1k behind it brings the output to about 10 V peak to peak, tried into loads beside a plain
+  divider. The sequencer plays it with an LFO on the CV, slow, through zero or at audio rate. The
+  analog parts are small per-lab models with his values (`src/labs/synth/_analog.ts`).
 * **More videos** (`#/more`): Ben's videos outside the playlist that go with it. These are his first
   build running programs and his introduction to transistors and logic gates (both from 2015 and
   linked from eater.net/8bit), plus his digital clock series (2026, eater.net/clock). Then other

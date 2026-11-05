@@ -7,9 +7,10 @@
  * follower in front of that base, and the scale tuned with a trimmer; then part 4's thermistors and
  * fine-tune knob in its mixer, and the sawtooth amplified and shaped into a pulse by another of the
  * 40106's inverters; then, from his "DIY VCO Series" after part 4, the quick tip's
- * sawtooth-to-triangle converter, an inverting buffer and two 1N4148s. Time is in seconds, voltages
- * in volts, currents in amps. Plain arithmetic, as src/labs/dclock/_analog.ts does for Ben's clock,
- * so the labs and the tests share it.
+ * sawtooth-to-triangle converter, an inverting buffer and two 1N4148s; and the PWM video's
+ * comparator, its threshold a passive mixer of a pot and a CV, with a buffered output. Time is in
+ * seconds, voltages in volts, currents in amps. Plain arithmetic, as src/labs/dclock/_analog.ts
+ * does for Ben's clock, so the labs and the tests share it.
  */
 
 import { rng } from '../dclock/_analog';
@@ -914,3 +915,122 @@ export function sawToTriangle(t: TriSetup, hz = TRI_SAW.hz, n = 512) {
   const at = t.inCap ? (-tau * Math.log1p(-top / (top + s * tau))) / period : top / (2 * amp);
   return { saw, a, b, node, out, vc, gain, ends: { after, before }, cross: top > 0 && bottom < 0 ? at : null };
 }
+
+// ---------------------------------------------------------------------------
+// The PWM video: a comparator for the pulse, its threshold voltage controlled, and a buffered output
+
+/**
+ * A wave through a capacitor in series, with `tau` (R C) to ground after it, from the moment it is
+ * connected with the capacitor empty: `input` is steady over each reading, `dt` long, and what
+ * comes out is the input less what the capacitor holds, which heads for the input as e^(−t/τ) does.
+ * Exact for an input that changes only between readings. (`coupled` gives the settled wave, but
+ * spreads each jump over a reading.)
+ */
+export function coupledFromRest(input: readonly number[], dt: number, tau: number): number[] {
+  const a = Math.exp(-dt / tau);
+  let vc = 0;
+  return input.map((x) => {
+    const y = x - vc;
+    vc = x + (vc - x) * a;
+    return y;
+  });
+}
+
+/**
+ * The PWM video's parts, from his bill of materials and the video: the threshold's passive mixer,
+ * the 100k offset pot across ±12 V through 100k, the CV through the 250k intensity pot and 68k,
+ * and 14k to ground; and his LFOs' swing, ±7 V.
+ */
+export const PWM = { pot: 100e3, offset: 100e3, ground: 14e3, cv: 68e3, intensity: 250e3, lfo: 7 };
+
+/** Where the comparator picks up the sawtooth: part 4's, after part 1's 1 µF, into its 100k (part 2's two 10k long gone). */
+export const PWM_TAU = pickupTau(false);
+
+/**
+ * The voltage where `feeds` meet with nothing else taking current, as at an op amp's input: each
+ * pulls it towards its own voltage as hard as its resistance lets it (Millman's theorem). A feed
+ * with no resistance sets it outright; one with infinite resistance adds nothing.
+ */
+export function meet(feeds: readonly Feed[]): number {
+  const stiff = feeds.find((f) => f.r === 0);
+  if (stiff) return stiff.v;
+  let g = 0, gv = 0;
+  for (const f of feeds) {
+    if (!Number.isFinite(f.r)) continue;
+    g += 1 / f.r;
+    gv += f.v / f.r;
+  }
+  return g ? gv / g : 0;
+}
+
+/** What feeds the comparator's − input, as the video builds it up. */
+export interface Threshold {
+  /** The offset pot's turn: 0 at its −12 V end, 1 at its +12 V end. */
+  turn: number;
+  /** Between its wiper and the − input: 0 (a jumper) at first, then 100k. */
+  rOffset: number;
+  /** From the − input to ground: Infinity (nothing) at first, then 14k. */
+  rGround: number;
+  /** The CV path, its 68k and the intensity pot together, or null before there is one. */
+  rCv: number | null;
+}
+
+/** The offset pot's wiper, as a feed into the − input: −12 to +12 V, behind its two parts in parallel and the resistor after them. */
+export function offsetFeed(t: Threshold): Feed {
+  const w = wiper(t.turn, 2 * V12, PWM.pot);
+  return { v: w.v - V12, r: w.r + t.rOffset };
+}
+
+/** The threshold with `cv` on the CV path (0 V: something in the jack, at 0 V). */
+export function thresholdOf(t: Threshold, cv = 0): number {
+  const feeds: Feed[] = [offsetFeed(t), { v: 0, r: t.rGround }];
+  if (t.rCv !== null) feeds.push({ v: cv, r: t.rCv });
+  return meet(feeds);
+}
+
+/** How far the threshold moves for each volt on the CV path: the CV's share of the mixer (0 without a path). */
+export const cvShare = (t: Threshold) => (t.rCv === null ? 0 : thresholdOf(t, 1) - thresholdOf(t, 0));
+
+/** As built at the end of the video, the intensity pot at `intensity` ohms. */
+export const pwmBuilt = (turn: number, intensity = 0): Threshold => ({ turn, rOffset: PWM.offset, rGround: PWM.ground, rCv: PWM.cv + intensity });
+
+/**
+ * How much of the time a comparator's output is high, with the core's sawtooth on its + input at
+ * `hz` after part 4's 1 µF (`tau`) and `vth` on its − input: from the jump until the sawtooth's
+ * fall (`coupledRamp`'s curve) gets down to it. 0 with the threshold at or above the top, 1 at or
+ * below the bottom: no pulse either way.
+ */
+export function comparatorWidth(vth: number, hz: number, tau = PWM_TAU, vdd = V12): number {
+  const { vp, vn } = thresholds(vdd);
+  const jump = vp - vn, period = 1 / hz, s = jump / period, top = rampTop(period, tau, jump);
+  if (vth >= top) return 0;
+  if (vth <= top - jump) return 1;
+  return Math.min(1, (-tau * Math.log((vth + s * tau) / (top + s * tau))) / period);
+}
+
+/** What follows the comparator to the jack: 100k with 68k to ground alone, a divider a hundred times lower, or his, the 100k and 68k into a buffer and 1k after it. */
+export type OutStage = 'divider' | 'low' | 'buffered';
+export const OUT_STAGES: Record<OutStage, { top: number; bottom: number; buffer: boolean; r: number }> = {
+  divider: { top: 100e3, bottom: 68e3, buffer: false, r: 0 },
+  low: { top: 1e3, bottom: 680, buffer: false, r: 0 },
+  buffered: { top: 100e3, bottom: 68e3, buffer: true, r: 1e3 },
+};
+
+/**
+ * The jack for `v` out of the comparator, into `load` to ground: `open`, with nothing on it (the
+ * divider's middle, which the buffer copies); `z`, the output impedance (the divider's two halves in
+ * parallel, or the buffer's 1k); `out`, into the load; `current`, what the comparator gives, through
+ * the divider and, without the buffer, the load beside its lower half; and `toGround`, what goes
+ * through that lower half.
+ */
+export function outStage(v: number, stage: OutStage, load = Infinity) {
+  const o = OUT_STAGES[stage];
+  const open = divide(v, o.top, o.bottom);
+  const z = o.buffer ? o.r : par(o.top, o.bottom);
+  const out = Number.isFinite(load) ? (open * load) / (load + z) : open;
+  const bottom = o.buffer || !Number.isFinite(load) ? o.bottom : par(o.bottom, load);
+  return { open, z, out, current: v / (o.top + bottom), toGround: (o.buffer ? open : out) / o.bottom };
+}
+
+/** Part 4's square out's output impedance: its 20k with the 100k beside it (the 1 µF a short at audio pitches, the 40106 behind it). */
+export const SQUARE_Z = par(SQUARE_DIV.top, SQUARE_DIV.bottom);

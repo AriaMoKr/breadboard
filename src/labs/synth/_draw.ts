@@ -4,8 +4,8 @@ import type { Kit } from '../clock/_draw';
 /**
  * Symbols the synth labs' schematics need beyond the clock labs' `Kit`: a battery, a supply rail
  * pointing down (for −9 V), a jack socket, an LED turned round, a diode, a Schmitt-trigger
- * inverter, a pot wired as a divider, an NPN transistor facing the other way, a PNP one, and an NTC
- * thermistor.
+ * inverter, a pot wired as a divider and one as a variable resistor, an NPN transistor facing the
+ * other way, a PNP one, and an NTC thermistor.
  */
 
 type P = [number, number];
@@ -54,6 +54,13 @@ export function potDivider(kit: Kit, x: number, y: number): { top: P; bottom: P;
   kit.resistor(x, y, 'v');
   kit.over.appendChild(s('path', { d: `M${x + 22},${y} H${x + 8} M${x + 8},${y} l6,-4 M${x + 8},${y} l6,4`, class: 'part' }));
   return { top: [x, y - 15], bottom: [x, y + 15], wiper: [x + 22, y] };
+}
+
+/** A pot wired as a variable resistor, horizontal and 30 long, centred on (x, y): a resistor with an arrow through it, up to the right. Returns its two ends. */
+export function rheostat(kit: Kit, x: number, y: number): { a: P; b: P } {
+  const r = kit.resistor(x, y, 'h');
+  kit.over.appendChild(s('path', { d: `M${x - 14},${y + 11} L${x + 14},${y - 11} M${x + 14},${y - 11} l-7.5,1.2 M${x + 14},${y - 11} l-2.9,7`, class: 'part' }));
+  return { a: r.a, b: r.b };
 }
 
 /** `Kit.npn` the other way round: its base on the left at (x − 18, y), its collector up to the right and its emitter down to the right. */
