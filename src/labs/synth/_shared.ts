@@ -1,10 +1,26 @@
 import { h, s, setClass, setText } from '../../ui/dom';
+import type { Schematic } from '../../ui/schematic';
 import { noteOf } from './_analog';
 
 /** How the VCO labs (parts 2 to 4) write voltages, currents, times and pitches, and parts 3 and 4's tuner. */
 
 /** The top of hearing. */
 export const HEARING = 20e3;
+
+/**
+ * A schematic's box beside a lab's readouts (`.synth-sch`, which the lab sizes in its row): no wider
+ * than the drawing, and on a touch screen, where the drawing stops shrinking at 3/4 of its size
+ * (styles.css), the box scrolls sideways. `show` puts a drawing in it, at its width as it is then.
+ */
+export function schBox(sch?: Schematic) {
+  const el = h('div', { class: 'synth-sch' });
+  const show = (next: Schematic) => {
+    el.replaceChildren(next.el);
+    el.style.maxWidth = next.el.style.maxWidth;
+  };
+  if (sch) show(sch);
+  return { el, show };
+}
 
 export const fmtV = (v: number) => `${v.toFixed(3)} V`;
 export const mV = (v: number) => `${Math.round(v * 1e3)} mV`;

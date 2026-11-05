@@ -7,7 +7,7 @@ import { callout, injectStyle } from '../latches/_shared';
 import { defineLab } from '../types';
 import { R_FOLLOW, ROOM, TUNING, V12, collectorCurrent, converter, follower, noteHz, noteOf, offsetFor, sinkTimes, thermalVoltage, tune, type Temps } from './_analog';
 import { diode, jack, npnLeft, pnpLeft, potDivider, railDown, schmitt } from './_draw';
-import { HEARING, IN_TUNE, cents, fmtA, fmtCv, fmtV, mV, offText, pitchText, playsText, sMV, sV, tunerCss, tunerRow } from './_shared';
+import { HEARING, IN_TUNE, cents, fmtA, fmtCv, fmtV, mV, offText, pitchText, playsText, sMV, sV, schBox, tunerCss, tunerRow } from './_shared';
 import { Tone } from './_sound';
 
 const SCOPE_CLASS = 'synth-tune';
@@ -62,7 +62,7 @@ const tempText = (t: number, finger: boolean) => `${t.toFixed(1)} °C${finger ? 
 
 const CSS = `
 .${SCOPE_CLASS} .synth-circuit { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: flex-start; }
-.${SCOPE_CLASS} .synth-circuit .schematic { flex: 1 1 440px; min-width: 0; }
+.${SCOPE_CLASS} .synth-sch { flex: 1 1 440px; min-width: 0; }
 .${SCOPE_CLASS} .synth-kv { flex: 1 1 220px; }
 .${SCOPE_CLASS} .schmitt-sign { stroke-width: 1.5; }
 .${SCOPE_CLASS} .kv dd { font-variant-numeric: tabular-nums; }
@@ -605,7 +605,7 @@ export default defineLab({
           potRow,
           trimRow,
           roomRow,
-          h('div', { class: 'synth-circuit' }, sch.el, kvHost),
+          h('div', { class: 'synth-circuit' }, schBox(sch).el, kvHost),
           status,
         ),
         recorderPanel,

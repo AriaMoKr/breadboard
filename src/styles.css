@@ -455,13 +455,14 @@ table.microcode td.editing { position: relative; color: transparent; }
 /* ==========================================================================
    High contrast (forced colours, such as Windows' contrast themes). The browser replaces
    background colours, which is how the simulator draws its state. So the pictures of hardware
-   (LEDs, memory bits, DIP switches, the displays) keep their own colours, outlined in the theme's
-   text colour to show on any background, and the marks of state (a toggle on, a lit signal, the
-   current step, the open tab, the current page) take the theme's Highlight.
+   (LEDs, memory bits, DIP switches, the displays, a scope's screen, whose lanes are drawn for it)
+   keep their own colours, outlined in the theme's text colour to show on any background, and the
+   marks of state (a toggle on, a lit signal, the current step, the open tab, the current page)
+   take the theme's Highlight.
    ========================================================================== */
 @media (forced-colors: active) {
-  .led, .bit, .dip-bank, .display4, .sevenseg { forced-color-adjust: none; }
-  .led { border-color: CanvasText; }
+  .led, .bit, .dip-bank, .display4, .sevenseg, .scope { forced-color-adjust: none; }
+  .led, .scope { border-color: CanvasText; }
   .bit::before { border-color: CanvasText; }
   .toggle-track { forced-color-adjust: none; background: Canvas; border-color: ButtonText; }
   .toggle-knob { background: ButtonText; }

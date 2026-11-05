@@ -1,6 +1,7 @@
 // Browser checks for what the unit tests can't see (npm run check:browser):
-// every page renders without errors, phones get no sideways scrolling and fingertip-sized
-// controls, the sticky toolbar, parts drawer and tap-to-zoom work, the two computer pages share
+// every page renders without errors, phones get no sideways scrolling, fingertip-sized controls
+// and schematics that stop shrinking at 3/4 of their size, in a box that scrolls, the sticky
+// toolbar, parts drawer and tap-to-zoom work, the two computer pages share
 // one machine, sandbox links round-trip, the breadboard view keeps its frame rate, and the VR
 // view builds the computer, runs it and answers the mouse on its boards' switches and buttons,
 // answers a gamepad and a TV's remote (?tv=emulate), and axe-core finds no accessibility problem
@@ -961,7 +962,7 @@ try {
       return `at the door turned ${arrived.yaw}°, walked to the table (z ${walked.z}), snapped to ${turned.yaw}°, jumped ${Math.hypot(jumped.x - turned.x, jumped.z - turned.z).toFixed(1)} m, out through the doorway`;
     });
 
-  await check('high contrast (forced colours): the LEDs, switches, toggles and lit signals keep their states, the open tab and the current page are marked', async () => {
+  await check('high contrast (forced colours): the LEDs, switches, toggles and lit signals keep their states, a scope its dark screen, the open tab and the current page are marked', async () => {
     // A contrast theme (Windows') replaces background colours, which is how the simulator draws its
     // state: the hardware keeps its own colours there and the marks of state take Highlight (styles.css).
     await page.send('Emulation.setEmulatedMedia', { features: [{ name: 'forced-colors', value: 'active' }, { name: 'prefers-color-scheme', value: 'dark' }] });
@@ -991,8 +992,16 @@ try {
         current: getComputedStyle(document.querySelector('.sidebar [aria-current=page]')).outlineStyle,
       };
     })()`);
+    // a scope draws its lanes for its own dark screen
+    const screen = await page.evaluate(`(async () => {
+      location.hash = '#/lab/oscillator-core';
+      await new Promise((r) => setTimeout(r, 600));
+      const e = document.querySelector('.scope');
+      return e ? getComputedStyle(e).backgroundColor : 'none';
+    })()`);
     await page.send('Emulation.setEmulatedMedia', { features: [] });
     assert(r.forced, 'forced colours not emulated');
+    assert(screen === 'rgb(10, 13, 16)', `a scope's screen is ${screen}`);
     const differ = (name, [a, b]) => assert(a !== b && a !== 'none' && b !== 'none', `${name}: on ${a}, off ${b}`);
     differ('an LED', r.led);
     differ('a memory bit', r.bit);
@@ -1002,7 +1011,7 @@ try {
     assert(r.dip[0] === 'rgb(192, 57, 43)' && r.dip[1] !== r.dip[0], `the DIP switches: ${r.dip.join(', ')}`);
     differ('the open tab', r.tab);
     assert(r.current === 'solid', `the current page is not outlined (${r.current})`);
-    return `LEDs ${r.led[0]} / ${r.led[1]}, a lit signal ${r.sig[0]}, the open tab ${r.tab[0]}`;
+    return `LEDs ${r.led[0]} / ${r.led[1]}, a lit signal ${r.sig[0]}, the open tab ${r.tab[0]}, a scope ${screen}`;
   });
 
   await check('comfort settings: a choice made in the Hallway (hallway.access) holds, and less motion stills the page', async () => {
@@ -1124,10 +1133,22 @@ try {
   await page.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
   await page.goto(base); // reload, so touch layouts are chosen
 
-  await check('phones: no page scrolls sideways, every control is at least 24 px', async () => {
+  await check('phones: no page scrolls sideways, every control is at least 24 px, a schematic keeps 3/4 of its size', async () => {
     const problems = await visitAll(routes, `() => {
       const out = [];
       if (document.documentElement.scrollWidth > innerWidth) out.push('page is ' + document.documentElement.scrollWidth + ' px wide');
+      // a schematic stops shrinking at 3/4 of its size (styles.css), and the box it is in scrolls instead
+      for (const e of document.querySelectorAll('#content svg.schematic')) {
+        const w = e.getBoundingClientRect().width;
+        if (!w) continue;
+        const size = parseFloat(e.style.getPropertyValue('--sch-w'));
+        const least = Math.min(0.75 * size, parseFloat(e.style.maxWidth) || Infinity);
+        const box = e.parentElement;
+        const cs = getComputedStyle(box);
+        const what = '“' + (e.getAttribute('aria-label') ?? 'schematic').slice(0, 40) + '”';
+        if (w < least - 1) out.push(what + ' is ' + Math.round(w) + ' px wide, under 3/4 of its ' + size + ' px');
+        else if (w > box.clientWidth + 1 && (cs.display === 'contents' || !/auto|scroll/.test(cs.overflowX))) out.push(what + ' is wider than its box, which does not scroll');
+      }
       const allowed = ${JSON.stringify(SMALL_OK.map(([sel]) => sel))};
       const clickable = (e) => e.matches('button, select, summary, label.toggle, [role=button], [role=switch]') || (e instanceof SVGElement && getComputedStyle(e).cursor === 'pointer');
       const small = new Map();

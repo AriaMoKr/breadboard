@@ -6,7 +6,7 @@ import {
   TRI_BASIC, TRI_BUILT, TRI_SAW, TUNING, V12, VDIODE, VD_PULL, VN, VP, VSAT, VSAT12, amplify, baseVoltage, collectorCurrent, comparator, comparatorWidth, converter, coreTimes, coreWave,
   coupled, coupledFromRest, coupledRamp, coupledSaw, cvShare, diodePoint, divide, follower, gainOf, ledCurrent, meet, mixer, noteHz, noteOf, offsetFeed, offsetFor, outStage, par,
   pickupTau, pnpSaturationCurrent, potForPulse, pulse, pulseWidth, pwmBuilt, rampTop, relaxationPeriod, sampleCore, saturationCurrent, sawOut, sawToTriangle, sawTop, sawWave,
-  schmittOut, shaperIn, sinkTimes, squareOut, thermalVoltage, thermistor, thresholdOf, thresholds, tune, wiper, type Threshold,
+  schmittOut, shaperIn, sinkTimes, squareOut, swingInto, thermalVoltage, thermistor, thresholdOf, thresholds, TL074_LOADED, tune, wiper, type Threshold,
 } from '../src/labs/synth/_analog';
 import { guideLayout, guideNets, type Setup } from '../src/labs/synth/_board';
 import { PWM_SPAN, PwmTone, harmonics, periodicWave, pwmCurve, pwmGate, triangle } from '../src/labs/synth/_sound';
@@ -985,9 +985,25 @@ describe('synth: voltage-controlled PWM', () => {
     // centred and turned up, the LFO takes the width from about 5% to 96%: just short of zero
     expect(comparatorWidth(thresholdOf(up, 7), C3)).toBeCloseTo(0.049, 2);
     expect(comparatorWidth(thresholdOf(up, -7), C3)).toBeCloseTo(0.961, 2);
-    // a twentieth of a turn down, the LFO's −7 V takes the threshold below the sawtooth: no pulse
+    // off centre it goes through zero: the LFO's −7 V takes the threshold below the sawtooth's bottom from
+    // 4.5% of the turn down (the wiper at −1.07 V with nothing on it), its +7 V above the top only from 6%
+    // up (+1.43 V), the sawtooth sitting a little above centre
     expect(comparatorWidth(thresholdOf(pwmBuilt(0.45, 0), -7), C3)).toBe(1);
     expect(comparatorWidth(thresholdOf(pwmBuilt(0.46, 0), -7), C3)).toBeLessThan(1);
+    expect(comparatorWidth(thresholdOf(pwmBuilt(0.55, 0), 7), C3)).toBeGreaterThan(0);
+    expect(comparatorWidth(thresholdOf(pwmBuilt(0.565, 0), 7), C3)).toBe(0);
+    const edge = (cv: number, stuck: (w: number) => boolean, from: number, to: number) => {
+      for (let k = 0; k < 40; k++) {
+        const m = (from + to) / 2;
+        if (stuck(comparatorWidth(thresholdOf(pwmBuilt(m, 0), cv), C3))) from = m;
+        else to = m;
+      }
+      return 24 * from - 12;
+    };
+    expect(edge(-7, (w) => w >= 1, 0, 0.5)).toBeCloseTo(-1.07, 2);
+    expect(edge(7, (w) => w <= 0, 1, 0.5)).toBeCloseTo(1.43, 2);
+    const top = sawTop(1 / C3, PWM_TAU), { vp, vn } = thresholds(V12);
+    expect((top + (top - (vp - vn))) / 2).toBeCloseTo(0.015, 3);
   });
 
   it('the output: 100k and 68k alone are 40k behind, buffered 1k; a low-value divider takes milliamps', () => {
@@ -1001,13 +1017,35 @@ describe('synth: voltage-controlled PWM', () => {
     expect(1 - outStage(VSAT12, 'divider', 100e3).out / open).toBeCloseTo(0.288, 3);
     expect(1 - outStage(VSAT12, 'buffered', 100e3).out / open).toBeCloseTo(0.0099, 4);
     expect(1 - outStage(VSAT12, 'low', 100e3).out / open).toBeCloseTo(0.004, 3);
-    // the current: tens of microamps through the high values, 6.25 mA through 1k and 680 Ω
+    // the current: tens of microamps through the high values, 6.25 mA through 1k and 680 Ω from ±10.5 V
     expect(outStage(VSAT12, 'buffered').current).toBeCloseTo(VSAT12 / 168e3, 9);
     expect(outStage(VSAT12, 'low').current).toBeCloseTo(6.25e-3, 6);
     expect(outStage(VSAT12, 'low').toGround).toBeCloseTo(6.25e-3, 6);
+    // what the comparator drives: the divider, and without the buffer the load beside its lower half
+    expect(outStage(VSAT12, 'low').rIn).toBe(1680);
+    expect(outStage(VSAT12, 'low', 10e3).rIn).toBeCloseTo(1e3 + par(680, 10e3), 9);
+    expect(outStage(VSAT12, 'divider', 10e3).rIn).toBeCloseTo(100e3 + par(68e3, 10e3), 9);
+    expect(outStage(VSAT12, 'buffered', 10e3).rIn).toBe(168e3);
     // from a full ±12 V his divider gives ±4.86 V, about 10 V peak to peak; part 4's square out was 16.7k behind
     expect(outStage(V12, 'buffered').open).toBeCloseTo(4.857, 3);
     expect(SQUARE_Z).toBeCloseTo(par(20e3, 100e3), 6);
+  });
+
+  it('a TL074 into a heavy load: TI’s curve, 13.5 V into 10k and 12 V into 2k on ±15 V; the low-value divider gets ±9.17 V', () => {
+    const on15 = (r: number) => (15 - TL074_LOADED.short) / (1 + TL074_LOADED.r / r);
+    expect(on15(10e3)).toBeCloseTo(13.5, 9);
+    expect(on15(2e3)).toBeCloseTo(12, 9);
+    expect(TL074_LOADED.r).toBeCloseTo(322.6, 1);
+    expect(TL074_LOADED.short).toBeCloseTo(1.065, 3);
+    // a light load, the high-value stages and the buffer into 10k and its 1k: 1.5 V short of the rails, as everywhere
+    for (const r of [8e3, 11e3, 168e3, 1e6, Infinity]) expect(swingInto(r), String(r)).toBe(VSAT12);
+    expect(swingInto(7e3)).toBeLessThan(VSAT12);
+    // the low-value divider's 1.68k: ±9.17 V, 5.46 mA, ±3.71 V at the jack, where ±10.5 V would give 6.25 mA
+    const vc = swingInto(outStage(VSAT12, 'low').rIn);
+    expect(vc).toBeCloseTo(9.174, 3);
+    expect(outStage(vc, 'low').current).toBeCloseTo(5.4607e-3, 7);
+    expect(outStage(vc, 'low').toGround).toBeCloseTo(outStage(vc, 'low').current, 12);
+    expect(outStage(vc, 'low').open).toBeCloseTo(3.713, 3);
   });
 
   it('the voice: its curve gives the width less a half, and its LFO is a sine-phase triangle', () => {

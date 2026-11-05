@@ -977,6 +977,66 @@ describe('integration: every lab mounts, runs and cleans up (fake DOM)', () => {
   }
 });
 
+describe('the PWM lab’s readouts (fake DOM)', () => {
+  beforeAll(installFakeDom);
+  afterAll(uninstallFakeDom);
+
+  it('never call some of the cycle none or all of it, and follow the threshold through each period at audio rate', () => {
+    raf.clear();
+    const root = new FElement('div');
+    asEl((G.document as { body: unknown }).body).appendChild(root);
+    const cleanup = LABS.get('voltage-controlled-pwm')!.mount(asEl(root) as unknown as HTMLElement);
+    const choose = (label: string, value: string) => {
+      const s = root.querySelectorAll('select').find((x) => x.closest('label')?.textContent.startsWith(label))!;
+      s.value = value;
+      fire(s, 'change');
+    };
+    const slide = (label: string, pos: number) => {
+      const i = root.querySelectorAll('label.slider').find((l) => l.querySelector('.slider-label')?.textContent === label)!.querySelector('input')!;
+      i.value = String(pos);
+      fire(i, 'input');
+    };
+    const read = (key: string) => root.querySelectorAll('.synth-kv dt').find((d) => d.textContent === key)!.nextSibling!.textContent;
+    const click = (label: string) => fire(root.querySelectorAll('button').find((b) => b.textContent === label)!, 'click');
+    // the offset pot from its −12 V end, 1200 places: the third and fourth steps' width at the edges of the pulse
+    choose('Step', '4');
+    slide('The offset pot', 90);
+    expect(read('the output')).toBe('high over 99% of the time');
+    slide('The offset pot', 1119);
+    expect(read('the output')).toBe('high under 1% of the time');
+    expect(read('the offset pot')).toMatch(/^93% of its turn: \+[\d.]+ V on its wiper \(\+10\.38 V with nothing on it\)$/);
+    // the fifth, the LFO on the CV and the intensity up: where it goes through zero, below −1.07 V and above +1.43 V
+    choose('Step', '5');
+    const zero: Record<number, string> = {
+      540: 'yes: no pulse for under 1% of each cycle, the output stuck high',
+      547: 'no: 9% at its narrowest, over 99% at its widest',
+      600: 'no: 5% at its narrowest, 96% at its widest',
+      660: 'no: 1% at its narrowest, 92% at its widest',
+      665: 'no: under 1% at its narrowest, 91% at its widest',
+      672: 'yes: no pulse for under 1% of each cycle, the output stuck low',
+      300: 'yes: no pulse for 20% of each cycle, the output stuck high',
+    };
+    for (const [pos, text] of Object.entries(zero)) {
+      slide('The offset pot', Number(pos));
+      expect(read('through zero'), pos).toBe(text);
+    }
+    // an LFO at 110 Hz against C3, the pot a quarter of the way up: every period keeps a pulse, though the
+    // threshold is past the sawtooth a fifth of the time
+    slide('The offset pot', 300);
+    slide('The LFO’s rate', 304);
+    expect(read('through zero')).toBe('no: every period has a pulse, though the threshold is past the sawtooth 20% of the time');
+    // the last step's audio rate, centred: 24% to 77% of each period at C3, where held still it would be 5% to 96%
+    choose('Step', '7');
+    click('Audio rate');
+    expect(read('the sequencer now')).toBe('step 1 of 8: C3, 131 Hz');
+    expect(read('the pulse')).toBe('24% to 77% of each period, the LFO moving the threshold within it; more than one pulse in 27% of the periods');
+    expect(read('through zero')).toBe('no: every period has a pulse');
+    if (typeof cleanup === 'function') cleanup();
+    root.remove();
+    frames(2);
+  });
+});
+
 describe('shared UI pieces (fake DOM)', () => {
   beforeAll(installFakeDom);
   afterAll(uninstallFakeDom);

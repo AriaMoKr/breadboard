@@ -13,7 +13,7 @@ import type { Schematic } from '../../ui/schematic';
 /** Scoped CSS for the kit; inject it under `.${scope}`. */
 export const kitCss = (scope: string) => `
 .${scope} { --ana: #f59e0b; --ref: #8b5cf6; }
-@media (prefers-color-scheme: light) { .${scope} { --ana: #d97706; --ref: #7c3aed; } }
+@media (prefers-color-scheme: light) { .${scope} { --ana: #b45309; --ref: #7c3aed; } } /* text in them is 4.5:1 or more on a schematic */
 .${scope} .schematic .wire.ana { stroke: var(--ana); }
 .${scope} .schematic .wire.ref { stroke: var(--ref); }
 .${scope} .schematic .wire.plain { stroke: var(--fg-dim); }

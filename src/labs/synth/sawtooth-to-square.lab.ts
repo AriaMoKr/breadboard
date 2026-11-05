@@ -38,7 +38,7 @@ import {
   type Temps,
 } from './_analog';
 import { diode, jack, npnLeft, ntc, pnpLeft, potDivider, railDown, schmitt } from './_draw';
-import { HEARING, cents, fmtCv, fmtHz, offText, pitchText, playsText, sMV, sV, tunerCss, tunerRow } from './_shared';
+import { HEARING, cents, fmtCv, fmtHz, offText, pitchText, playsText, sMV, sV, schBox, tunerCss, tunerRow } from './_shared';
 import { Tone } from './_sound';
 
 const SCOPE_CLASS = 'synth-square';
@@ -136,7 +136,7 @@ const tempText = (t: number, finger: boolean) => `${t.toFixed(1)} °C${finger ? 
 
 const CSS = `
 .${SCOPE_CLASS} .synth-circuit { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: flex-start; }
-.${SCOPE_CLASS} .synth-circuit .schematic { flex: 1 1 440px; min-width: 0; }
+.${SCOPE_CLASS} .synth-sch { flex: 1 1 440px; min-width: 0; }
 .${SCOPE_CLASS} .synth-kv { flex: 1 1 220px; }
 .${SCOPE_CLASS} .schmitt-sign, .${SCOPE_CLASS} .ntc-mark { stroke-width: 1.5; }
 .${SCOPE_CLASS} .kv dd { font-variant-numeric: tabular-nums; }
@@ -469,7 +469,7 @@ export default defineLab({
       b.ana('plain', j.sleeve, [540, 294]);
       b.ground(540, 294);
     });
-    const schHost = h('div', { style: 'display: contents' });
+    const schHost = schBox();
 
     // ---- readouts
     const kv = {
@@ -750,7 +750,7 @@ export default defineLab({
     const apply = () => {
       const show = (el: HTMLElement, v: boolean) => (el.style.display = v ? '' : 'none');
       const shape = step >= 3;
-      schHost.replaceChildren(shape ? schB.el : schA.el);
+      schHost.show(shape ? schB : schA);
       gFine.show(step === 2);
       gOld.show(step <= 5);
       gOut3.show(step === 3);
@@ -853,7 +853,7 @@ export default defineLab({
           fineRow,
           trimRow,
           pwRow,
-          h('div', { class: 'synth-circuit' }, schHost, kvHost),
+          h('div', { class: 'synth-circuit' }, schHost.el, kvHost),
           status,
         ),
         tunerPanel,

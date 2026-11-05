@@ -1008,7 +1008,7 @@ export function comparatorWidth(vth: number, hz: number, tau = PWM_TAU, vdd = V1
   return Math.min(1, (-tau * Math.log((vth + s * tau) / (top + s * tau))) / period);
 }
 
-/** What follows the comparator to the jack: 100k with 68k to ground alone, a divider a hundred times lower, or his, the 100k and 68k into a buffer and 1k after it. */
+/** What follows the comparator to the jack: 100k with 68k to ground alone (his divider without his buffer), a divider a hundred times lower (the lab's own), or his, the 100k and 68k into a buffer and 1k after it. */
 export type OutStage = 'divider' | 'low' | 'buffered';
 export const OUT_STAGES: Record<OutStage, { top: number; bottom: number; buffer: boolean; r: number }> = {
   divider: { top: 100e3, bottom: 68e3, buffer: false, r: 0 },
@@ -1019,18 +1019,35 @@ export const OUT_STAGES: Record<OutStage, { top: number; bottom: number; buffer:
 /**
  * The jack for `v` out of the comparator, into `load` to ground: `open`, with nothing on it (the
  * divider's middle, which the buffer copies); `z`, the output impedance (the divider's two halves in
- * parallel, or the buffer's 1k); `out`, into the load; `current`, what the comparator gives, through
- * the divider and, without the buffer, the load beside its lower half; and `toGround`, what goes
- * through that lower half.
+ * parallel, or the buffer's 1k); `out`, into the load; `rIn`, the resistance the comparator drives,
+ * the divider and, without the buffer, the load beside its lower half; `current`, what it gives
+ * through that; and `toGround`, what goes through the lower half.
  */
 export function outStage(v: number, stage: OutStage, load = Infinity) {
   const o = OUT_STAGES[stage];
   const open = divide(v, o.top, o.bottom);
   const z = o.buffer ? o.r : par(o.top, o.bottom);
   const out = Number.isFinite(load) ? (open * load) / (load + z) : open;
-  const bottom = o.buffer || !Number.isFinite(load) ? o.bottom : par(o.bottom, load);
-  return { open, z, out, current: v / (o.top + bottom), toGround: (o.buffer ? open : out) / o.bottom };
+  const rIn = o.top + (o.buffer || !Number.isFinite(load) ? o.bottom : par(o.bottom, load));
+  return { open, z, out, rIn, current: v / rIn, toGround: (o.buffer ? open : out) / o.bottom };
 }
+
+/**
+ * TI's typical curve of a TL07x's swing against its load (SLOS080W, figure 5-43, on ±15 V): 13.5 V
+ * into 10k and about 12 V into 2k, as if it were a little short of the rail (`short`, 1.06 V) behind
+ * a resistance (`r`, 323 Ω).
+ */
+export const TL074_LOADED = (() => {
+  const r = (10e3 * 2e3 * (12 - 13.5)) / (13.5 * 2e3 - 12 * 10e3);
+  return { r, short: 15 - (13.5 * (10e3 + r)) / 10e3 };
+})();
+
+/**
+ * A TL074's output at a rail on ±12 V into `r` to ground: VSAT12, 1.5 V short of the rail, into a
+ * light load, as everywhere here, and less into a heavy one, as TI's curve has it (`TL074_LOADED`):
+ * VSAT12 from about 8k up.
+ */
+export const swingInto = (r: number) => Math.min(VSAT12, (V12 - TL074_LOADED.short) / (1 + TL074_LOADED.r / r));
 
 /** Part 4's square out's output impedance: its 20k with the 100k beside it (the 1 µF a short at audio pitches, the 40106 behind it). */
 export const SQUARE_Z = par(SQUARE_DIV.top, SQUARE_DIV.bottom);

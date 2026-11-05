@@ -181,9 +181,10 @@ and Moritz Klein's synth, from his
   sawtooth on one input and a threshold on the other, makes the pulse with no offset to remove.
   100k and 14k keep its threshold within the sawtooth's swing (charts show the pot's turn without
   and with them), a CV comes in through 68k and a 250k intensity pot, and a buffered divider with
-  1k behind it brings the output to about 10 V peak to peak, tried into loads beside a plain
-  divider. The sequencer plays it with an LFO on the CV, slow, through zero or at audio rate. The
-  analog parts are small per-lab models with his values (`src/labs/synth/_analog.ts`).
+  1k behind it brings the output down towards the 10 V peak to peak modules expect (8.5 V here,
+  the TL074 swinging ±10.5 V), tried into loads beside a plain divider and one of low values. The
+  sequencer plays it with an LFO on the CV, slow, through zero or at audio rate. The analog parts
+  are small per-lab models with his values (`src/labs/synth/_analog.ts`).
 * **More videos** (`#/more`): Ben's videos outside the playlist that go with it. These are his first
   build running programs and his introduction to transistors and logic gates (both from 2015 and
   linked from eater.net/8bit), plus his digital clock series (2026, eater.net/clock). Then other
@@ -213,9 +214,10 @@ Vite stays on version 7 for now. Vite 8's bundler, Rolldown, has no native build
 MinGW-built Node in MSYS2's UCRT64 shell, so Vite 8 doesn't start there.
 
 `npm run check:browser` checks in headless Chrome what the unit tests can't see. It checks
-that every page renders without errors, that phones get no sideways scrolling and controls of
-at least 24 px, the sticky toolbar, parts drawer and tap-to-zoom, the shared computer, placing,
-moving, deleting and stepping in the sandbox with real clicks, taps and drags, sandbox links, the
+that every page renders without errors, that phones get no sideways scrolling, controls of at
+least 24 px and schematics that stop shrinking at 3/4 of their size in a box that scrolls, the
+sticky toolbar, parts drawer and tap-to-zoom, the shared computer, placing, moving, deleting and
+stepping in the sandbox with real clicks, taps and drags, sandbox links, the
 breadboard view's frame rate, and that the VR view builds the computer in 3D, runs it, works
 with a gamepad (a stand-in for `navigator.getGamepads`) and on a TV (`?tv=emulate`, with real key
 presses as the remote sends them, and through a door of the Hallway), and leads back to the
@@ -228,8 +230,8 @@ tree it checks that a slider is named by its label and gives its value once, as 
 320 px that Tab reaches a table's box that scrolls, with its focus ring, and the arrow keys
 scroll it. Under emulated high
 contrast (forced colours, as Windows' contrast themes) it checks that the LEDs, switches, toggles
-and lit signals still show their states and the open tab and current page are marked, and at
-320 px wide that no page scrolls sideways.
+and lit signals still show their states, a scope keeps its dark screen, and the open tab and
+current page are marked, and at 320 px wide that no page scrolls sideways.
 `npm run check:browser -- --dist`
 checks the built site instead (run `npm run build` first), plus the download link, install and
 offline use, and `-- --url <address>` checks a deployed copy the same way (such as

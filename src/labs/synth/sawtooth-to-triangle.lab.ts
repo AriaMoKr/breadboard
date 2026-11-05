@@ -8,7 +8,7 @@ import { callout, injectStyle } from '../latches/_shared';
 import { defineLab } from '../types';
 import { D1N4148, ROOM, SCOPE_IN, TRI, TRI_BASIC, TRI_BUILT, TRI_SAW, VSAT12, diodePoint, noteHz, rampTop, sawToTriangle, thermalVoltage, type Pull, type TriSetup } from './_analog';
 import { diode, railDown } from './_draw';
-import { HEARING, fmtHz } from './_shared';
+import { HEARING, fmtHz, schBox } from './_shared';
 import { Tone, harmonics } from './_sound';
 
 const SCOPE_CLASS = 'synth-triangle';
@@ -57,7 +57,7 @@ const stepText = (step: number) => (Math.abs(step) < 0.0005 ? 'none' : `${Math.a
 
 const CSS = `
 .${SCOPE_CLASS} .synth-circuit { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: flex-start; }
-.${SCOPE_CLASS} .synth-circuit .schematic { flex: 1 1 440px; min-width: 0; }
+.${SCOPE_CLASS} .synth-sch { flex: 1 1 440px; min-width: 0; }
 .${SCOPE_CLASS} .synth-kv { flex: 1 1 220px; }
 .${SCOPE_CLASS} .kv dd { font-variant-numeric: tabular-nums; }
 .${SCOPE_CLASS} .pot-slider { display: flex; width: 100%; }
@@ -274,7 +274,7 @@ export default defineLab({
     });
     const gPullGround = b.group(() => b.ground(490, 203));
     const gPullNeg = b.group(() => railDown(b, 490, 203, '−12 V'));
-    const schHost = h('div', { style: 'display: contents' });
+    const schHost = schBox();
 
     /** The schematic's words, per step. */
     const schematicLabel = (): string => {
@@ -528,7 +528,7 @@ export default defineLab({
     const apply = () => {
       const show = (el: HTMLElement, v: boolean) => (el.style.display = v ? '' : 'none');
       const t = step === 1 ? null : setup();
-      schHost.replaceChildren(step === 1 ? schA.el : schB.el);
+      schHost.show(step === 1 ? schA : schB);
       gInvA.show(buffer === 'inverting');
       gFolA.show(buffer === 'follower');
       if (t) {
@@ -609,7 +609,7 @@ export default defineLab({
           rInRow,
           rFbRow,
           offsetRow,
-          h('div', { class: 'synth-circuit' }, schHost, kvHost),
+          h('div', { class: 'synth-circuit' }, schHost.el, kvHost),
           status,
         ),
         scopePanel,

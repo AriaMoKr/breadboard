@@ -7,6 +7,7 @@ import { callout, injectStyle } from '../latches/_shared';
 import { defineLab } from '../types';
 import { Coupling, PHONES, R_OUT, SchmittCore, VBAT, VDIODE, VN, VP, coreTimes, coreWave, par, sampleCore } from './_analog';
 import { battery, diode, jack, railDown, schmitt } from './_draw';
+import { schBox } from './_shared';
 import { Tone } from './_sound';
 
 const SCOPE_CLASS = 'synth-core';
@@ -28,7 +29,7 @@ const SETTLED = { lo: VN - CORE.mean, hi: VP - CORE.mean };
 
 const CSS = `
 .${SCOPE_CLASS} .synth-circuit { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: flex-start; }
-.${SCOPE_CLASS} .synth-circuit .schematic { flex: 1 1 380px; min-width: 0; }
+.${SCOPE_CLASS} .synth-sch { flex: 1 1 380px; min-width: 0; }
 .${SCOPE_CLASS} .synth-kv { flex: 1 1 220px; }
 .${SCOPE_CLASS} .schmitt-sign { stroke-width: 1.5; }
 .${SCOPE_CLASS} .kv dd { font-variant-numeric: tabular-nums; }
@@ -380,7 +381,7 @@ export default defineLab({
           'The circuit',
           { accent: 'red', chips: '40106 · TL074 (one of its four op amps) · 1N4148 · 2.2 nF and 1 µF foil · 100k ×4 · a jack socket · two 9 V batteries' },
           row(stepSel, jackToggle.el, againBtn.el, listenToggle.el),
-          h('div', { class: 'synth-circuit' }, sch.el, kvHost),
+          h('div', { class: 'synth-circuit' }, schBox(sch).el, kvHost),
           status,
         ),
         panel('Scope', { accent: 'yellow' }, scopeHost, scopeNote),

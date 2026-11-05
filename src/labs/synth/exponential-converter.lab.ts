@@ -7,7 +7,7 @@ import { callout, injectStyle } from '../latches/_shared';
 import { defineLab } from '../types';
 import { R_OUT, ROOM, SchmittCore, SinkCore, V12, VDIODE, baseVoltage, collectorCurrent, coreTimes, noteHz, sampleCore, sinkTimes, thermalVoltage, thresholds, wiper, type Feed } from './_analog';
 import { diode, jack, npnLeft, potDivider, schmitt } from './_draw';
-import { HEARING, fmtA, fmtCv, fmtHz, fmtT, fmtV, mV, pitchText, playsText } from './_shared';
+import { HEARING, fmtA, fmtCv, fmtHz, fmtT, fmtV, mV, pitchText, playsText, schBox } from './_shared';
 import { Tone } from './_sound';
 
 const SCOPE_CLASS = 'synth-expo';
@@ -68,7 +68,7 @@ const currentFor = (hz: number) => C * (VP12 - VN12) * hz;
 
 const CSS = `
 .${SCOPE_CLASS} .synth-circuit { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: flex-start; }
-.${SCOPE_CLASS} .synth-circuit .schematic { flex: 1 1 420px; min-width: 0; }
+.${SCOPE_CLASS} .synth-sch { flex: 1 1 420px; min-width: 0; }
 .${SCOPE_CLASS} .synth-kv { flex: 1 1 220px; }
 .${SCOPE_CLASS} .schmitt-sign { stroke-width: 1.5; }
 .${SCOPE_CLASS} .kv dd { font-variant-numeric: tabular-nums; }
@@ -540,7 +540,7 @@ export default defineLab({
           { accent: 'red', chips: '40106 · BC548C · 1N4148 · 2.2 nF foil · a 100k pot · 100k ×2 · 4k · a jack for the CV · part 1’s output stage, its divider now two 10k · 12 V' },
           row(stepSel, rSel, cSel, runToggle.el, nextBtn.el, fingerToggle.el, listenToggle.el),
           potRow,
-          h('div', { class: 'synth-circuit' }, sch.el, kvHost),
+          h('div', { class: 'synth-circuit' }, schBox(sch).el, kvHost),
           status,
         ),
         transistorPanel,

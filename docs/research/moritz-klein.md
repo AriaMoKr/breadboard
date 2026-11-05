@@ -519,8 +519,9 @@ s); the playlist shows 7:24.
 - [S] His simulation is the finished circuit, on a 5 µs step:
   - a sawtooth of ±1.5 V at 300 Hz from a generator (CircuitJS's, rising), on the comparator's +
     input, the op amp clipping at ±12 V;
-  - on its − input: a 100k pot ("OFFSET", at 53%) across ±12 V, its wiper through 100k, with 14k
-    to ground;
+  - on its − input: a 100k pot ("OFFSET", at 53% from its +12 V end: 47% of the lab's turn, its
+    wiper at −0.71 V with nothing on it, which gives the − input's saved 0.0038 V) across ±12 V,
+    its wiper through 100k, with 14k to ground;
   - a CV slider from −7 to +7 V (at 0.42 V) through a 250k pot as a variable resistor ("CV INT",
     at 0.5%: 1.25k) and 68k to the same − input;
   - the output through 100k, with 68k to ground, into a follower (its − input on its output), then
@@ -587,10 +588,23 @@ s); the playlist shows 7:24.
     a pulse over 86% of it (from 7% to 93%), and with the 68k beside the 14k the ends are ±1.248 V;
   - the CV's share: 0.156 with the intensity up (±1.09 V of the LFO's ±7 V), 0.038 at 250k (±0.27
     V). Centred and turned up, a ±7 V triangle takes the width from 4.9% to 96.1%, just short of
-    zero; about a twentieth of the offset pot's turn either way and it goes through;
+    zero. With the offset pot's wiper below −1.07 V or above +1.43 V (with nothing on it: 4.5% of
+    its turn down, 6% up, the sawtooth sitting a little above centre) it goes through on that side;
+  - the width over the LFO's cycle, the threshold held still at each point, exact at the edges:
+    a triangle spends as long at each level as at any other, so the share of its cycle past the
+    sawtooth's top or bottom is a straight line in the threshold. That is what comes out while the
+    LFO is well below the note. From a quarter of the note's rate up, the readouts follow the
+    threshold through each period instead, for a period starting at 256 places in the LFO's cycle:
+    at C3, centred and turned up, a 110 Hz LFO gives 24% to 77% of each period, more than one pulse
+    in about a quarter of them (the width held still would say 5% to 96%), and with the offset pot
+    a quarter of the way up every period keeps a pulse, though the threshold is past the sawtooth
+    a fifth of the time;
   - the output stage (`outStage`), from the TL074's ±10.5 V: 4.25 V open. 100k and 68k alone are
-    40.5k behind and lose 29% into a module's 100k; 1k and 680 Ω are 405 Ω behind but take 6.25 mA;
-    the buffer and 1k lose 1%, the divider taking 63 µA. From ±12 V his divider gives ±4.86 V.
+    40.5k behind and lose 29% into a module's 100k; 1k and 680 Ω are 405 Ω behind but take 5.46 mA,
+    a load so heavy that the TL074 reaches only ±9.17 V into it (`swingInto`: TI's typical curve of
+    its swing against the load, SLOS080W figure 5-43, has 13.5 V into 10k and about 12 V into 2k on
+    ±15 V, as if 1.06 V short of the rail behind 323 Ω); the buffer and 1k lose 1%, the divider
+    taking 63 µA. From ±12 V his divider gives ±4.86 V.
 - [I] The sound (`PwmTone` in `src/labs/synth/_sound.ts`): the browser's sawtooth less a copy of it
   delayed by the width, which is a pulse as free of aliasing as the sawtooth. The threshold, a
   steady voltage and a triangle LFO, goes through a curve of the model's width, so the delay
@@ -610,10 +624,14 @@ s); the playlist shows 7:24.
     CV, with his three sounds as presets.
 
   Its estimates, said on the page: the sawtooth, the core's with TI's typical thresholds; the
-  TL074's swing for both op amps; the first step's width set directly; the three examples at 40
-  Hz, ±5 V and 7 V up; the LFO, a triangle with no resistance of its own; the low-value divider
-  and the loads; the note, C3, until the last step; the sequence; and the audio-rate oscillator, a
-  triangle at 110 Hz.
+  TL074's swing for both op amps, and less into the low-value divider; the offset pot, presumably
+  part 4's; the first step's width set directly; the three examples at 40 Hz, ±5 V and 7 V up; the
+  LFO, a triangle with no resistance of its own; 100k and 68k alone (his divider without his
+  buffer) and the low-value divider, the lab's own comparisons, and the loads; the note, C3, until
+  the last step; the sequence; and his three sounds' settings, which he doesn't give: a slow LFO at
+  0.4 Hz with the intensity pot at 50k, through zero at 2 Hz with the offset pot a quarter of the
+  way up (no pulse over 20% of each cycle at C3), and the audio-rate oscillator, a triangle at 110
+  Hz.
 - [Lab] The site's group lists all four videos after part 4. The tip and the PWM video have their
   labs, and the module video and the kit's introduction stay listed without.
 
@@ -774,9 +792,9 @@ kit", 3-8 minutes each) are left out, and so is the rest of the DIY VCO series, 
 | Capacitors as timing parts | everything | — (the sandbox's capacitors only make edge pulses) |
 
 _Sources: his channel and its playlists on YouTube (the watch pages' details and descriptions; the
-transcripts of the guide, VCO parts 1-4 and the triangle tip); his CircuitJS links (tinyurl.com,
-decoded); the 1N4148's common SPICE model (D1N4148); Erica
-Synths' kit pages; CDM, 3 January 2022; the Mixer kit's manual as rendered on manualsdir.com;
-onsemi's BC556B/BC557/BC558B datasheet (Rev. 3, 2007) and Fairchild's BC556-BC560 (Rev. 1.7,
-2016); TI's CD40106B (SCHS097F) and TL07xx (SLOS080W) datasheets; the parts in
+transcripts of the guide, VCO parts 1-4, the triangle tip and the PWM video); his CircuitJS links
+(tinyurl.com, decoded); the 1N4148's common SPICE model (D1N4148); Erica Synths' kit pages; CDM,
+3 January 2022; the Mixer kit's manual as rendered on manualsdir.com; onsemi's BC556B/BC557/BC558B
+datasheet (Rev. 3, 2007) and Fairchild's BC556-BC560 (Rev. 1.7, 2016); TI's CD40106B (SCHS097F)
+and TL07xx (SLOS080W, its table and its typical curves) datasheets; the parts in
 src/breadboard/catalog.ts._
