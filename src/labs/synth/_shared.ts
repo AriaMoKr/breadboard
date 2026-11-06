@@ -8,19 +8,35 @@ import { noteOf } from './_analog';
 export const HEARING = 20e3;
 
 /**
- * A schematic's box beside a lab's readouts (`.synth-sch`, which the lab sizes in its row): no wider
- * than the drawing, and on a touch screen, where the drawing stops shrinking at 3/4 of its size
- * (styles.css), the box scrolls sideways. `show` puts a drawing in it, at its width as it is then.
+ * A schematic's box beside a lab's readouts (`.synth-sch`, which the lab sizes in its row, with
+ * `schBoxCss`): no wider than the drawing, and on a touch screen, where the drawing stops shrinking
+ * at 3/4 of its size (styles.css), the box scrolls sideways. `show` puts a drawing in it, at its
+ * width as it is then.
  */
 export function schBox(sch?: Schematic) {
   const el = h('div', { class: 'synth-sch' });
   const show = (next: Schematic) => {
     el.replaceChildren(next.el);
     el.style.maxWidth = next.el.style.maxWidth;
+    el.style.setProperty('--sch-w', next.el.style.getPropertyValue('--sch-w'));
   };
   if (sch) show(sch);
   return { el, show };
 }
+
+/**
+ * `schBox`'s rules, under `.${scope}`. With a mouse the box shrinks as the drawing does. On a touch
+ * screen it keeps the drawing's 3/4 (`--sch-w`, from `show`) or its row's width if that is less,
+ * so that what sits beside it wraps below while the whole drawing fits on the row, and it scrolls
+ * only where it doesn't; and it draws the drawing's focus ring itself, since a box that scrolls
+ * clips what is drawn outside the drawing.
+ */
+export const schBoxCss = (scope: string) => `
+.${scope} .synth-sch { min-width: 0; }
+@media (pointer: coarse) {
+  .${scope} .synth-sch { min-width: min(100%, calc(var(--sch-w, 0) * 0.75px)); }
+  .${scope} .synth-sch:has(> .schematic:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+}`;
 
 export const fmtV = (v: number) => `${v.toFixed(3)} V`;
 export const mV = (v: number) => `${Math.round(v * 1e3)} mV`;

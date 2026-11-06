@@ -124,9 +124,10 @@ it in cleanup.
 * Interactive first: switches, buttons and sliders that the learner drives, with live
   LEDs/wires/scope, plus a short `callout` that explains what is happening now.
 * Everything must work at 320 px width (no horizontal page scroll; the
-  schematic SVGs scale down, on a touch screen to 3/4 of their size, then their box scrolls; a
-  table that doesn't fit goes in a `scrollBox`) and in light and dark colour schemes (use CSS
-  variables like `var(--fg)`, `var(--panel)`, never hard-coded white or black text).
+  schematic SVGs scale down, on a touch screen to 3/4 of their size, then their box scrolls, and
+  a box that clips the schematic's focus ring draws it itself, as the synth labs' `schBoxCss`
+  does; a table that doesn't fit goes in a `scrollBox`) and in light and dark colour schemes
+  (use CSS variables like `var(--fg)`, `var(--panel)`, never hard-coded white or black text).
 * Keep each lab self-contained in its own file(s) under its group directory.
   Shared helpers for one group go in `src/labs/<group>/_shared.ts` (no
   `.lab.ts` suffix). Don't modify files outside your group without being told to.

@@ -1133,22 +1133,71 @@ try {
   await page.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
   await page.goto(base); // reload, so touch layouts are chosen
 
-  await check('phones: no page scrolls sideways, every control is at least 24 px, a schematic keeps 3/4 of its size', async () => {
+  /**
+   * A function's source for visitAll's pages: `fn(when)` on the page as it opens, then on each step of
+   * a lab that has them (its "Step" select), `when` naming the step; the first step again after.
+   */
+  const EACH_STEP = `(fn) => {
+    fn('');
+    const sel = [...document.querySelectorAll('#content select')].find((s) => s.closest('label')?.textContent.trim().startsWith('Step'));
+    if (!sel) return;
+    const first = sel.value;
+    for (const o of sel.options) {
+      if (o.value === first) continue;
+      sel.value = o.value;
+      sel.dispatchEvent(new Event('change', { bubbles: true }));
+      fn(' (step “' + o.textContent.trim().slice(0, 30) + '”)');
+    }
+    sel.value = first;
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+  }`;
+
+  await check('phones: no page scrolls sideways, every control is at least 24 px, a schematic keeps 3/4 of its size and shows its focus ring', async () => {
+    // A key first, so that focus() shows the ring as Tab would (the browser's keyboard way of focusing).
+    const tab = { key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9, nativeVirtualKeyCode: 9 };
+    await page.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', ...tab });
+    await page.send('Input.dispatchKeyEvent', { type: 'keyUp', ...tab });
     const problems = await visitAll(routes, `() => {
       const out = [];
+      // A box that scrolls cuts off what is drawn outside it, as the ring 2 px outside a schematic that fills
+      // it is: a ring shows where one of its top and bottom edges and one of its sides are inside each box
+      // above it that clips.
+      const ring = (e) => {
+        const s = getComputedStyle(e);
+        if (s.outlineStyle === 'none' || !(parseFloat(s.outlineWidth) > 0)) return false;
+        const r = e.getBoundingClientRect(), by = parseFloat(s.outlineOffset) + parseFloat(s.outlineWidth);
+        const top = r.top - by, bottom = r.bottom + by, left = r.left - by, right = r.right + by;
+        for (let a = e.parentElement; a && a !== document.body; a = a.parentElement) {
+          const as = getComputedStyle(a);
+          if (as.display === 'contents' || (as.overflowX === 'visible' && as.overflowY === 'visible')) continue;
+          const b = a.getBoundingClientRect(), cl = b.left + a.clientLeft, ct = b.top + a.clientTop, cr = cl + a.clientWidth, cb = ct + a.clientHeight;
+          if (!((top >= ct && top <= cb) || (bottom >= ct && bottom <= cb)) || !((left >= cl && left <= cr) || (right >= cl && right <= cr))) return false;
+        }
+        return true;
+      };
+      (${EACH_STEP})((when) => {
+        for (const e of document.querySelectorAll('#content svg.schematic')) {
+          const w = e.getBoundingClientRect().width;
+          if (!w) continue;
+          const what = '“' + (e.getAttribute('aria-label') ?? 'schematic').slice(0, 40) + '”' + when;
+          // a schematic stops shrinking at 3/4 of its size (styles.css), and the box it is in scrolls instead
+          const size = parseFloat(e.style.getPropertyValue('--sch-w'));
+          const least = Math.min(0.75 * size, parseFloat(e.style.maxWidth) || Infinity);
+          const box = e.parentElement, cs = getComputedStyle(box);
+          if (w < least - 1) out.push(what + ' is ' + Math.round(w) + ' px wide, under 3/4 of its ' + size + ' px');
+          else if (w > box.clientWidth + 1 && (cs.display === 'contents' || !/auto|scroll/.test(cs.overflowX))) out.push(what + ' is wider than its box, which does not scroll');
+          // a schematic in a row that wraps: the touch tablets' check visits its page
+          const rs = getComputedStyle(box.parentElement);
+          if (rs.display === 'flex' && rs.flexWrap === 'wrap') (window.__wrapRows ??= new Set()).add(location.hash);
+          if (e.tabIndex < 0) continue;
+          e.focus({ preventScroll: true });
+          window.__rings = (window.__rings ?? 0) + 1;
+          if (!e.matches(':focus-visible')) out.push(what + ' takes focus, but shows no ring');
+          else if (!ring(e) && !ring(box)) out.push(what + ': its focus ring is cut off');
+          e.blur();
+        }
+      });
       if (document.documentElement.scrollWidth > innerWidth) out.push('page is ' + document.documentElement.scrollWidth + ' px wide');
-      // a schematic stops shrinking at 3/4 of its size (styles.css), and the box it is in scrolls instead
-      for (const e of document.querySelectorAll('#content svg.schematic')) {
-        const w = e.getBoundingClientRect().width;
-        if (!w) continue;
-        const size = parseFloat(e.style.getPropertyValue('--sch-w'));
-        const least = Math.min(0.75 * size, parseFloat(e.style.maxWidth) || Infinity);
-        const box = e.parentElement;
-        const cs = getComputedStyle(box);
-        const what = '“' + (e.getAttribute('aria-label') ?? 'schematic').slice(0, 40) + '”';
-        if (w < least - 1) out.push(what + ' is ' + Math.round(w) + ' px wide, under 3/4 of its ' + size + ' px');
-        else if (w > box.clientWidth + 1 && (cs.display === 'contents' || !/auto|scroll/.test(cs.overflowX))) out.push(what + ' is wider than its box, which does not scroll');
-      }
       const allowed = ${JSON.stringify(SMALL_OK.map(([sel]) => sel))};
       const clickable = (e) => e.matches('button, select, summary, label.toggle, [role=button], [role=switch]') || (e instanceof SVGElement && getComputedStyle(e).cursor === 'pointer');
       const small = new Map();
@@ -1166,7 +1215,44 @@ try {
       return out.join(', ');
     }`);
     assert(!problems.length, problems.join('\n'));
-    return `allowed smaller: ${SMALL_OK.map(([s, why]) => `${s} (${why})`).join('; ')}`;
+    const rings = await page.evaluate('window.__rings ?? 0');
+    assert(rings > 0, 'no schematic took focus: touch screens make them take it');
+    return `${rings} schematics focused over the steps; allowed smaller: ${SMALL_OK.map(([s, why]) => `${s} (${why})`).join('; ')}`;
+  });
+
+  await check('touch tablets: a schematic beside its readouts lets them wrap below, rather than scroll, at every step', async () => {
+    // 760 px across, a tablet upright: a box in a row that wraps keeps 3/4 of its schematic (the synth
+    // labs' schBoxCss), so what sits beside it goes below, and it scrolls only where even that is wider
+    // than the row. The pages with such a row, as the phones' check found them (or all of them).
+    const found = await page.evaluate('[...(window.__wrapRows ?? [])]');
+    const pages = found.length ? found : routes;
+    await page.send('Emulation.setDeviceMetricsOverride', { width: 760, height: 1024, deviceScaleFactor: 2, mobile: true });
+    let rows = 0;
+    try {
+      await page.goto(`${base}#/`, 300);
+      await page.send('Page.reload');
+      await sleep(1500);
+      const problems = await visitAll(pages, `() => {
+        const out = [];
+        (${EACH_STEP})((when) => {
+          for (const e of document.querySelectorAll('#content svg.schematic')) {
+            const box = e.parentElement, row = box.parentElement, rs = getComputedStyle(row);
+            if (!e.getBoundingClientRect().width || rs.display !== 'flex' || rs.flexWrap !== 'wrap') continue;
+            window.__tabletRows = (window.__tabletRows ?? 0) + 1;
+            const least = 0.75 * parseFloat(e.style.getPropertyValue('--sch-w')), over = box.scrollWidth - box.clientWidth;
+            if (over > 1 && least <= row.clientWidth) out.push('“' + (e.getAttribute('aria-label') ?? 'schematic').slice(0, 40) + '”' + when + ' scrolls ' + over + ' px, though 3/4 of it, ' + least + ' px, fits its row of ' + row.clientWidth + ' px');
+          }
+        });
+        return out.join(', ');
+      }`);
+      rows = await page.evaluate('window.__tabletRows ?? 0');
+      assert(!problems.length, problems.join('\n'));
+    } finally {
+      await page.send('Emulation.setDeviceMetricsOverride', { width: 375, height: 812, deviceScaleFactor: 2, mobile: true });
+      await page.goto(base, 1500);
+    }
+    assert(rows > 0, 'no schematic sits in a row that wraps');
+    return `${pages.length} pages, ${rows} schematics over their steps`;
   });
 
   await check('phones: the computer toolbar stays under the top bar', async () => {

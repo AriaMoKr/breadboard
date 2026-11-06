@@ -758,7 +758,7 @@ function fakeContext(canvas: FElement) {
 class FElement extends FNode {
   childNodes: FNode[] = [];
   attributes: Record<string, string> = {};
-  style: Record<string, unknown> = { setProperty(this: Record<string, string>, k: string, v: string) { this[k] = v; }, removeProperty(this: Record<string, string>, k: string) { delete this[k]; } };
+  style: Record<string, unknown> = { setProperty(this: Record<string, string>, k: string, v: string) { this[k] = v; }, getPropertyValue(this: Record<string, unknown>, k: string) { return typeof this[k] === 'string' ? this[k] : ''; }, removeProperty(this: Record<string, string>, k: string) { delete this[k]; } };
   dataset: Record<string, string> = {};
   listeners: Record<string, FListener[]> = {};
   classList = new FClassList(this);
@@ -981,7 +981,7 @@ describe('the PWM lab’s readouts (fake DOM)', () => {
   beforeAll(installFakeDom);
   afterAll(uninstallFakeDom);
 
-  it('never call some of the cycle none or all of it, and follow the threshold through each period at audio rate', () => {
+  it('never call some of the cycle none or all of it, follow the threshold through each period at audio rate, and measure the output stage from its open level', () => {
     raf.clear();
     const root = new FElement('div');
     asEl((G.document as { body: unknown }).body).appendChild(root);
@@ -1005,6 +1005,9 @@ describe('the PWM lab’s readouts (fake DOM)', () => {
     slide('The offset pot', 1119);
     expect(read('the output')).toBe('high under 1% of the time');
     expect(read('the offset pot')).toMatch(/^93% of its turn: \+[\d.]+ V on its wiper \(\+10\.38 V with nothing on it\)$/);
+    // near the centre the wiper loaded and with nothing on it print alike: no bracket
+    slide('The offset pot', 599);
+    expect(read('the offset pot')).toBe('50% of its turn: −0.02 V on its wiper');
     // the fifth, the LFO on the CV and the intensity up: where it goes through zero, below −1.07 V and above +1.43 V
     choose('Step', '5');
     const zero: Record<number, string> = {
@@ -1031,6 +1034,17 @@ describe('the PWM lab’s readouts (fake DOM)', () => {
     expect(read('the sequencer now')).toBe('step 1 of 8: C3, 131 Hz');
     expect(read('the pulse')).toBe('24% to 77% of each period, the LFO moving the threshold within it; more than one pulse in 27% of the periods');
     expect(read('through zero')).toBe('no: every period has a pulse');
+    // the sixth, 1k and 680 Ω into 10k: the level with nothing on the jack, whatever the load, and 449 Ω behind it
+    choose('Step', '6');
+    choose('After the comparator', 'low');
+    choose('On the jack', 'ten');
+    expect(read('with nothing on it')).toBe('+3.71 V to −3.71 V, 7.4 V peak to peak');
+    expect(read('into the load')).toBe('+3.55 V to −3.55 V: 4.3% less, into 10k');
+    expect(read('the output impedance')).toBe('449 Ω: the divider’s two halves side by side, 405 Ω, with the comparator’s own 323 Ω behind the 1k');
+    choose('On the jack', 'scope');
+    expect(read('with nothing on it')).toBe('+3.71 V to −3.71 V, 7.4 V peak to peak');
+    choose('After the comparator', 'buffered');
+    expect(read('the output impedance')).toBe('1k: the 1k, the buffer behind it');
     if (typeof cleanup === 'function') cleanup();
     root.remove();
     frames(2);

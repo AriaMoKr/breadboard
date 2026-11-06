@@ -7,7 +7,7 @@ import { callout, injectStyle } from '../latches/_shared';
 import { defineLab } from '../types';
 import { Coupling, PHONES, R_OUT, SchmittCore, VBAT, VDIODE, VN, VP, coreTimes, coreWave, par, sampleCore } from './_analog';
 import { battery, diode, jack, railDown, schmitt } from './_draw';
-import { schBox } from './_shared';
+import { schBox, schBoxCss } from './_shared';
 import { Tone } from './_sound';
 
 const SCOPE_CLASS = 'synth-core';
@@ -29,7 +29,7 @@ const SETTLED = { lo: VN - CORE.mean, hi: VP - CORE.mean };
 
 const CSS = `
 .${SCOPE_CLASS} .synth-circuit { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: flex-start; }
-.${SCOPE_CLASS} .synth-sch { flex: 1 1 380px; min-width: 0; }
+.${SCOPE_CLASS} .synth-sch { flex: 1 1 380px; }
 .${SCOPE_CLASS} .synth-kv { flex: 1 1 220px; }
 .${SCOPE_CLASS} .schmitt-sign { stroke-width: 1.5; }
 .${SCOPE_CLASS} .kv dd { font-variant-numeric: tabular-nums; }
@@ -131,7 +131,7 @@ export default defineLab({
     const d = new Disposer();
     const wrap = h('div', { class: SCOPE_CLASS });
     root.appendChild(wrap);
-    d.add(injectStyle(wrap, kitCss(SCOPE_CLASS) + CSS));
+    d.add(injectStyle(wrap, kitCss(SCOPE_CLASS) + schBoxCss(SCOPE_CLASS) + CSS));
 
     let step: Step = 1, plugged = true, listen = false;
 

@@ -590,21 +590,29 @@ s); the playlist shows 7:24.
     V). Centred and turned up, a ±7 V triangle takes the width from 4.9% to 96.1%, just short of
     zero. With the offset pot's wiper below −1.07 V or above +1.43 V (with nothing on it: 4.5% of
     its turn down, 6% up, the sawtooth sitting a little above centre) it goes through on that side;
-  - the width over the LFO's cycle, the threshold held still at each point, exact at the edges:
-    a triangle spends as long at each level as at any other, so the share of its cycle past the
-    sawtooth's top or bottom is a straight line in the threshold. That is what comes out while the
-    LFO is well below the note. From a quarter of the note's rate up, the readouts follow the
-    threshold through each period instead, for a period starting at 256 places in the LFO's cycle:
-    at C3, centred and turned up, a 110 Hz LFO gives 24% to 77% of each period, more than one pulse
-    in about a quarter of them (the width held still would say 5% to 96%), and with the offset pot
-    a quarter of the way up every period keeps a pulse, though the threshold is past the sawtooth
-    a fifth of the time;
+  - the width over the LFO's cycle, the threshold held still at each point (`heldStill`), exact at
+    the edges: a triangle spends as long at each level as at any other, so the share of its cycle
+    past the sawtooth's top or bottom is a straight line in the threshold. It is exact for a moving
+    threshold too while the threshold falls no faster than the sawtooth does at the end of each
+    period, where it falls most slowly (`crossesOnce`): then the two cross once a period, as the
+    sawtooth falls, and each period's pulse is as wide as the threshold held still where they
+    cross would make it. At C3 that holds for an LFO up to 69 Hz with the intensity up, 283 Hz with
+    the intensity pot at 250k. Faster, the readouts follow the threshold through each period
+    (`comparatorPeriods`), each period exactly: cut where the triangle turns and where the
+    threshold starts to fall faster than the sawtooth, so that they cross at most once between
+    cuts. The periods start all over the LFO's cycle, 256 places in it with each share's edges
+    found between them by halving, stretches narrower than the places sought where the margin
+    dips towards 0, and the narrowest and widest sought out around the places. At C3, centred and
+    turned up, a 110 Hz LFO gives 24% to 77% of each period, more than one pulse in 27% of them
+    (the width held still would say 5% to 96%), and with the offset pot a quarter of the way up
+    every period keeps a pulse, though the threshold is past the sawtooth a fifth of the time;
   - the output stage (`outStage`), from the TL074's ±10.5 V: 4.25 V open. 100k and 68k alone are
-    40.5k behind and lose 29% into a module's 100k; 1k and 680 Ω are 405 Ω behind but take 5.46 mA,
-    a load so heavy that the TL074 reaches only ±9.17 V into it (`swingInto`: TI's typical curve of
-    its swing against the load, SLOS080W figure 5-43, has 13.5 V into 10k and about 12 V into 2k on
-    ±15 V, as if 1.06 V short of the rail behind 323 Ω); the buffer and 1k lose 1%, the divider
-    taking 63 µA. From ±12 V his divider gives ±4.86 V.
+    40.5k behind and lose 29% into a module's 100k; 1k and 680 Ω take 5.46 mA, a load so heavy that
+    the TL074 reaches only ±9.17 V into it (`swingInto`: TI's typical curve of its swing against
+    the load, SLOS080W figure 5-43, has 13.5 V into 10k and about 12 V into 2k on ±15 V, as if 1.06
+    V short of the rail behind 323 Ω), 3.71 V open. With the 323 Ω behind the 1k they are 449 Ω
+    behind, not the 405 Ω of the two alone (`outZ`), and lose 0.4% into 100k, 4.3% into 10k. The
+    buffer and 1k lose 1%, the divider taking 63 µA. From ±12 V his divider gives ±4.86 V.
 - [I] The sound (`PwmTone` in `src/labs/synth/_sound.ts`): the browser's sawtooth less a copy of it
   delayed by the width, which is a pulse as free of aliasing as the sawtooth. The threshold, a
   steady voltage and a triangle LFO, goes through a curve of the model's width, so the delay
@@ -629,9 +637,9 @@ s); the playlist shows 7:24.
   LFO, a triangle with no resistance of its own; 100k and 68k alone (his divider without his
   buffer) and the low-value divider, the lab's own comparisons, and the loads; the note, C3, until
   the last step; the sequence; and his three sounds' settings, which he doesn't give: a slow LFO at
-  0.4 Hz with the intensity pot at 50k, through zero at 2 Hz with the offset pot a quarter of the
-  way up (no pulse over 20% of each cycle at C3), and the audio-rate oscillator, a triangle at 110
-  Hz.
+  0.4 Hz with the intensity pot at 50k, through zero at 2 Hz with the intensity up and the offset
+  pot a quarter of the way up (no pulse over 20% of each cycle at C3), and the audio-rate
+  oscillator, a triangle at 110 Hz.
 - [Lab] The site's group lists all four videos after part 4. The tip and the PWM video have their
   labs, and the module video and the kit's introduction stay listed without.
 

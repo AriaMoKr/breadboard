@@ -8,7 +8,7 @@ import { callout, injectStyle } from '../latches/_shared';
 import { defineLab } from '../types';
 import { D1N4148, ROOM, SCOPE_IN, TRI, TRI_BASIC, TRI_BUILT, TRI_SAW, VSAT12, diodePoint, noteHz, rampTop, sawToTriangle, thermalVoltage, type Pull, type TriSetup } from './_analog';
 import { diode, railDown } from './_draw';
-import { HEARING, fmtHz, schBox } from './_shared';
+import { HEARING, fmtHz, schBox, schBoxCss } from './_shared';
 import { Tone, harmonics } from './_sound';
 
 const SCOPE_CLASS = 'synth-triangle';
@@ -57,7 +57,7 @@ const stepText = (step: number) => (Math.abs(step) < 0.0005 ? 'none' : `${Math.a
 
 const CSS = `
 .${SCOPE_CLASS} .synth-circuit { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: flex-start; }
-.${SCOPE_CLASS} .synth-sch { flex: 1 1 440px; min-width: 0; }
+.${SCOPE_CLASS} .synth-sch { flex: 1 1 440px; }
 .${SCOPE_CLASS} .synth-kv { flex: 1 1 220px; }
 .${SCOPE_CLASS} .kv dd { font-variant-numeric: tabular-nums; }
 .${SCOPE_CLASS} .pot-slider { display: flex; width: 100%; }
@@ -114,7 +114,7 @@ export default defineLab({
     const d = new Disposer();
     const wrap = h('div', { class: SCOPE_CLASS });
     root.appendChild(wrap);
-    d.add(injectStyle(wrap, kitCss(SCOPE_CLASS) + CSS));
+    d.add(injectStyle(wrap, kitCss(SCOPE_CLASS) + schBoxCss(SCOPE_CLASS) + CSS));
 
     let step: Step = 1, listen = false;
     let buffer: Buffer = 'inverting', input: Input = 'saw', steady = 5;

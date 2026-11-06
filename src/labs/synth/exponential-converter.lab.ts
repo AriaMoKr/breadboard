@@ -7,7 +7,7 @@ import { callout, injectStyle } from '../latches/_shared';
 import { defineLab } from '../types';
 import { R_OUT, ROOM, SchmittCore, SinkCore, V12, VDIODE, baseVoltage, collectorCurrent, coreTimes, noteHz, sampleCore, sinkTimes, thermalVoltage, thresholds, wiper, type Feed } from './_analog';
 import { diode, jack, npnLeft, potDivider, schmitt } from './_draw';
-import { HEARING, fmtA, fmtCv, fmtHz, fmtT, fmtV, mV, pitchText, playsText, schBox } from './_shared';
+import { HEARING, fmtA, fmtCv, fmtHz, fmtT, fmtV, mV, pitchText, playsText, schBox, schBoxCss } from './_shared';
 import { Tone } from './_sound';
 
 const SCOPE_CLASS = 'synth-expo';
@@ -68,7 +68,7 @@ const currentFor = (hz: number) => C * (VP12 - VN12) * hz;
 
 const CSS = `
 .${SCOPE_CLASS} .synth-circuit { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: flex-start; }
-.${SCOPE_CLASS} .synth-sch { flex: 1 1 420px; min-width: 0; }
+.${SCOPE_CLASS} .synth-sch { flex: 1 1 420px; }
 .${SCOPE_CLASS} .synth-kv { flex: 1 1 220px; }
 .${SCOPE_CLASS} .schmitt-sign { stroke-width: 1.5; }
 .${SCOPE_CLASS} .kv dd { font-variant-numeric: tabular-nums; }
@@ -184,7 +184,7 @@ export default defineLab({
     const d = new Disposer();
     const wrap = h('div', { class: SCOPE_CLASS });
     root.appendChild(wrap);
-    d.add(injectStyle(wrap, kitCss(SCOPE_CLASS) + CSS));
+    d.add(injectStyle(wrap, kitCss(SCOPE_CLASS) + schBoxCss(SCOPE_CLASS) + CSS));
 
     let step: Step = 1, bigR = false, bigC = false, listen = false, running = true, finger = false;
     /** The sequencer's note, the time towards its next, and the transistor's temperature. */

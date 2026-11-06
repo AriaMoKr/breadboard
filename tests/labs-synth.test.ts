@@ -3,9 +3,9 @@ import { ANALOG_CHIPS, CHIPS, CHIP_IDS, chipDef } from '../src/breadboard/catalo
 import { validateLayout } from '../src/breadboard/layout';
 import {
   BC548C, CLAMP_IN, Coupling, D1N4148, FloatingInput, OUT_STAGES, PHONES, PWM, PWM_TAU, R_FOLLOW, R_OUT, Relaxation, SAW_AMP, SCOPE_IN, SQUARE_DIV, SQUARE_Z, SchmittCore, SinkCore, TRI,
-  TRI_BASIC, TRI_BUILT, TRI_SAW, TUNING, V12, VDIODE, VD_PULL, VN, VP, VSAT, VSAT12, amplify, baseVoltage, collectorCurrent, comparator, comparatorWidth, converter, coreTimes, coreWave,
-  coupled, coupledFromRest, coupledRamp, coupledSaw, cvShare, diodePoint, divide, follower, gainOf, ledCurrent, meet, mixer, noteHz, noteOf, offsetFeed, offsetFor, outStage, par,
-  pickupTau, pnpSaturationCurrent, potForPulse, pulse, pulseWidth, pwmBuilt, rampTop, relaxationPeriod, sampleCore, saturationCurrent, sawOut, sawToTriangle, sawTop, sawWave,
+  TRI_BASIC, TRI_BUILT, TRI_SAW, TUNING, V12, VDIODE, VD_PULL, VN, VP, VSAT, VSAT12, amplify, baseVoltage, collectorCurrent, comparator, comparatorPeriods, comparatorWidth, converter,
+  coreTimes, coreWave, coupled, coupledFromRest, coupledRamp, coupledSaw, crossesOnce, cvShare, diodePoint, divide, follower, gainOf, heldStill, ledCurrent, meet, mixer, noteHz, noteOf,
+  offsetFeed, offsetFor, outStage, outZ, par, periodAt, pickupTau, pnpSaturationCurrent, potForPulse, pulse, pulseWidth, pwmBuilt, rampTop, relaxationPeriod, sampleCore, saturationCurrent, sawOut, sawToTriangle, sawTop, sawWave,
   schmittOut, shaperIn, sinkTimes, squareOut, swingInto, thermalVoltage, thermistor, thresholdOf, thresholds, TL074_LOADED, tune, wiper, type Threshold,
 } from '../src/labs/synth/_analog';
 import { guideLayout, guideNets, type Setup } from '../src/labs/synth/_board';
@@ -1046,6 +1046,96 @@ describe('synth: voltage-controlled PWM', () => {
     expect(outStage(vc, 'low').current).toBeCloseTo(5.4607e-3, 7);
     expect(outStage(vc, 'low').toGround).toBeCloseTo(outStage(vc, 'low').current, 12);
     expect(outStage(vc, 'low').open).toBeCloseTo(3.713, 3);
+  });
+
+  it('the low-value divider’s jack: 449 Ω behind it, the comparator’s own 323 Ω behind the 1k; 0.4% lost into 100k, 4.3% into 10k', () => {
+    expect(outZ('low')).toBeCloseTo(par(1e3 + TL074_LOADED.r, 680), 9);
+    expect(outZ('low')).toBeCloseTo(449.1, 1);
+    // the high-value stages leave the comparator its full swing, and the buffer has its 1k
+    expect(outZ('divider')).toBe(outStage(VSAT12, 'divider').z);
+    expect(outZ('buffered')).toBe(1e3);
+    // against the level with nothing on the jack, the comparator's swing as the divider alone pulls it in
+    const open = outStage(swingInto(outStage(VSAT12, 'low').rIn), 'low').open;
+    const lost = (load: number) => 1 - outStage(swingInto(outStage(VSAT12, 'low', load).rIn), 'low', load).out / open;
+    for (const load of [1e6, 100e3, 33e3, 10e3]) expect(lost(load), String(load)).toBeCloseTo(outZ('low') / (load + outZ('low')), 9);
+    expect(lost(100e3)).toBeCloseTo(0.00447, 5);
+    expect(lost(10e3)).toBeCloseTo(0.043, 3);
+  });
+
+  it('a threshold slow enough crosses the sawtooth once a period: at C3 an LFO up to 69 Hz with the intensity up, 283 Hz at 250k', () => {
+    // the sawtooth's gentlest fall, at the end of each period: about 302 V/s at C3
+    const P = 1 / C3, { vp, vn } = thresholds(V12), jump = vp - vn, c = rampTop(P, PWM_TAU, jump) + (jump / P) * PWM_TAU;
+    const gentlest = (c / PWM_TAU) * Math.exp(-P / PWM_TAU);
+    expect(gentlest).toBeCloseTo(302.1, 1);
+    expect(crossesOnce(gentlest, C3)).toBe(true);
+    expect(crossesOnce(gentlest * 1.0001, C3)).toBe(false);
+    // the triangle's slope is 4 swings a cycle
+    const limit = (t: Threshold) => gentlest / (4 * PWM.lfo * cvShare(t));
+    expect(limit(pwmBuilt(0.5, 0))).toBeCloseTo(69.06, 2);
+    expect(limit(pwmBuilt(0.5, PWM.intensity))).toBeCloseTo(283.3, 1);
+  });
+
+  it('the LFO moving the threshold within each period: 24% to 77% at audio rate, and held still exact while it crosses once', () => {
+    const of = (t: Threshold) => ({ base: thresholdOf(t, 0), swing: PWM.lfo * cvShare(t) });
+    // audio rate, centred and turned up: 24% to 77% of each period, more than one pulse in 27% of them, none stuck
+    const audio = of(pwmBuilt(0.5, 0)), p = comparatorPeriods(audio.base, audio.swing, C3, 110);
+    expect(crossesOnce(4 * audio.swing * 110, C3)).toBe(false);
+    expect(p.lo).toBeCloseTo(0.2387, 4);
+    expect(p.hi).toBeCloseTo(0.7666, 4);
+    expect(p.more).toBeCloseTo(0.2666, 4);
+    expect([p.low, p.high]).toEqual([0, 0]);
+    // through zero at 110 Hz: every period keeps a pulse, though the threshold is past the sawtooth a fifth of the time
+    const zero = of(pwmBuilt(0.25, 0)), q = comparatorPeriods(zero.base, zero.swing, C3, 110);
+    expect(q.lo).toBeCloseTo(0.4225, 4);
+    expect(q.hi).toBeCloseTo(0.989, 3);
+    expect([q.low, q.high]).toEqual([0, 0]);
+    expect(heldStill(zero.base, zero.swing, C3).high).toBeCloseTo(0.2013, 4);
+    // below the criterion the count is held still's, at the edges of going through zero too: no stuck periods that aren't
+    for (const pos of [300, 540, 547, 600, 665, 672]) {
+      for (const intensity of [0, 50e3]) {
+        for (const rate of [0.5, 5, 36.3]) {
+          const { base, swing } = of(pwmBuilt(pos / 1200, intensity)), at = `${pos} ${intensity} ${rate}`;
+          expect(crossesOnce(4 * swing * rate, C3), at).toBe(true);
+          const a = comparatorPeriods(base, swing, C3, rate), b = heldStill(base, swing, C3);
+          for (const k of ['lo', 'hi', 'low', 'high', 'more'] as const) expect(a[k], `${at} ${k}`).toBeCloseTo(b[k], 6);
+        }
+      }
+    }
+    // held still at the edges: the pot at 547 of its 1200 places just keeps a pulse in every period, at 540 it doesn't
+    const edge = of(pwmBuilt(547 / 1200, 0)), held = heldStill(edge.base, edge.swing, C3);
+    expect([held.low, held.high]).toEqual([0, 0]);
+    expect(heldStill(of(pwmBuilt(540 / 1200, 0)).base, of(pwmBuilt(540 / 1200, 0)).swing, C3).high).toBeGreaterThan(0);
+  });
+
+  it('each period as a fine sampling of it has it: the time high, and how many pulses start in it', () => {
+    const { vp, vn } = thresholds(V12), jump = vp - vn;
+    for (const [turn, rate, hz] of [[0.5, 110, C3], [0.25, 110, C3], [0.4, 1000, C3], [0.6, 250, noteHz('G4')]]) {
+      const t = pwmBuilt(turn, 0), base = thresholdOf(t, 0), swing = PWM.lfo * cvShare(t), one = periodAt(base, swing, hz, rate);
+      const P = 1 / hz, s = jump / P, top = rampTop(P, PWM_TAU, jump), c = top + s * PWM_TAU, n = 50000;
+      for (let j = 0; j < 12; j++) {
+        const ph = (j + 0.37) / 12, r = one(ph);
+        // just before the period's jump, the sawtooth at its bottom
+        let on = 0, rises = 0, was = top - jump > base + swing * triangle(ph);
+        for (let i = 0; i < n; i++) {
+          const u = ((i + 0.5) / n) * P, is = c * Math.exp(-u / PWM_TAU) - s * PWM_TAU > base + swing * triangle(ph + rate * u);
+          if (is) on++;
+          if (is && !was) rises++;
+          was = is;
+        }
+        expect(r.width, `${turn} ${rate} ${ph}`).toBeCloseTo(on / n, 3);
+        expect(r.rises, `${turn} ${rate} ${ph}`).toBe(rises);
+      }
+    }
+  });
+
+  it('stuck periods as they start to appear, in less of the cycle than lies between the places it is sampled at', () => {
+    // at 90 Hz the offset pot at 401 of its 1200 places holds the output high in under a hundredth of a percent of the periods
+    const t = pwmBuilt(401 / 1200, 0), base = thresholdOf(t, 0), swing = PWM.lfo * cvShare(t);
+    const a = comparatorPeriods(base, swing, C3, 90), fine = comparatorPeriods(base, swing, C3, 90, 16384);
+    expect(a.high).toBeGreaterThan(0);
+    expect(a.high).toBeLessThan(1e-4);
+    expect(a.high).toBeCloseTo(fine.high, 8);
+    expect(a.low).toBe(0);
   });
 
   it('the voice: its curve gives the width less a half, and its LFO is a sine-phase triangle', () => {

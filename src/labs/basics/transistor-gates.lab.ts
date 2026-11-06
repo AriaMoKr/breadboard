@@ -25,6 +25,11 @@ const CSS = `
 .tg-lab .electron { fill: #60a5fa; }
 .tg-lab .hole { fill: none; stroke: #f87171; stroke-width: 1.5; }
 .tg-lab .fixed { fill: var(--fg-faint); font: 11px ui-monospace, monospace; text-anchor: middle; }
+/* the current's path and a transistor that is on, 3:1 or more on the light panel too */
+@media (prefers-color-scheme: light) {
+  .tg-lab .tg-wire.hot, .tg-lab .tg-res.hot { stroke: #b45309; }
+  .tg-lab .tg-npn.on, .tg-lab .tg-npn.on + .tg-npn-ring { stroke: #15803d; }
+}
 `;
 
 // ---------------------------------------------------------------------------

@@ -14,6 +14,7 @@
  */
 
 import { rng } from '../dclock/_analog';
+import { triangle } from './_sound';
 
 /** A 9 V battery. */
 export const VBAT = 9;
@@ -1008,6 +1009,201 @@ export function comparatorWidth(vth: number, hz: number, tau = PWM_TAU, vdd = V1
   return Math.min(1, (-tau * Math.log((vth + s * tau) / (top + s * tau))) / period);
 }
 
+/**
+ * Whether a threshold moving at no more than `slope` volts a second crosses the sawtooth at `hz` at
+ * most once a period, as it falls: while the sawtooth falls faster still at the end of each period,
+ * where it falls most slowly. Then each period has at most one pulse, from the jump to that
+ * crossing, and `heldStill`'s figures are exact for a moving threshold too.
+ */
+export function crossesOnce(slope: number, hz: number, tau = PWM_TAU, vdd = V12): boolean {
+  const { vp, vn } = thresholds(vdd);
+  const jump = vp - vn, period = 1 / hz, s = jump / period, top = rampTop(period, tau, jump);
+  return slope <= ((top + s * tau) / tau) * Math.exp(-period / tau);
+}
+
+/**
+ * What the comparator's output does over the cycles of an LFO on its threshold: `lo` and `hi`, the
+ * narrowest and widest a period's pulse gets (how much of the period it is high); `low` and `high`,
+ * how much of the time (the share of the periods) it has no pulse, stuck low or stuck high; `more`,
+ * how much of the time a period holds more than one pulse.
+ */
+export type Periods = { lo: number; hi: number; low: number; high: number; more: number };
+
+/**
+ * The same with the threshold, `base` plus `swing` volts of a triangle LFO, held still at each point
+ * of the LFO's cycle, as it all but is while the LFO is slow: `comparatorWidth` at its ends, and how
+ * long it spends past the sawtooth's top and bottom. Exact, and not only for a slow LFO, while
+ * `crossesOnce` holds.
+ */
+export function heldStill(base: number, swing: number, hz: number, tau = PWM_TAU, vdd = V12): Periods {
+  const { vp, vn } = thresholds(vdd);
+  const top = rampTop(1 / hz, tau, vp - vn), bottom = top - (vp - vn);
+  // a triangle spends as long at each level between its ends as at any other
+  const past = (by: number) => (swing > 0 ? Math.max(0, Math.min(1, by / (2 * swing))) : by > 0 ? 1 : 0);
+  return { lo: comparatorWidth(base + swing, hz, tau, vdd), hi: comparatorWidth(base - swing, hz, tau, vdd), low: past(base + swing - top), high: past(bottom - base + swing), more: 0 };
+}
+
+/**
+ * One period of the comparator's output, the sawtooth at `hz` against `base` plus `swing` volts of a
+ * triangle LFO at `rate` hertz, the LFO at `phase` of its cycle (`triangle`'s) at the period's jump:
+ * `width`, how much of the period the output is high; `rises`, how many pulses start in it (at the
+ * jump or later); `most` and `least`, the most and least the sawtooth gets above the threshold
+ * (the output stuck low for the period if `most` is 0 or less, stuck high if `least` is above 0).
+ */
+export type Period = { width: number; rises: number; most: number; least: number };
+
+/**
+ * `Period` exactly, for an LFO at `phase` (0 to 1): the period cut where the triangle turns and,
+ * where the threshold falls, where it starts to fall faster than the sawtooth, so that between the
+ * cuts the sawtooth less the threshold only rises or only falls, and crosses 0 at most once, found
+ * by regula falsi (Illinois).
+ */
+export function periodAt(base: number, swing: number, hz: number, rate: number, tau = PWM_TAU, vdd = V12): (phase: number) => Period {
+  const { vp, vn } = thresholds(vdd);
+  const jump = vp - vn, period = 1 / hz, s = jump / period, top = rampTop(period, tau, jump), bottom = top - jump, c = top + s * tau;
+  const steep = 4 * swing * rate, tol = period * 1e-10;
+  // where a threshold falling as steeply as the LFO's starts to fall faster than the sawtooth
+  const turn = steep > 0 ? -tau * Math.log((steep * tau) / c) : NaN;
+  /** The sawtooth, at the period's end its bottom, just before the next jump. */
+  const saw = (u: number) => (u >= period ? bottom : c * Math.exp(-u / tau) - s * tau);
+  return (phase) => {
+    let width = 0, rises = 0, most = -Infinity, least = Infinity;
+    /** From `a` to `b`, the threshold `tha` at `a` and moving `m` volts a second. */
+    const piece = (a: number, b: number, tha: number, m: number) => {
+      const f = (u: number) => saw(u) - tha - m * (u - a);
+      const fa = f(a), fb = f(b);
+      most = Math.max(most, fa, fb);
+      least = Math.min(least, fa, fb);
+      if (fa > 0 && fb > 0) width += b - a;
+      else if (fa > 0 || fb > 0) {
+        let lo = a, hi = b, flo = fa, fhi = fb, side = 0;
+        for (let k = 0; k < 60 && hi - lo > tol; k++) {
+          let x = (lo * fhi - hi * flo) / (fhi - flo);
+          if (!(x > lo && x < hi)) x = (lo + hi) / 2;
+          const fx = f(x);
+          if (fx > 0 === fa > 0) {
+            [lo, flo] = [x, fx];
+            if (side === 1) fhi /= 2;
+            side = 1;
+          } else {
+            [hi, fhi] = [x, fx];
+            if (side === -1) flo /= 2;
+            side = -1;
+          }
+        }
+        const x = (lo + hi) / 2;
+        if (fa > 0) width += x - a;
+        else {
+          width += b - x;
+          rises++;
+        }
+      }
+    };
+    const cuts = [0];
+    if (steep > 0) {
+      for (let k = Math.floor(2 * (phase - 0.25)) + 1; ; k++) {
+        const u = (0.25 + k / 2 - phase) / rate;
+        if (u >= period) break;
+        if (u > 0) cuts.push(u);
+      }
+    }
+    cuts.push(period);
+    for (let i = 0; i + 1 < cuts.length; i++) {
+      const a = cuts[i], b = cuts[i + 1], tha = base + swing * triangle(phase + rate * a);
+      // rising or falling: which half of the triangle the middle of the piece is in
+      const falling = steep > 0 && (((phase + rate * ((a + b) / 2) + 0.25) % 1) + 1) % 1 > 0.5;
+      const m = falling ? -steep : steep;
+      if (falling && turn > a && turn < b) {
+        piece(a, turn, tha, m);
+        piece(turn, b, tha + m * (turn - a), m);
+      } else piece(a, b, tha, m);
+    }
+    // the jump, if the output was low before it and is high after
+    const th0 = base + swing * triangle(phase);
+    if (bottom <= th0 && th0 < top) rises++;
+    return { width: width / period, rises, most, least };
+  };
+}
+
+/** Golden-section search for the least of `g` between `a` and `b`: where, and what. */
+function leastOf(g: (x: number) => number, a: number, b: number, steps = 30) {
+  const r = (Math.sqrt(5) - 1) / 2;
+  let c = b - r * (b - a), d = a + r * (b - a), gc = g(c), gd = g(d);
+  for (let k = 0; k < steps; k++) {
+    if (gc < gd) {
+      b = d;
+      d = c;
+      gd = gc;
+      c = b - r * (b - a);
+      gc = g(c);
+    } else {
+      a = c;
+      c = d;
+      gc = gd;
+      d = a + r * (b - a);
+      gd = g(d);
+    }
+  }
+  return gc < gd ? { x: c, y: gc } : { x: d, y: gd };
+}
+
+/**
+ * `Periods` with the LFO moving the threshold within each period (`periodAt`), the periods starting
+ * at every point of its cycle in turn, as they do unless the LFO and the note are locked together:
+ * from periods starting at `places` points of the cycle, the narrowest and widest sought out around
+ * the narrowest and widest of them, and each share's edges found by halving, between two that
+ * differ, and between two that don't where a margin dips towards 0 (`most` for stuck low, `least`
+ * for stuck high), for the stretch it may dip past 0 between them.
+ */
+export function comparatorPeriods(base: number, swing: number, hz: number, rate: number, places = 256, tau = PWM_TAU, vdd = V12): Periods {
+  const one = periodAt(base, swing, hz, rate, tau, vdd);
+  const at = (x: number) => one(x - Math.floor(x));
+  const res = Array.from({ length: places }, (_, k) => one(k / places));
+  const wrap = (k: number) => ((k % places) + places) % places;
+  const extreme = (sign: 1 | -1) => {
+    let k = 0;
+    for (let j = 1; j < places; j++) if (sign * res[j].width < sign * res[k].width) k = j;
+    return sign * Math.min(sign * res[k].width, leastOf((x) => sign * at(x).width, (k - 1) / places, (k + 1) / places).y);
+  };
+  /** How much of the cycle `inside` holds for; with a `margin`, below 0 (or at it) inside, also the narrow stretches between places. */
+  const share = (inside: (p: Period) => boolean, margin?: (p: Period) => number) => {
+    const g = margin ? res.map(margin) : [];
+    // a place where the margin is lowest, close enough to 0 that it may dip past it before the next
+    const dip = (k: number) => {
+      const i = wrap(k), p = g[wrap(i - 1)], n = g[wrap(i + 1)];
+      return g[i] <= p && g[i] <= n && g[i] < Math.max(p, n) - g[i];
+    };
+    /** Where `inside` changes between `a`, where it is `inA`, and `b`, where it isn't. */
+    const edge = (a: number, b: number, inA: boolean) => {
+      for (let k = 0; k < 24; k++) {
+        const m = (a + b) / 2;
+        if (inside(at(m)) === inA) a = m;
+        else b = m;
+      }
+      return (a + b) / 2;
+    };
+    let sum = 0;
+    for (let k = 0; k < places; k++) {
+      const a = k / places, b = (k + 1) / places, ia = inside(res[k]), ib = inside(res[wrap(k + 1)]);
+      if (ia && ib) sum += b - a;
+      else if (ia) sum += edge(a, b, true) - a;
+      else if (ib) sum += b - edge(a, b, false);
+      else if (margin && (dip(k) || dip(k + 1))) {
+        const m = leastOf((x) => margin(at(x)), a, b);
+        if (inside(at(m.x))) sum += edge(m.x, b, true) - edge(a, m.x, false);
+      }
+    }
+    return sum;
+  };
+  return {
+    lo: extreme(1),
+    hi: extreme(-1),
+    low: share((p) => p.most <= 0, (p) => p.most),
+    high: share((p) => p.least > 0, (p) => -p.least),
+    more: share((p) => p.rises > 1),
+  };
+}
+
 /** What follows the comparator to the jack: 100k with 68k to ground alone (his divider without his buffer), a divider a hundred times lower (the lab's own), or his, the 100k and 68k into a buffer and 1k after it. */
 export type OutStage = 'divider' | 'low' | 'buffered';
 export const OUT_STAGES: Record<OutStage, { top: number; bottom: number; buffer: boolean; r: number }> = {
@@ -1035,7 +1231,8 @@ export function outStage(v: number, stage: OutStage, load = Infinity) {
 /**
  * TI's typical curve of a TL07x's swing against its load (SLOS080W, figure 5-43, on ±15 V): 13.5 V
  * into 10k and about 12 V into 2k, as if it were a little short of the rail (`short`, 1.06 V) behind
- * a resistance (`r`, 323 Ω).
+ * a resistance (`r`, 323 Ω). A fit to those two points: close to the curve from about 1.5k up, as
+ * every load here is (the heaviest, the low-value divider into 10k, 1.64k), and short of it below.
  */
 export const TL074_LOADED = (() => {
   const r = (10e3 * 2e3 * (12 - 13.5)) / (13.5 * 2e3 - 12 * 10e3);
@@ -1048,6 +1245,16 @@ export const TL074_LOADED = (() => {
  * VSAT12 from about 8k up.
  */
 export const swingInto = (r: number) => Math.min(VSAT12, (V12 - TL074_LOADED.short) / (1 + TL074_LOADED.r / r));
+
+/**
+ * The jack's output impedance after `stage`, the comparator at a rail behind it: `outStage`'s `z`,
+ * and where the stage is a load heavy enough to pull the comparator's swing in (`swingInto`), the
+ * comparator's own resistance (`TL074_LOADED`'s) behind the divider's top as well.
+ */
+export function outZ(stage: OutStage): number {
+  const o = OUT_STAGES[stage], open = outStage(VSAT12, stage);
+  return o.buffer || swingInto(open.rIn) >= VSAT12 ? open.z : par(o.top + TL074_LOADED.r, o.bottom);
+}
 
 /** Part 4's square out's output impedance: its 20k with the 100k beside it (the 1 µF a short at audio pitches, the 40106 behind it). */
 export const SQUARE_Z = par(SQUARE_DIV.top, SQUARE_DIV.bottom);

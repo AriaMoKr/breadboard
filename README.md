@@ -215,23 +215,24 @@ MinGW-built Node in MSYS2's UCRT64 shell, so Vite 8 doesn't start there.
 
 `npm run check:browser` checks in headless Chrome what the unit tests can't see. It checks
 that every page renders without errors, that phones get no sideways scrolling, controls of at
-least 24 px and schematics that stop shrinking at 3/4 of their size in a box that scrolls, the
-sticky toolbar, parts drawer and tap-to-zoom, the shared computer, placing, moving, deleting and
-stepping in the sandbox with real clicks, taps and drags, sandbox links, the
-breadboard view's frame rate, and that the VR view builds the computer in 3D, runs it, works
-with a gamepad (a stand-in for `navigator.getGamepads`) and on a TV (`?tv=emulate`, with real key
-presses as the remote sends them, and through a door of the Hallway), and leads back to the
-Hallway when a door of it led there. It also runs Deque's
-[axe-core](https://github.com/dequelabs/axe-core) on every page and the VR view, in the dark and
-the light theme, on a desktop and at 320 px wide, with the rules of WCAG 2.2 AA and its best
-practices, and fails on anything it finds: text contrast, target sizes, names and roles,
-headings, landmarks, boxes that scroll but can't be reached by keys. In Chrome's accessibility
-tree it checks that a slider is named by its label and gives its value once, as it moves, and at
-320 px that Tab reaches a table's box that scrolls, with its focus ring, and the arrow keys
-scroll it. Under emulated high
-contrast (forced colours, as Windows' contrast themes) it checks that the LEDs, switches, toggles
-and lit signals still show their states, a scope keeps its dark screen, and the open tab and
-current page are marked, and at 320 px wide that no page scrolls sideways.
+least 24 px and schematics that stop shrinking at 3/4 of their size in a box that scrolls, at
+every step of a lab, with their focus ring showing, that on a touch tablet a schematic beside
+its readouts lets them wrap below rather than scroll, the sticky toolbar, parts drawer and
+tap-to-zoom, the shared computer, placing, moving, deleting and stepping in the sandbox with
+real clicks, taps and drags, sandbox links, the breadboard view's frame rate, and that the VR
+view builds the computer in 3D, runs it, works with a gamepad (a stand-in for
+`navigator.getGamepads`) and on a TV (`?tv=emulate`, with real key presses as the remote sends
+them, and through a door of the Hallway), and leads back to the Hallway when a door of it led
+there. It also runs Deque's [axe-core](https://github.com/dequelabs/axe-core) on every page and
+the VR view, in the dark and the light theme, on a desktop and at 320 px wide, with the rules of
+WCAG 2.2 AA and its best practices, and fails on anything it finds: text contrast, target sizes,
+names and roles, headings, landmarks, boxes that scroll but can't be reached by keys. In Chrome's
+accessibility tree it checks that a slider is named by its label and gives its value once, as it
+moves, and at 320 px that Tab reaches a table's box that scrolls, with its focus ring, and the
+arrow keys scroll it. Under emulated high contrast (forced colours, as Windows' contrast themes)
+it checks that the LEDs, switches, toggles and lit signals still show their states, a scope
+keeps its dark screen, and the open tab and current page are marked, and at 320 px wide that no
+page scrolls sideways.
 `npm run check:browser -- --dist`
 checks the built site instead (run `npm run build` first), plus the download link, install and
 offline use, and `-- --url <address>` checks a deployed copy the same way (such as

@@ -48,12 +48,14 @@ const MO_CSS = `
 .mo-lab .scope-cursor { position: absolute; top: 6px; bottom: 6px; width: 2px; background: var(--accent-2); opacity: 0.85; pointer-events: none; }
 @media (prefers-color-scheme: light) {
   .mo-lab .schematic .sch-text.val { fill: #b45309; }
-  .mo-lab .mo-bus.active { stroke: #d97706; }
+  .mo-lab .mo-bus.active { stroke: #b45309; }
   .mo-lab .mo-steps li.done, .mo-lab .mo-badge.ok { color: #15803d; }
   .mo-lab .mo-badge.warn { color: #b45309; }
   .mo-lab .mo-badge.bad { color: #b91c1c; }
   .mo-lab .truth-table td.on { color: #c81e1e; }
 }
+/* in high contrast the scope keeps its own screen (styles.css), and its cursor with it */
+@media (forced-colors: active) { .mo-lab .scope-cursor { forced-color-adjust: none; } }
 `;
 
 /** Inject the group CSS (and optional lab CSS) into `root`. Returns a remover. */
